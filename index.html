@@ -91,9 +91,11 @@
 <!-- ============ 暂停 ============ -->
 <div id="pauseOverlay" class="overlay hidden">
   <h2>已暂停</h2>
-  <div class="hint">按 P / Esc 继续战斗</div>
+  <div id="pauseBuild" class="own-row small"></div>
+  <div id="pauseRunStats" class="run-stats"></div>
   <div class="menu-btns">
     <button id="btnResume" class="menu-btn primary">▸ 继续战斗 <i>P</i></button>
+    <button id="btnRestart2" class="menu-btn">▸ 重新开始 <i>R</i></button>
     <button id="btnQuit" class="menu-btn danger">▸ 回到主菜单</button>
   </div>
 </div>
@@ -115,8 +117,10 @@
     <div class="stat"><span>抵达波次</span><b id="finalWave">1</b></div>
     <div class="stat"><span>最高纪录</span><b id="finalHi">0</b></div>
   </div>
+  <div id="overRunStats" class="run-stats"></div>
+  <div id="overBuild" class="own-row small"></div>
   <div class="menu-btns">
-    <button id="btnRestart" class="menu-btn primary">▸ 再来一局 <i>Enter</i></button>
+    <button id="btnRestart" class="menu-btn primary">▸ 再来一局 <i>Enter/R</i></button>
     <button id="btnOverMenu" class="menu-btn">▸ 回到主菜单 <i>Esc</i></button>
   </div>
 </div>

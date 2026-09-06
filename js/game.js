@@ -35,6 +35,10 @@ class Game {
       finalWave: document.getElementById('finalWave'),
       finalHi: document.getElementById('finalHi'),
       newRecord: document.getElementById('newRecord'),
+      overRunStats: document.getElementById('overRunStats'),
+      overBuild: document.getElementById('overBuild'),
+      pauseBuild: document.getElementById('pauseBuild'),
+      pauseRunStats: document.getElementById('pauseRunStats'),
       stHi: document.getElementById('stHi'),
       stWave: document.getElementById('stWave'),
       stGames: document.getElementById('stGames'),
@@ -113,6 +117,7 @@ class Game {
     this.score = 0; this.combo = 0; this.comboT = 0;
     this.wave = 0; this.waveTime = 0; this.spawnQueue = [];
     this.waveQuota = 0; this.waveKills = 0; this.trickleT = 0;
+    this.maxCombo = 0;
     this.banner = null; this.waveClearT = -1;
     this.deathT = -1; this.newRecord = false;
     // 肉鸽成长状态
@@ -165,9 +170,13 @@ class Game {
   }
 
   togglePause() {
-    if (this.state === 'playing') this.state = 'paused';
-    else if (this.state === 'paused') this.state = 'playing';
-    else return;
+    if (this.state === 'playing') {
+      this.state = 'paused';
+      this._dom.pauseBuild.innerHTML = this._buildSummaryHTML();
+      this._dom.pauseRunStats.textContent = this._runStatsText();
+    } else if (this.state === 'paused') {
+      this.state = 'playing';
+    } else return;
     if (AudioSys.musicGain) AudioSys.musicGain.gain.value = this.state === 'paused' ? 0.1 : 0.3;
     this._showState();
   }
@@ -708,6 +717,7 @@ class Game {
   killEnemy(e) {
     this.combo++;
     this.comboT = this.comboWindow;
+    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
     this.stats.kills = this._stat('kills', 0) + 1;
     this.waveKills++;
     this.runKills++;
@@ -1032,6 +1042,15 @@ class Game {
       ctx.fillStyle = this.flashColor + (clamp(this.flashT / 0.4, 0, 1) * 0.4).toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
     }
+    // 濒死警示:最后一丝生命时屏幕边缘红色脉动
+    if (this.state === 'playing' && this.player.alive && this.player.lives === 1) {
+      const a = 0.10 + 0.07 * Math.sin(performance.now() / 250);
+      const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.34, W / 2, H / 2, H * 0.72);
+      g.addColorStop(0, 'rgba(255,40,70,0)');
+      g.addColorStop(1, 'rgba(255,40,70,' + a.toFixed(3) + ')');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
 
     if (this.state !== 'menu') this._drawHud(ctx);
   }
@@ -1185,6 +1204,23 @@ class Game {
     }
   }
 
+  /* 本局构筑摘要(暂停/结算共用) */
+  _buildSummaryHTML() {
+    let html = '';
+    for (const u of UPGRADES) {
+      const c = this.mods[u.id] || 0;
+      if (c > 0) html += '<span class="chip"><i>' + u.icon + '</i>' + u.name + (u.max > 1 ? ' ×' + c : '') + '</span>';
+    }
+    for (const b of BONDS) {
+      if (this.bonds.includes(b.id)) html += '<span class="chip bond">羁绊·' + b.name + '</span>';
+    }
+    if (!html) html = '<span class="chip">本局尚未获得强化</span>';
+    return html;
+  }
+  _runStatsText() {
+    return '击坠 ' + this.runKills + ' · 精英 ' + this.runEliteKills + ' · 等级 ' + this.level + ' · 最高连击 ' + this.maxCombo;
+  }
+
   _gameover() {
     this.state = 'gameover';
     AudioSys.gameover();
@@ -1216,6 +1252,8 @@ class Game {
     d.finalWave.textContent = this.wave;
     d.finalHi.textContent = this.daily ? this._dailyBest() : this.hi;
     this._refreshMenuHi();
+    d.overRunStats.textContent = this._runStatsText();
+    d.overBuild.innerHTML = this._buildSummaryHTML();
     d.newRecord.classList.toggle('hidden', !this.newRecord);
     this._showState();
   }

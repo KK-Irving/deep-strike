@@ -157,6 +157,12 @@ h2 {
   display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
   max-width: 470px; margin-top: 14px;
 }
+.own-row.small { max-width: 430px; margin-top: 10px; }
+.own-row.small .chip { font-size: 10.5px; padding: 2px 8px; }
+.run-stats {
+  margin-top: 10px; font-size: 12px; letter-spacing: 1px;
+  color: rgba(159, 232, 255, 0.65); font-family: Consolas, monospace;
+}
 .chip {
   font-size: 11px; padding: 3px 9px; letter-spacing: 1px;
   color: rgba(207, 232, 255, 0.85);

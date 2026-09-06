@@ -42,6 +42,8 @@
     if (e.code === 'KeyM') AudioSys.toggleMute();
     if (e.code === 'KeyF') game.autoFire = !game.autoFire;
     if (e.code === 'KeyP' || e.code === 'Escape') game.togglePause();
+    // R 快速重开(暂停或结算时)
+    if (e.code === 'KeyR' && (game.state === 'paused' || game.state === 'gameover')) game.start(game.daily);
     // 升级选卡快捷键
     if (game.state === 'levelup') {
       if (e.code === 'Digit1' || e.code === 'Numpad1') game.chooseCard(0);
@@ -77,6 +79,7 @@
   $('btnDaily').addEventListener('click', () => { AudioSys.init(); game.start(true); });
   $('btnRestart').addEventListener('click', () => { AudioSys.init(); game.start(); });
   $('btnResume').addEventListener('click', () => game.togglePause());
+  $('btnRestart2').addEventListener('click', () => { AudioSys.init(); game.start(game.daily); });
   $('btnHelp').addEventListener('click', () => game.showMenuPanel('help'));
   $('btnStats').addEventListener('click', () => game.showMenuPanel('stats'));
   $('btnHelpBack').addEventListener('click', () => game.showMenuPanel('main'));
