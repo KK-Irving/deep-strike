@@ -103,26 +103,29 @@ function initSprites() {
       g.beginPath(); g.arc(0, -4, 2.6, 0, TAU); g.fill();
     })
   };
-  // BOSS 舰体(旋转外环与核心动态绘制)
-  SPRITES.boss = {
-    half: 84,
-    body: makeSprite(84, (g) => {
-      g.shadowColor = '#ff3355'; g.shadowBlur = 22;
-      g.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = i / 6 * TAU + Math.PI / 6;
-        const px = Math.cos(a) * 44, py = Math.sin(a) * 44;
-        i ? g.lineTo(px, py) : g.moveTo(px, py);
-      }
-      g.closePath();
-      g.fillStyle = '#3a1220'; g.fill();
-      g.lineWidth = 3; g.strokeStyle = '#ff5577'; g.stroke();
-      g.shadowBlur = 0;
-      g.fillStyle = '#55182b';
-      g.fillRect(-54, -8, 14, 26);
-      g.fillRect(40, -8, 14, 26);
-    })
-  };
+  // BOSS 舰体(旋转外环与核心动态绘制,双变体配色)
+  SPRITES.boss = {};
+  for (const [vname, vcfg] of Object.entries(BOSS_VARIANTS)) {
+    SPRITES.boss[vname] = {
+      half: 84,
+      body: makeSprite(84, (g) => {
+        g.shadowColor = vcfg.glow; g.shadowBlur = 22;
+        g.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = i / 6 * TAU + Math.PI / 6;
+          const px = Math.cos(a) * 44, py = Math.sin(a) * 44;
+          i ? g.lineTo(px, py) : g.moveTo(px, py);
+        }
+        g.closePath();
+        g.fillStyle = vcfg.hull; g.fill();
+        g.lineWidth = 3; g.strokeStyle = vcfg.color; g.stroke();
+        g.shadowBlur = 0;
+        g.fillStyle = vcfg.turret;
+        g.fillRect(-54, -8, 14, 26);
+        g.fillRect(40, -8, 14, 26);
+      })
+    };
+  }
   // 道具盒
   for (const [type, cfg] of Object.entries(PowerUp.CFG)) {
     SPRITES.power[type] = {
@@ -578,21 +581,30 @@ class Enemy {
 }
 
 /* ============================================================
- * BOSS 旗舰:三阶段弹幕
+ * BOSS 旗舰:三阶段弹幕;第 10/20/30…波出现「暴风」变体
  * ============================================================ */
+const BOSS_VARIANTS = {
+  flag:  { name: '敌方旗舰', color: '#ff5577', glow: '#ff3355', hull: '#3a1220', turret: '#55182b', core: '#ff2b4e' },
+  storm: { name: '暴风旗舰', color: '#3fe8c8', glow: '#17bfa0', hull: '#12424e', turret: '#1d5f70', core: '#2be8c8' }
+};
+const bossVariant = (wave) => (wave >= 10 && Math.floor(wave / 5) % 2 === 0 ? 'storm' : 'flag');
+
 class Boss {
   constructor(wave) {
     this.wave = wave;
+    this.variant = bossVariant(wave);
+    const storm = this.variant === 'storm';
     this.x = W / 2; this.y = -90;
     this.r = 44;
-    this.maxHp = this.hp = 150 + wave * 45;
+    this.maxHp = this.hp = (150 + wave * 45) * (storm ? 1.3 : 1);
     this.t = 0; this.flash = 0; this.dead = false;
     this.state = 'enter';
     this.dir = 1;
     this.fireCd = 1.2;
-    this.score = 2500 + wave * 250;
-    this.escortCd = 4;
+    this.score = (2500 + wave * 250) * (storm ? 1.25 : 1);
+    this.escortCd = storm ? 4.5 : 6;
     this.phase = 0;
+    this.burstCycle = 0;
   }
 
   update(dt, game) {
@@ -603,7 +615,8 @@ class Boss {
       if (this.y >= 115) this.state = 'fight';
       return;
     }
-    this.x += this.dir * (36 + this.wave * 1.5) * dt;
+    const storm = this.variant === 'storm';
+    this.x += this.dir * (36 + this.wave * 1.5) * (storm ? 1.35 : 1) * dt;
     if (this.x < 70) { this.x = 70; this.dir = 1; }
     if (this.x > W - 70) { this.x = W - 70; this.dir = -1; }
     const frac = this.hp / this.maxHp;
@@ -612,7 +625,7 @@ class Boss {
     if (this.fireCd <= 0) this._attack(game);
     this.escortCd -= dt;
     if (this.phase >= 1 && this.escortCd <= 0) {
-      this.escortCd = 6;
+      this.escortCd = storm ? 5 : 6;
       game.enemies.push(new Enemy('drone', clamp(this.x - 60, 40, W - 40), game.wave));
       game.enemies.push(new Enemy('drone', clamp(this.x + 60, 40, W - 40), game.wave));
     }
@@ -620,6 +633,35 @@ class Boss {
 
   _attack(game) {
     const x = this.x, y = this.y + 26;
+    if (this.variant === 'storm') {
+      if (this.phase === 0) {
+        // 高速窄角狙击三连
+        const a = game.aimedAngle(x, y);
+        for (let i = -1; i <= 1; i++)
+          game.enemyShot(x, y, a + i * 0.1, 240 + this.wave * 4, 'orange');
+        this.fireCd = 0.8;
+      } else if (this.phase === 1) {
+        // 双臂旋转螺旋
+        const n = 2, a0 = this.t * 3.6;
+        for (let i = 0; i < n; i++)
+          game.enemyShot(x, y, a0 + i * Math.PI, 165);
+        this.fireCd = 0.13;
+      } else {
+        // 四臂螺旋 + 周期性瞄准齐射
+        const a = this.t * 4.2;
+        for (let i = 0; i < 4; i++)
+          game.enemyShot(x, y, a + i * Math.PI / 2, 150);
+        this.burstCycle++;
+        if (this.burstCycle % 9 === 0) {
+          const aim = game.aimedAngle(x, y);
+          for (let i = -1; i <= 1; i++)
+            game.enemyShot(x, y, aim + i * 0.16, 220 + this.wave * 3);
+        }
+        this.fireCd = 0.18;
+      }
+      AudioSys.enemyShoot();
+      return;
+    }
     if (this.phase === 0) {
       const a = game.aimedAngle(x, y);
       for (let i = -1; i <= 1; i++)
@@ -653,12 +695,14 @@ class Boss {
   }
 
   draw(ctx) {
+    const cfg = BOSS_VARIANTS[this.variant];
     ctx.save();
     ctx.translate(this.x, this.y);
     // 旋转外环
     ctx.save();
     ctx.rotate(this.t * 0.7);
-    ctx.strokeStyle = 'rgba(255,85,119,0.45)';
+    ctx.strokeStyle = cfg.color;
+    ctx.globalAlpha = 0.45;
     ctx.lineWidth = 3;
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
@@ -668,12 +712,13 @@ class Boss {
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
-    // 舰体(预渲染精灵)
-    const spr = SPRITES.boss;
-    ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
+    // 舰体(按变体取预渲染精灵)
+    const spr = (this.variant === 'storm' ? SPRITES.boss.storm : SPRITES.boss.flag).body;
+    ctx.globalAlpha = 1;
+    ctx.drawImage(spr, -SPRITES.boss[this.variant].half, -SPRITES.boss[this.variant].half, SPRITES.boss[this.variant].half * 2, SPRITES.boss[this.variant].half * 2);
     // 核心
     const pr = 11 + Math.sin(this.t * 5) * 3;
-    ctx.fillStyle = this.flash > 0 ? '#ffffff' : '#ff2b4e';
+    ctx.fillStyle = this.flash > 0 ? '#ffffff' : cfg.core;
     ctx.beginPath();
     ctx.arc(0, 0, pr, 0, TAU);
     ctx.fill();

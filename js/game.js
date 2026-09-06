@@ -258,7 +258,8 @@ class Game {
     this.waveKills = 0; this.trickleT = 0;
     if (n % 5 === 0) {
       this.waveQuota = 1; // 目标:击毁旗舰
-      this.banner = { text: '⚠ WARNING ⚠', sub: '目标:击毁敌方旗舰', life: 2.2, max: 2.2, red: true };
+      const bname = BOSS_VARIANTS[bossVariant(n)].name;
+      this.banner = { text: '⚠ WARNING ⚠', sub: '目标:击毁' + bname, life: 2.2, max: 2.2, red: true };
       AudioSys.alarm();
       this.spawnQueue.push({ boss: true, t: 2.0 });
       return;
