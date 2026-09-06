@@ -43,7 +43,7 @@
     if (e.code === 'KeyF') game.autoFire = !game.autoFire;
     if (e.code === 'KeyP' || e.code === 'Escape') game.togglePause();
     // R 快速重开(暂停或结算时)
-    if (e.code === 'KeyR' && (game.state === 'paused' || game.state === 'gameover')) game.start(game.daily);
+    if (e.code === 'KeyR' && (game.state === 'paused' || game.state === 'gameover')) game.start(game.mode);
     // 升级选卡快捷键(遗物模式下选择遗物;满槽替换模式下选择要丢弃的模块)
     if (game.state === 'levelup') {
       if (game._relicMode) {
@@ -66,7 +66,8 @@
     }
     if (game.state === 'menu') {
       if (e.code === 'Enter') game.start();
-      if (e.code === 'KeyD') game.start(true);
+      if (e.code === 'KeyD') game.start('daily');
+      if (e.code === 'KeyW') game.start('weekly');
       if (e.code === 'KeyG') game.showMenuPanel('shop');
       if (e.code === 'KeyH') game.showMenuPanel('help');
       if (e.code === 'KeyT') game.showMenuPanel('stats');
@@ -90,10 +91,11 @@
   // 按钮
   const $ = (id) => document.getElementById(id);
   $('btnStart').addEventListener('click', () => { AudioSys.init(); game.start(); });
-  $('btnDaily').addEventListener('click', () => { AudioSys.init(); game.start(true); });
+  $('btnDaily').addEventListener('click', () => { AudioSys.init(); game.start('daily'); });
+  $('btnWeekly').addEventListener('click', () => { AudioSys.init(); game.start('weekly'); });
   $('btnRestart').addEventListener('click', () => { AudioSys.init(); game.start(); });
   $('btnResume').addEventListener('click', () => game.togglePause());
-  $('btnRestart2').addEventListener('click', () => { AudioSys.init(); game.start(game.daily); });
+  $('btnRestart2').addEventListener('click', () => { AudioSys.init(); game.start(game.mode); });
   $('btnShop').addEventListener('click', () => game.showMenuPanel('shop'));
   $('btnShopBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnHelp').addEventListener('click', () => game.showMenuPanel('help'));

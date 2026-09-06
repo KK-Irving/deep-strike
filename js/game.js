@@ -35,7 +35,7 @@ class Game {
     this.keys = { left: false, right: false, up: false, down: false, fire: false, slow: false };
     this.touch = { active: false, x: 0, y: 0 };
     this.autoFire = true; // F 键可切换
-    this.daily = false;   // 每日挑战模式
+    this.mode = 'normal'; // normal | daily | weekly
     this.bg = createBackground();
     this.stars = new Starfield();
     this.player = new Player();
@@ -172,10 +172,10 @@ class Game {
     this._recalc();
   }
 
-  start(dailyMode) {
-    this.daily = !!dailyMode;
-    // 每日挑战:按日期播种,全天同一波次序列与抽卡序列
-    RNG = this.daily ? mulberry32(this._dailySeed()) : Math.random;
+  start(challengeMode) {
+    this.mode = challengeMode || 'normal';
+    // 每日/周挑战:播种固定波次序列与抽卡序列;周挑战威胁+1
+    RNG = this.mode === 'normal' ? Math.random : mulberry32(this._challengeSeed());
     this._reset();
     this.state = 'playing';
     AudioSys.init();
@@ -187,7 +187,8 @@ class Game {
     if (bo.shield) this.player.shield = true;
     this._showState();
     this.startWave(1);
-    if (this.daily) this.banner = { text: '每日挑战', sub: this._dailyKey() + ' · 固定关卡,冲击纪录', life: 2.4, max: 2.4, gold: true };
+    if (this.mode === 'daily') this.banner = { text: '每日挑战', sub: this._challengeKey() + ' · 固定关卡,冲击纪录', life: 2.4, max: 2.4, gold: true };
+    if (this.mode === 'weekly') this.banner = { text: '周挑战', sub: this._challengeKey() + ' · 威胁+1,词缀更凶,冲击纪录', life: 2.4, max: 2.4, gold: true };
   }
 
   /* ---- 每日挑战 ---- */
@@ -195,22 +196,39 @@ class Game {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
-  _dailySeed() {
-    const k = this._dailyKey();
+  _weekKey() {
+    const d = new Date();
+    const start = new Date(d.getFullYear(), 0, 1);
+    const week = Math.ceil((((d - start) / 86400000) + start.getDay() + 1) / 7);
+    return d.getFullYear() + '-W' + String(week).padStart(2, '0');
+  }
+  _challengeKey() {
+    return this.mode === 'weekly' ? this._weekKey() : this._dailyKey();
+  }
+  _challengeSeed() {
+    const k = this._challengeKey();
     let h = 2166136261;
     for (let i = 0; i < k.length; i++) { h ^= k.charCodeAt(i); h = Math.imul(h, 16777619); }
     return h >>> 0;
   }
-  _dailyBest() {
-    try { return +localStorage.getItem('deepstrike.dailyHi.' + this._dailyKey()) || 0; }
+  _challengePrefix() {
+    return this.mode === 'weekly' ? 'deepstrike.weeklyHi.' : 'deepstrike.dailyHi.';
+  }
+  _challengeBest() {
+    try { return +localStorage.getItem(this._challengePrefix() + this._challengeKey()) || 0; }
     catch (e) { return 0; }
   }
-  _saveDailyBest(score) {
-    try { localStorage.setItem('deepstrike.dailyHi.' + this._dailyKey(), String(score)); }
+  _saveChallengeBest(score) {
+    try { localStorage.setItem(this._challengePrefix() + this._challengeKey(), String(score)); }
     catch (e) { /* 忽略 */ }
   }
   _refreshMenuHi() {
-    this._dom.menuHi.textContent = '最高纪录 ' + this.hi + ' · 每日挑战 ' + this._dailyBest();
+    this._dom.menuHi.textContent = '最高纪录 ' + this.hi + ' · 每日 ' + this._modeBest('daily') + ' · 周挑战 ' + this._modeBest('weekly');
+  }
+  _modeBest(mode) {
+    const key = (mode === 'weekly' ? 'deepstrike.weeklyHi.' : 'deepstrike.dailyHi.') + (mode === 'weekly' ? this._weekKey() : this._dailyKey());
+    try { return +localStorage.getItem(key) || 0; }
+    catch (e) { return 0; }
   }
 
   togglePause() {
@@ -249,8 +267,11 @@ class Game {
   /* 弹速增长封顶波数:防止后期弹速无限膨胀 */
   effWave() { return Math.min(this.wave, 18); }
 
-  /* 无尽模式威胁等级:第 15 波起每 5 波 +1 */
-  threatLevel() { return Math.floor(Math.max(0, this.wave - 10) / 5); }
+  /* 无尽模式威胁等级:第 15 波起每 5 波 +1;周挑战全程 +1 */
+  threatLevel() {
+    const base = Math.floor(Math.max(0, this.wave - 10) / 5);
+    return base + (this.mode === 'weekly' ? 1 : 0);
+  }
 
   /* ---------------- 肉鸽升级系统 ---------------- */
   _recalc() {
@@ -626,7 +647,7 @@ class Game {
     const threat = this.threatLevel();
     // 波次词缀:第 6 波起 40% 概率(BOSS 波除外)
     this.waveMod = null;
-    if (n >= 6 && n % 5 !== 0 && RNG() < 0.4) {
+    if (n >= 6 && n % 5 !== 0 && RNG() < (this.mode === 'weekly' ? 0.7 : 0.4)) {
       this.waveMod = WAVE_MODS[irand(0, WAVE_MODS.length - 1)];
     }
     // 环境参数:威胁与词缀共同作用于本波敌机
@@ -1495,18 +1516,19 @@ class Game {
       ctx.font = '12px sans-serif';
       ctx.fillText('♪ OFF', W - 14, 38);
     }
-    // 每日挑战标识
-    if (this.daily) {
+    // 挑战模式标识
+    if (this.mode !== 'normal') {
+      const tagName = this.mode === 'weekly' ? '周挑战' : '每日挑战';
       ctx.fillStyle = '#ffd166';
       ctx.font = 'bold 11px Consolas, monospace';
-      ctx.fillText('每日挑战 · 纪录 ' + this._dailyBest(), W - 14, 54);
+      ctx.fillText(tagName + ' · 纪录 ' + this._challengeBest(), W - 14, 54);
     }
     // 无尽模式:威胁等级与波次词缀
     const threat = this.threatLevel();
     if (threat > 0) {
       ctx.fillStyle = 'rgba(255,120,140,0.9)';
       ctx.font = 'bold 11px Consolas, monospace';
-      ctx.fillText('⚡ 威胁等级 ' + threat, W - 14, this.daily ? 68 : 54);
+      ctx.fillText('⚡ 威胁等级 ' + threat, W - 14, this.mode !== 'normal' ? 68 : 54);
     }
     if (this.waveMod) {
       ctx.fillStyle = '#ffd166';
@@ -1670,13 +1692,13 @@ class Game {
   _gameover() {
     this.state = 'gameover';
     AudioSys.gameover();
-    if (this.daily && this.score >= 5000) Ach.unlock('daily_5000', this);
-    if (this.daily) {
-      // 每日挑战:独立当日纪录
-      const best = this._dailyBest();
+    if (this.mode === 'daily' && this.score >= 5000) Ach.unlock('daily_5000', this);
+    if (this.mode !== 'normal') {
+      // 挑战模式:独立纪录
+      const best = this._challengeBest();
       if (this.score > best) {
         this.newRecord = true;
-        this._saveDailyBest(this.score);
+        this._saveChallengeBest(this.score);
         AudioSys.record();
       }
     } else if (this.score > this.hi) {
@@ -1697,7 +1719,7 @@ class Game {
     const d = this._dom;
     d.finalScore.textContent = this.score;
     d.finalWave.textContent = this.wave;
-    d.finalHi.textContent = this.daily ? this._dailyBest() : this.hi;
+    d.finalHi.textContent = this.mode !== 'normal' ? this._challengeBest() : this.hi;
     this._refreshMenuHi();
     // 星晶结算:得分/1000 + 旗舰 10 + 精英 2
     Shop.lastEarn = Math.floor(this.score / 1000) + (this.runBossKills || 0) * 10 + (this.runEliteKills || 0) * 2;

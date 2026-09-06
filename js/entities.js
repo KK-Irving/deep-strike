@@ -356,12 +356,15 @@ class Player {
         game.floats.push(new FloatText(this.x, this.y - 24, '护盾充能完毕', '#4db8ff', 12));
       }
     }
-    if (Math.random() < 0.6)
+    if (Math.random() < 0.6) {
+      // 尾焰粒子随皮肤配色
+      const accent = (typeof Shop !== 'undefined') ? Shop.accent() : '#39d7ff';
       game._addParticle(new Particle(
         this.x + rand(-2.5, 2.5), this.y + 13,
         rand(-14, 14), rand(90, 160),
         rand(0.12, 0.28), rand(1.2, 2.4),
-        Math.random() < 0.7 ? '#39d7ff' : '#bff7ff'));
+        Math.random() < 0.7 ? accent : '#bff7ff'));
+    }
   }
   _fire(game) {
     const P = game.playerBullets;
