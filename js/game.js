@@ -20,18 +20,26 @@ class Game {
     this.flashT = 0; this.flashColor = 'rgba(255,255,255,';
     this.bombActive = false; this.bombT = 0;
     this._reset();
+    this.menuPanel = 'main';       // 主菜单子页面: main | help | stats
+    this.stats = this._loadStats();
     this._dom = {
       menu: document.getElementById('menuOverlay'),
       pause: document.getElementById('pauseOverlay'),
       over: document.getElementById('overOverlay'),
-      btnStart: document.getElementById('btnStart'),
-      btnResume: document.getElementById('btnResume'),
-      btnRestart: document.getElementById('btnRestart'),
+      menuMain: document.getElementById('menuMain'),
+      menuHelp: document.getElementById('menuHelp'),
+      menuStats: document.getElementById('menuStats'),
       menuHi: document.getElementById('menuHi'),
       finalScore: document.getElementById('finalScore'),
       finalWave: document.getElementById('finalWave'),
       finalHi: document.getElementById('finalHi'),
-      newRecord: document.getElementById('newRecord')
+      newRecord: document.getElementById('newRecord'),
+      stHi: document.getElementById('stHi'),
+      stWave: document.getElementById('stWave'),
+      stGames: document.getElementById('stGames'),
+      stKills: document.getElementById('stKills'),
+      stScore: document.getElementById('stScore'),
+      stBoss: document.getElementById('stBoss')
     };
     this._dom.menuHi.textContent = '最高纪录 ' + this.hi;
     this._showState();
@@ -39,6 +47,43 @@ class Game {
 
   _loadHi() { try { return +localStorage.getItem('deepstrike.hi') || 0; } catch (e) { return 0; } }
   _saveHi() { try { localStorage.setItem('deepstrike.hi', String(this.hi)); } catch (e) { /* 忽略 */ } }
+
+  /* ---- 战绩档案(累计统计) ---- */
+  _loadStats() {
+    try { return JSON.parse(localStorage.getItem('deepstrike.stats')) || {}; }
+    catch (e) { return {}; }
+  }
+  _stat(key, def) { return typeof this.stats[key] === 'number' ? this.stats[key] : def; }
+  saveStats() {
+    try { localStorage.setItem('deepstrike.stats', JSON.stringify(this.stats)); } catch (e) { /* 忽略 */ }
+  }
+  _refreshStatsPanel() {
+    const d = this._dom;
+    d.stHi.textContent = this.hi;
+    d.stWave.textContent = this._stat('bestWave', 0);
+    d.stGames.textContent = this._stat('games', 0);
+    d.stKills.textContent = this._stat('kills', 0);
+    d.stScore.textContent = this._stat('totalScore', 0);
+    d.stBoss.textContent = this._stat('bossKills', 0);
+  }
+
+  /* ---- 菜单子页面切换 ---- */
+  showMenuPanel(name) {
+    if (this.state !== 'menu' && this.state !== 'gameover') return;
+    if (this.state === 'gameover') this.toMenu();
+    this.menuPanel = name;
+    if (name === 'stats') this._refreshStatsPanel();
+    this._showState();
+  }
+
+  /* ---- 从游戏返回主菜单 ---- */
+  toMenu() {
+    this.state = 'menu';
+    this.menuPanel = 'main';
+    this.saveStats();
+    this._dom.menuHi.textContent = '最高纪录 ' + this.hi;
+    this._showState();
+  }
 
   _reset() {
     this.player.reset();
@@ -82,6 +127,11 @@ class Game {
     d.menu.classList.toggle('hidden', this.state !== 'menu');
     d.pause.classList.toggle('hidden', this.state !== 'paused');
     d.over.classList.toggle('hidden', this.state !== 'gameover');
+    if (this.state === 'menu') {
+      d.menuMain.classList.toggle('hidden', this.menuPanel !== 'main');
+      d.menuHelp.classList.toggle('hidden', this.menuPanel !== 'help');
+      d.menuStats.classList.toggle('hidden', this.menuPanel !== 'stats');
+    }
   }
 
   multiplier() { return 1 + Math.min(3, Math.floor(this.combo / 8)); }
@@ -272,6 +322,7 @@ class Game {
   killEnemy(e) {
     this.combo++;
     this.comboT = 2;
+    this.stats.kills = this._stat('kills', 0) + 1;
     const mult = this.multiplier();
     const pts = Math.round(e.score * mult);
     this.score += pts;
@@ -286,6 +337,7 @@ class Game {
   killBoss(b) {
     this.combo++;
     this.comboT = 2;
+    this.stats.bossKills = this._stat('bossKills', 0) + 1;
     const pts = Math.round(b.score * this.multiplier());
     this.score += pts;
     this.floats.push(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
@@ -501,7 +553,7 @@ class Game {
       ctx.fillRect(0, 0, W, H);
     }
 
-    this._drawHud(ctx);
+    if (this.state !== 'menu') this._drawHud(ctx);
   }
 
   _drawHud(ctx) {
@@ -600,6 +652,14 @@ class Game {
       this._saveHi();
       AudioSys.record();
     }
+    // 累计战绩
+    const s = this.stats;
+    s.games = this._stat('games', 0) + 1;
+    s.kills = this._stat('kills', 0);
+    s.bossKills = this._stat('bossKills', 0);
+    s.totalScore = this._stat('totalScore', 0) + this.score;
+    s.bestWave = Math.max(this._stat('bestWave', 0), this.wave);
+    this.saveStats();
     const d = this._dom;
     d.finalScore.textContent = this.score;
     d.finalWave.textContent = this.wave;

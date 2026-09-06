@@ -6,6 +6,7 @@
 (function () {
   const canvas = document.getElementById('game');
   const game = new Game(canvas);
+  window.game = game; // 调试/测试用全局句柄
 
   // 逻辑分辨率固定 480×720,按窗口等比缩放并适配 devicePixelRatio
   function resize() {
@@ -41,7 +42,15 @@
     if (e.code === 'KeyM') AudioSys.toggleMute();
     if (e.code === 'KeyF') game.autoFire = !game.autoFire;
     if (e.code === 'KeyP' || e.code === 'Escape') game.togglePause();
-    if (e.code === 'Enter' && (game.state === 'menu' || game.state === 'gameover')) game.start();
+    if (game.state === 'menu') {
+      if (e.code === 'Enter') game.start();
+      if (e.code === 'KeyH') game.showMenuPanel('help');
+      if (e.code === 'KeyT') game.showMenuPanel('stats');
+      if ((e.code === 'Escape' || e.code === 'Backspace') && game.menuPanel !== 'main') game.showMenuPanel('main');
+    } else if (game.state === 'gameover') {
+      if (e.code === 'Enter') game.start();
+      if (e.code === 'Escape' || e.code === 'Backspace') game.toMenu();
+    }
   });
   window.addEventListener('keyup', (e) => {
     if (KEYMAP[e.code]) {
@@ -55,9 +64,43 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) game.autoPause(); });
 
   // 按钮
-  document.getElementById('btnStart').addEventListener('click', () => { AudioSys.init(); game.start(); });
-  document.getElementById('btnRestart').addEventListener('click', () => { AudioSys.init(); game.start(); });
-  document.getElementById('btnResume').addEventListener('click', () => game.togglePause());
+  const $ = (id) => document.getElementById(id);
+  $('btnStart').addEventListener('click', () => { AudioSys.init(); game.start(); });
+  $('btnRestart').addEventListener('click', () => { AudioSys.init(); game.start(); });
+  $('btnResume').addEventListener('click', () => game.togglePause());
+  $('btnHelp').addEventListener('click', () => game.showMenuPanel('help'));
+  $('btnStats').addEventListener('click', () => game.showMenuPanel('stats'));
+  $('btnHelpBack').addEventListener('click', () => game.showMenuPanel('main'));
+  $('btnStatsBack').addEventListener('click', () => game.showMenuPanel('main'));
+  $('btnOverMenu').addEventListener('click', () => game.toMenu());
+
+  // 危险操作二次确认:第一次点击进入待确认态,3 秒未确认自动复原
+  function armConfirm(btn, action) {
+    const label = btn.innerHTML;
+    let armed = false, timer = 0;
+    btn.addEventListener('click', () => {
+      if (!armed) {
+        armed = true;
+        btn.classList.add('armed');
+        btn.innerHTML = '▸ 确认返回?(再次点击)';
+        timer = setTimeout(() => {
+          armed = false;
+          btn.classList.remove('armed');
+          btn.innerHTML = label;
+        }, 3000);
+        return;
+      }
+      clearTimeout(timer);
+      armed = false;
+      btn.classList.remove('armed');
+      btn.innerHTML = label;
+      action();
+    });
+  }
+  armConfirm($('btnQuit'), () => game.toMenu());
+
+  // 版本号
+  $('verTag').textContent = window.GAME_VERSION || 'dev';
 
   // 触屏:单指拖动移动并连发,双指点按放炸弹
   function toLogical(t) {

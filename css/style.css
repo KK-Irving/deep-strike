@@ -36,28 +36,89 @@ h2 {
 }
 .over-title { color: #ff5577 !important; text-shadow: 0 0 18px rgba(255, 51, 85, 0.8) !important; }
 
+/* ---------- 主菜单页面切换 ---------- */
+.menu-page { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.menu-btns { display: flex; flex-direction: column; gap: 12px; margin-top: 34px; align-items: center; }
+
+.menu-btn {
+  width: 280px; padding: 12px 20px;
+  font-size: 17px; letter-spacing: 3px; font-family: inherit;
+  color: #cfe8ff; background: rgba(10, 24, 52, 0.65);
+  border: 1px solid rgba(126, 243, 255, 0.35);
+  border-radius: 10px; cursor: pointer;
+  text-align: left;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s;
+}
+.menu-btn i {
+  float: right; font-style: normal; font-family: Consolas, monospace;
+  font-size: 12px; color: rgba(159, 232, 255, 0.5); padding-top: 3px; letter-spacing: 1px;
+}
+.menu-btn:hover, .menu-btn:focus-visible {
+  transform: translateX(4px);
+  background: rgba(16, 42, 84, 0.85);
+  border-color: rgba(126, 243, 255, 0.8);
+  box-shadow: 0 0 18px rgba(0, 210, 255, 0.35);
+  outline: none;
+}
+.menu-btn:active { transform: translateX(4px) scale(0.98); }
+.menu-btn.primary {
+  color: #052027; font-weight: bold;
+  background: linear-gradient(180deg, #8ff5ff, #37c8e8);
+  border-color: transparent;
+  box-shadow: 0 0 22px rgba(0, 210, 255, 0.5);
+}
+.menu-btn.primary i { color: rgba(5, 32, 39, 0.6); }
+.menu-btn.primary:hover { box-shadow: 0 0 32px rgba(0, 220, 255, 0.75); }
+.menu-btn.danger { border-color: rgba(255, 85, 119, 0.5); }
+.menu-btn.danger:hover, .menu-btn.danger.armed {
+  border-color: #ff5577; color: #ff8fa5;
+  box-shadow: 0 0 18px rgba(255, 51, 85, 0.4);
+}
+.menu-btn.danger.armed { background: rgba(80, 12, 28, 0.7); }
+
+/* ---------- 说明 / 档案面板 ---------- */
 .panel {
-  margin: 30px 0 8px; padding: 18px 26px;
+  margin: 26px 0 8px; padding: 18px 26px;
   border: 1px solid rgba(126, 243, 255, 0.25);
   border-radius: 12px;
   background: rgba(10, 20, 45, 0.5);
+  max-width: 430px;
 }
-.controls { display: grid; grid-template-columns: auto auto; gap: 8px 18px; text-align: left; font-size: 14px; }
+.panel.scroll { max-height: 62vh; overflow-y: auto; }
+.sec-title {
+  margin: 10px 0 8px; font-size: 14px; letter-spacing: 6px;
+  color: #7ef3ff; text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+.sec-title:first-child { margin-top: 0; }
+.controls { display: grid; grid-template-columns: auto auto; gap: 7px 18px; text-align: left; font-size: 13.5px; }
 .ctl { display: contents; }
 .ctl span:first-child { color: #7ef3ff; font-family: Consolas, monospace; font-weight: bold; white-space: nowrap; }
 .ctl span:last-child { color: rgba(207, 232, 255, 0.85); }
+.c-red { color: #ff4d6d !important; }
+.c-pink { color: #ff7ab8 !important; }
+.c-orange { color: #ff9a3c !important; }
+.c-purple { color: #c86bff !important; }
+.c-boss { color: #ff5577 !important; }
+.c-blue { color: #4db8ff !important; }
+.c-green { color: #51e08a !important; }
 .hint { margin-top: 14px; font-size: 12.5px; line-height: 1.7; color: rgba(159, 232, 255, 0.55); }
+.hint.left { text-align: left; }
 
-.btn {
-  margin-top: 22px; padding: 12px 44px;
-  font-size: 17px; letter-spacing: 4px; font-family: inherit;
-  color: #052027; background: linear-gradient(180deg, #8ff5ff, #37c8e8);
-  border: none; border-radius: 999px; cursor: pointer;
-  box-shadow: 0 0 22px rgba(0, 210, 255, 0.5);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+.stats-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 20px 26px; padding: 8px 4px 2px;
 }
-.btn:hover { transform: scale(1.05); box-shadow: 0 0 32px rgba(0, 220, 255, 0.75); }
-.btn:active { transform: scale(0.97); }
+.stat { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.stat span { font-size: 12px; color: rgba(159, 232, 255, 0.6); letter-spacing: 2px; }
+.stat b {
+  font-size: 24px; color: #eaf7ff; font-family: Consolas, monospace;
+  text-shadow: 0 0 14px rgba(0, 220, 255, 0.5);
+}
+
+.footer {
+  margin-top: 28px; font-size: 11.5px; letter-spacing: 2px;
+  color: rgba(159, 232, 255, 0.35); font-family: Consolas, monospace;
+}
 
 .hi-score { margin-top: 16px; font-size: 13px; color: rgba(255, 209, 102, 0.8); letter-spacing: 2px; }
 
@@ -69,9 +130,3 @@ h2 {
 @keyframes blink { 50% { opacity: 0.35; } }
 
 .stats { display: flex; gap: 34px; margin: 18px 0 6px; }
-.stat { display: flex; flex-direction: column; gap: 6px; }
-.stat span { font-size: 12.5px; color: rgba(159, 232, 255, 0.6); letter-spacing: 2px; }
-.stat b {
-  font-size: 30px; color: #eaf7ff; font-family: Consolas, monospace;
-  text-shadow: 0 0 14px rgba(0, 220, 255, 0.5);
-}
