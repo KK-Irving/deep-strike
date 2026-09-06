@@ -97,6 +97,7 @@ class Game {
     this.floats = [];
     this.score = 0; this.combo = 0; this.comboT = 0;
     this.wave = 0; this.waveTime = 0; this.spawnQueue = [];
+    this.waveQuota = 0; this.waveKills = 0; this.trickleT = 0;
     this.banner = null; this.waveClearT = -1;
     this.deathT = -1; this.newRecord = false;
   }
@@ -139,13 +140,15 @@ class Game {
   /* ---------------- 波次导演 ---------------- */
   startWave(n) {
     this.wave = n; this.waveTime = 0; this.spawnQueue = []; this.waveClearT = -1;
+    this.waveKills = 0; this.trickleT = 0;
     if (n % 5 === 0) {
-      this.banner = { text: '⚠ WARNING ⚠', sub: '敌方旗舰接近', life: 2.2, max: 2.2, red: true };
+      this.waveQuota = 1; // 目标:击毁旗舰
+      this.banner = { text: '⚠ WARNING ⚠', sub: '目标:击毁敌方旗舰', life: 2.2, max: 2.2, red: true };
       AudioSys.alarm();
       this.spawnQueue.push({ boss: true, t: 2.0 });
       return;
     }
-    this.banner = { text: 'WAVE ' + n, sub: '敌机来袭', life: 1.8, max: 1.8, red: false };
+    this.banner = { text: 'WAVE ' + n, sub: '', life: 1.8, max: 1.8, red: false };
     AudioSys.waveStart();
     let budget = 8 + n * 3;
     let t = 1.0;
@@ -169,6 +172,9 @@ class Game {
       }
       t += rand(0.8, 1.7) * Math.max(0.5, 1 - n * 0.04);
     }
+    // 关卡目标:必须击坠足够数量的敌机才能过关,躲避无法通关
+    this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65);
+    this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机';
   }
 
   /* ---------------- 主更新 ---------------- */
@@ -216,9 +222,21 @@ class Game {
 
     this._collide();
 
-    // 波次推进:出怪完毕且场上无敌人
+    // 波次推进:配额达成 + 出怪完毕且场上无敌人
+    const quotaMet = this.waveKills >= this.waveQuota;
     if (this.spawnQueue.length === 0 && this.enemies.length === 0 && !this.boss) {
-      if (this.waveClearT < 0) {
+      if (!quotaMet) {
+        // 配额未达成:持续派出增援,躲避无法过关
+        this.trickleT -= dt;
+        if (this.trickleT <= 0) {
+          this.trickleT = Math.max(0.7, 1.6 - this.wave * 0.06);
+          const roll = Math.random();
+          const type = this.wave >= 3 && roll < 0.16 ? 'tank'
+            : this.wave >= 2 && roll < 0.5 ? 'waver'
+            : this.wave >= 4 && roll < 0.65 ? 'sniper' : 'drone';
+          this.enemies.push(new Enemy(type, rand(60, W - 60), this.wave));
+        }
+      } else if (this.waveClearT < 0) {
         this.waveClearT = 1.6;
         const bonus = 200 + this.wave * 100;
         this.score += bonus;
@@ -323,6 +341,7 @@ class Game {
     this.combo++;
     this.comboT = 2;
     this.stats.kills = this._stat('kills', 0) + 1;
+    this.waveKills++;
     const mult = this.multiplier();
     const pts = Math.round(e.score * mult);
     this.score += pts;
@@ -338,6 +357,7 @@ class Game {
     this.combo++;
     this.comboT = 2;
     this.stats.bossKills = this._stat('bossKills', 0) + 1;
+    this.waveKills++;
     const pts = Math.round(b.score * this.multiplier());
     this.score += pts;
     this.floats.push(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
@@ -572,6 +592,20 @@ class Game {
     ctx.fillStyle = '#ffd166';
     ctx.font = 'bold 16px Consolas, monospace';
     ctx.fillText('WAVE ' + this.wave, W - 14, 14);
+    // 关卡目标进度
+    const quotaMet = this.waveKills >= this.waveQuota;
+    ctx.font = 'bold 12px Consolas, monospace';
+    if (this.wave % 5 === 0) {
+      ctx.fillStyle = '#ff8fa5';
+      ctx.fillText('目标:击毁旗舰', W - 14, 38);
+    } else if (quotaMet) {
+      ctx.fillStyle = '#51e08a';
+      ctx.fillText('目标达成 ' + this.waveKills + '/' + this.waveQuota, W - 14, 38);
+    } else {
+      const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 150);
+      ctx.fillStyle = 'rgba(255,209,102,' + pulse.toFixed(2) + ')';
+      ctx.fillText('击坠 ' + this.waveKills + ' / ' + this.waveQuota, W - 14, 38);
+    }
     if (AudioSys.muted) {
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.font = '12px sans-serif';
