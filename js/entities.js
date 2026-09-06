@@ -470,7 +470,8 @@ const ELITE_CFG = {
 };
 
 class Enemy {
-  constructor(type, x, wave, elite) {
+  constructor(type, x, wave, elite, env) {
+    env = env || { hpMul: 1, spdMul: 1, fireMul: 1 };
     this.type = type;
     this.x = x; this.y = -26; this.baseX = x;
     this.t = 0; this.dead = false; this.flash = 0;
@@ -509,6 +510,11 @@ class Enemy {
       this.fireCd = rand(0.8, 1.6);
       this.color = '#c86bff'; this.fill = '#2a1240';
     }
+    // 无尽模式环境:威胁等级与波次词缀
+    this.hp = Math.round(this.hp * env.hpMul);
+    this.vy *= env.spdMul;
+    if (this.fireCd !== undefined) this.fireCd *= env.fireMul;
+    this.fireMul = env.fireMul;
     // 精英强化:血量 ×4、体型 ×1.3、分数 ×4,词缀附加特性(支持双词缀组合)
     this.elite = elite ? (Array.isArray(elite) ? elite : [elite]) : null;
     if (this.elite) {
@@ -549,7 +555,7 @@ class Enemy {
       this.x = clamp(this.baseX + Math.sin(this.t * this.freq) * this.amp, 16, W - 16);
       this.fireCd -= dt;
       if (canFire && this.fireCd <= 0) {
-        this.fireCd = rand(1.8, 3.2);
+        this.fireCd = rand(1.8, 3.2) * this.fireMul;
         game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 150 + game.effWave() * 5);
         AudioSys.enemyShoot();
       }
@@ -557,7 +563,7 @@ class Enemy {
       this.y += this.vy * dt;
       this.fireCd -= dt;
       if (canFire && this.fireCd <= 0) {
-        this.fireCd = 2.4;
+        this.fireCd = 2.4 * this.fireMul;
         for (let i = -1; i <= 1; i++)
           game.enemyShot(this.x, this.y + this.r, Math.PI / 2 + i * 0.4, 140 + game.effWave() * 4, 'orange');
         AudioSys.enemyShoot();
@@ -597,7 +603,7 @@ class Enemy {
         this.x = clamp(this.baseX + Math.sin(this.t * 0.8) * 40, 30, W - 30);
         this.fireCd -= dt;
         if (canFire && this.fireCd <= 0) {
-          this.fireCd = Math.max(1.2, 2.6 - game.wave * 0.12);
+          this.fireCd = Math.max(1.2, 2.6 - game.wave * 0.12) * this.fireMul;
           game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 210 + game.effWave() * 6);
           AudioSys.enemyShoot();
         }
@@ -615,7 +621,7 @@ class Enemy {
       // 分裂词缀:死亡时裂解为 3 架无人机
       if (this.elite && this.elite.includes('splitter')) {
         for (let i = -1; i <= 1; i++)
-          game.enemies.push(new Enemy('drone', clamp(this.x + i * 30, 30, W - 30), game.wave));
+          game.enemies.push(new Enemy('drone', clamp(this.x + i * 30, 30, W - 30), game.wave, null, game._env));
       }
       // 复仇词缀:死亡时向四周释放环形弹幕
       if (this.elite && this.elite.includes('vengeance')) {
@@ -720,8 +726,8 @@ class Boss {
     this.escortCd -= dt;
     if (this.phase >= 1 && this.escortCd <= 0) {
       this.escortCd = storm ? 5 : 6;
-      game.enemies.push(new Enemy('drone', clamp(this.x - 60, 40, W - 40), game.wave));
-      game.enemies.push(new Enemy('drone', clamp(this.x + 60, 40, W - 40), game.wave));
+      game.enemies.push(new Enemy('drone', clamp(this.x - 60, 40, W - 40), game.wave, null, game._env));
+      game.enemies.push(new Enemy('drone', clamp(this.x + 60, 40, W - 40), game.wave, null, game._env));
     }
   }
 

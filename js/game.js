@@ -4,6 +4,15 @@
  * 状态机 / 波次导演 / 碰撞 / 特效 / HUD 渲染
  * ============================================================ */
 
+/* 无尽模式波次词缀:第 6 波起概率出现(BOSS 波除外) */
+const WAVE_MODS = [
+  { id: 'horde',   icon: '✸', name: '狂潮', desc: '出怪配额 +40%' },
+  { id: 'iron',    icon: '⚙', name: '钢铁', desc: '敌机生命 +35%' },
+  { id: 'swift',   icon: '💨', name: '迅影', desc: '敌机速度 +20%' },
+  { id: 'barrage', icon: '🔥', name: '弹雨', desc: '敌方开火频率 +40%' },
+  { id: 'bounty',  icon: '💎', name: '赏金', desc: '经验 +50%,掉落翻倍' }
+];
+
 class Game {
   constructor(canvas) {
     this.canvas = canvas;
@@ -133,6 +142,7 @@ class Game {
     this._cardChoices = [];
     this._pendingSwap = null; this._swapList = null;
     this.evo = {}; this.bulletFreezeT = 0;
+    this.waveMod = null; this._env = { hpMul: 1, spdMul: 1, fireMul: 1 };
     this._recalc();
   }
 
@@ -205,6 +215,9 @@ class Game {
 
   /* 弹速增长封顶波数:防止后期弹速无限膨胀 */
   effWave() { return Math.min(this.wave, 18); }
+
+  /* 无尽模式威胁等级:第 15 波起每 5 波 +1 */
+  threatLevel() { return Math.floor(Math.max(0, this.wave - 10) / 5); }
 
   /* ---------------- 肉鸽升级系统 ---------------- */
   _recalc() {
@@ -504,6 +517,24 @@ class Game {
     this.waveKills = 0; this.trickleT = 0;
     // 时间冻结:每波开始静止敌方弹幕
     if (this.evo.time) this.bulletFreezeT = 2.5;
+    const threat = this.threatLevel();
+    // 波次词缀:第 6 波起 40% 概率(BOSS 波除外)
+    this.waveMod = null;
+    if (n >= 6 && n % 5 !== 0 && RNG() < 0.4) {
+      this.waveMod = WAVE_MODS[irand(0, WAVE_MODS.length - 1)];
+    }
+    // 环境参数:威胁与词缀共同作用于本波敌机
+    this._env = {
+      hpMul: (1 + threat * 0.15) * (this.waveMod && this.waveMod.id === 'iron' ? 1.35 : 1),
+      spdMul: this.waveMod && this.waveMod.id === 'swift' ? 1.2 : 1,
+      fireMul: Math.max(0.45, Math.pow(0.94, threat)) * (this.waveMod && this.waveMod.id === 'barrage' ? 0.6 : 1)
+    };
+    // 里程碑:每 10 波投放补给(炸弹+1 与 25% 生命修复)
+    const milestone = n > 10 && (n - 1) % 10 === 0;
+    if (milestone) {
+      if (this.player.bombs < 5) this.player.bombs++;
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + Math.round(this.player.maxHp * 0.25));
+    }
     if (n >= 5) Ach.unlock('wave_5', this);
     if (n >= 10) Ach.unlock('wave_10', this);
     if (n >= 15) Ach.unlock('wave_15', this);
@@ -517,7 +548,7 @@ class Game {
     }
     this.banner = { text: 'WAVE ' + n, sub: '', life: 1.8, max: 1.8, red: false };
     AudioSys.waveStart();
-    let budget = 8 + n * 3;
+    let budget = 8 + n * 3 + this.threatLevel() * 2;
     let t = 1.0;
     while (budget > 0) {
       const roll = RNG();
@@ -542,7 +573,8 @@ class Game {
       t += rand(0.8, 1.7) * Math.max(0.5, 1 - n * 0.04);
     }
     // 关卡目标:必须击坠足够数量的敌机才能过关,躲避无法通关
-    this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65);
+    const hordeMul = this.waveMod && this.waveMod.id === 'horde' ? 1.4 : 1;
+    this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65 * hordeMul);
     this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机';
     // 精英机:第 3 波起概率随队,第 7 波起可能双精英,第 10 波起概率出现双词缀精英
     if (n >= 3 && RNG() < 0.65) {
@@ -572,6 +604,8 @@ class Game {
       for (let i = 0; i < 3; i++)
         this.spawnQueue.push({ supply: true, t: rand(1, 5), x: rand(50, W - 50) });
     }
+    if (this.waveMod) this.banner.sub += ' · ' + this.waveMod.icon + ' ' + this.waveMod.name;
+    if (milestone) this.banner.sub += ' · ⚡ 威胁纪元补给';
   }
 
   /* ---------------- 主更新 ---------------- */
@@ -588,7 +622,7 @@ class Game {
         else if (s.asteroid) this.asteroids.push(new Asteroid(s.x, -30, s.r));
         else if (s.supply) this.supplies.push(new SupplyDrop(s.x, SUPPLY_LOOT[irand(0, SUPPLY_LOOT.length - 1)]));
         else {
-          this.enemies.push(new Enemy(s.type, s.x, this.wave, s.elite));
+          this.enemies.push(new Enemy(s.type, s.x, this.wave, s.elite, this._env));
           if (s.elite) AudioSys.elite();
         }
         this.spawnQueue.splice(i, 1);
@@ -688,7 +722,7 @@ class Game {
             : this.wave >= 5 && roll < 0.34 ? 'shielder'
             : this.wave >= 2 && roll < 0.62 ? 'waver'
             : this.wave >= 4 && roll < 0.78 ? 'sniper' : 'drone';
-          this.enemies.push(new Enemy(type, rand(60, W - 60), this.wave));
+          this.enemies.push(new Enemy(type, rand(60, W - 60), this.wave, null, this._env));
         }
       } else if (this.waveClearT < 0) {
         this.waveClearT = 1.6;
@@ -919,7 +953,7 @@ class Game {
     this.shake(Math.min(9, 1.5 + e.r * 0.18), 0.22);
     // 掉落经验晶体(精英 ×4)
     const xpTable = { drone: 2, waver: 3, sniper: 4, tank: 8, bomber: 3, shielder: 10 };
-    let xp = (xpTable[e.type] || 2) * (e.elite ? 4 : 1);
+    let xp = (xpTable[e.type] || 2) * (e.elite ? 4 : 1) * (this.waveMod && this.waveMod.id === 'bounty' ? 1.5 : 1);
     while (xp > 0) {
       const v = Math.min(4, xp);
       xp -= v;
@@ -937,7 +971,7 @@ class Game {
       this.score += bonus;
       this._addFloat(new FloatText(e.x, e.y - 26, '精英击坠 +' + bonus, e.eliteColor, 13));
     }
-    else if (RNG() < 0.13) this._dropPower(e.x, e.y);
+    else if (RNG() < (this.waveMod && this.waveMod.id === 'bounty' ? 0.26 : 0.13)) this._dropPower(e.x, e.y);
   }
 
   killBoss(b) {
@@ -1292,6 +1326,19 @@ class Game {
       ctx.fillStyle = '#ffd166';
       ctx.font = 'bold 11px Consolas, monospace';
       ctx.fillText('每日挑战 · 纪录 ' + this._dailyBest(), W - 14, 54);
+    }
+    // 无尽模式:威胁等级与波次词缀
+    const threat = this.threatLevel();
+    if (threat > 0) {
+      ctx.fillStyle = 'rgba(255,120,140,0.9)';
+      ctx.font = 'bold 11px Consolas, monospace';
+      ctx.fillText('⚡ 威胁等级 ' + threat, W - 14, this.daily ? 68 : 54);
+    }
+    if (this.waveMod) {
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(this.waveMod.icon + ' ' + this.waveMod.name + ' · ' + this.waveMod.desc, 14, 54);
     }
     // 生命条(数值化生命)
     {
