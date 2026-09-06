@@ -290,14 +290,19 @@ class Game {
     // 关卡目标:必须击坠足够数量的敌机才能过关,躲避无法通关
     this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65);
     this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机';
-    // 精英机:第 3 波起概率随队,高波次可能双精英
-    this._eliteQueue = [];
+    // 精英机:第 3 波起概率随队,第 7 波起可能双精英,第 10 波起概率出现双词缀精英
     if (n >= 3 && Math.random() < 0.65) {
-      const count = n >= 7 && Math.random() < 0.35 ? 2 : 1;
       const affixes = Object.keys(ELITE_CFG);
+      const count = n >= 7 && Math.random() < 0.35 ? 2 : 1;
       for (let i = 0; i < count; i++) {
         const idx = irand(0, this.spawnQueue.length - 1);
-        this.spawnQueue[idx].elite = affixes[irand(0, affixes.length - 1)];
+        const a1 = affixes[irand(0, affixes.length - 1)];
+        const list = [a1];
+        if (n >= 10 && Math.random() < 0.35) {
+          const a2 = affixes[irand(0, affixes.length - 1)];
+          if (a2 !== a1) list.push(a2);
+        }
+        this.spawnQueue[idx].elite = list;
       }
       this.banner.sub += ' · ⚠ 精英机随队';
     }

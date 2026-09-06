@@ -414,10 +414,12 @@ class Player {
  * 精英词缀:swift 迅捷 / iron 铁壁 / splitter 分裂 / berserk 狂暴
  * ============================================================ */
 const ELITE_CFG = {
-  swift:    { name: '迅捷', color: '#37e2ff', desc: '高速机动' },
-  iron:     { name: '铁壁', color: '#c9d4e3', desc: '装甲强化' },
-  splitter: { name: '分裂', color: '#51e08a', desc: '死亡分裂' },
-  berserk:  { name: '狂暴', color: '#ff6a3c', desc: '火力狂暴' }
+  swift:     { name: '迅捷', color: '#37e2ff', desc: '高速机动' },
+  iron:      { name: '铁壁', color: '#c9d4e3', desc: '装甲强化' },
+  splitter:  { name: '分裂', color: '#51e08a', desc: '死亡分裂' },
+  berserk:   { name: '狂暴', color: '#ff6a3c', desc: '火力狂暴' },
+  phantom:   { name: '幽影', color: '#b8c6ff', desc: '周期相位免疫' },
+  vengeance: { name: '复仇', color: '#ffd166', desc: '死亡弹幕反扑' }
 };
 
 class Enemy {
@@ -447,19 +449,19 @@ class Enemy {
       this.fireCd = rand(0.8, 1.6);
       this.color = '#c86bff'; this.fill = '#2a1240';
     }
-    // 精英强化:血量 ×4、体型 ×1.3、分数 ×4,词缀附加特性
-    this.elite = elite || null;
+    // 精英强化:血量 ×4、体型 ×1.3、分数 ×4,词缀附加特性(支持双词缀组合)
+    this.elite = elite ? (Array.isArray(elite) ? elite : [elite]) : null;
     if (this.elite) {
       this.hp = Math.round(this.hp * 4);
       this.r = this.r * 1.3;
       this.score *= 4;
-      const cfg = ELITE_CFG[this.elite];
-      this.eliteName = '精英·' + cfg.name;
-      this.eliteColor = cfg.color;
-      if (this.elite === 'swift') this.vy *= 1.6;
-      if (this.elite === 'iron') { this.hp *= 1.6; this.vy *= 0.7; }
-      if (this.elite === 'berserk') this.vy *= 1.2;
-      if (this.fireCd !== undefined) this.fireCd *= this.elite === 'berserk' ? 0.45 : 0.6;
+      this.eliteName = '精英·' + this.elite.map(a => ELITE_CFG[a].name).join('+');
+      this.eliteColor = this.elite.length > 1 ? '#ff8fd0' : ELITE_CFG[this.elite[0]].color;
+      if (this.elite.includes('swift')) this.vy *= 1.6;
+      if (this.elite.includes('iron')) { this.hp *= 1.6; this.vy *= 0.7; }
+      if (this.elite.includes('berserk')) { this.vy *= 1.2; if (this.fireCd !== undefined) this.fireCd *= 0.45; }
+      if (this.elite.includes('phantom')) { this.phaseCd = 2.2; this.elitePhased = false; }
+      if (this.fireCd !== undefined && !this.elite.includes('berserk')) this.fireCd *= 0.6;
     }
     this.maxHp = this.hp;
   }
@@ -467,7 +469,18 @@ class Enemy {
   update(dt, game) {
     this.t += dt;
     this.flash = Math.max(0, this.flash - dt);
+    // 幽影词缀:周期相位(免疫伤害且停止开火)
+    if (this.elite && this.elite.includes('phantom')) {
+      if (this.elitePhased) {
+        this.phaseDur -= dt;
+        if (this.phaseDur <= 0) this.elitePhased = false;
+      } else {
+        this.phaseCd -= dt;
+        if (this.phaseCd <= 0) { this.elitePhased = true; this.phaseDur = 1.0; this.phaseCd = 2.6; }
+      }
+    }
     const onScreen = this.y > 0;
+    const canFire = onScreen && !this.elitePhased;
     if (this.type === 'drone') {
       this.y += this.vy * dt;
       this.x = clamp(this.baseX + Math.sin(this.t * this.freq) * this.amp, 16, W - 16);
@@ -475,7 +488,7 @@ class Enemy {
       this.y += this.vy * dt;
       this.x = clamp(this.baseX + Math.sin(this.t * this.freq) * this.amp, 16, W - 16);
       this.fireCd -= dt;
-      if (onScreen && this.fireCd <= 0) {
+      if (canFire && this.fireCd <= 0) {
         this.fireCd = rand(1.8, 3.2);
         game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 150 + game.wave * 5);
         AudioSys.enemyShoot();
@@ -483,7 +496,7 @@ class Enemy {
     } else if (this.type === 'tank') {
       this.y += this.vy * dt;
       this.fireCd -= dt;
-      if (onScreen && this.fireCd <= 0) {
+      if (canFire && this.fireCd <= 0) {
         this.fireCd = 2.4;
         for (let i = -1; i <= 1; i++)
           game.enemyShot(this.x, this.y + this.r, Math.PI / 2 + i * 0.4, 140 + game.wave * 4, 'orange');
@@ -496,7 +509,7 @@ class Enemy {
       } else {
         this.x = clamp(this.baseX + Math.sin(this.t * 0.8) * 40, 30, W - 30);
         this.fireCd -= dt;
-        if (this.fireCd <= 0) {
+        if (canFire && this.fireCd <= 0) {
           this.fireCd = Math.max(1.2, 2.6 - game.wave * 0.12);
           game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 210 + game.wave * 6);
           AudioSys.enemyShoot();
@@ -517,6 +530,13 @@ class Enemy {
         for (let i = -1; i <= 1; i++)
           game.enemies.push(new Enemy('drone', clamp(this.x + i * 30, 30, W - 30), game.wave));
       }
+      // 复仇词缀:死亡时向四周释放环形弹幕
+      if (this.elite && this.elite.includes('vengeance')) {
+        const n = 12;
+        for (let i = 0; i < n; i++)
+          game.enemyShot(this.x, this.y, i / n * TAU, 140 + game.wave * 4);
+        AudioSys.enemyShoot();
+      }
       game.killEnemy(this);
     }
   }
@@ -524,6 +544,7 @@ class Enemy {
   draw(ctx) {
     ctx.save();
     ctx.translate(this.x, this.y);
+    if (this.elitePhased) ctx.globalAlpha = 0.3; // 相位状态半透明
     // 精英光环与名牌
     if (this.elite) {
       const pr = this.r + 8 + Math.sin(this.t * 5) * 2.5;
