@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>深空突袭 · DEEP STRIKE</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="game" width="480" height="720"></canvas>
+
+<div id="menuOverlay" class="overlay">
+  <h1>深空突袭</h1>
+  <div class="subtitle">DEEP STRIKE</div>
+  <div class="panel">
+    <div class="controls">
+      <div class="ctl"><span>W A S D / 方向键</span><span>移动</span></div>
+      <div class="ctl"><span>F</span><span>自动连发开关(默认开)</span></div>
+      <div class="ctl"><span>J / 空格</span><span>手动射击(按住连发)</span></div>
+      <div class="ctl"><span>K</span><span>清屏炸弹</span></div>
+      <div class="ctl"><span>Shift</span><span>低速精准(显示判定点)</span></div>
+      <div class="ctl"><span>P / Esc</span><span>暂停</span></div>
+      <div class="ctl"><span>M</span><span>静音</span></div>
+    </div>
+    <div class="hint">击落敌机拾取道具,连击提升得分倍率 · 每 5 波遭遇旗舰 BOSS<br>触屏:单指拖动移动并连发,双指点按放炸弹</div>
+  </div>
+  <button id="btnStart" class="btn">开始出击 (Enter)</button>
+  <div id="menuHi" class="hi-score">最高纪录 0</div>
+</div>
+
+<div id="pauseOverlay" class="overlay hidden">
+  <h2>已暂停</h2>
+  <div class="hint">按 P / Esc 继续战斗</div>
+  <button id="btnResume" class="btn">继续 (P)</button>
+</div>
+
+<div id="overOverlay" class="overlay hidden">
+  <h2 class="over-title">战机被击毁</h2>
+  <div id="newRecord" class="new-record hidden">★ 新纪录 ★</div>
+  <div class="stats">
+    <div class="stat"><span>最终得分</span><b id="finalScore">0</b></div>
+    <div class="stat"><span>抵达波次</span><b id="finalWave">1</b></div>
+    <div class="stat"><span>最高纪录</span><b id="finalHi">0</b></div>
+  </div>
+  <button id="btnRestart" class="btn">再来一局 (Enter)</button>
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
