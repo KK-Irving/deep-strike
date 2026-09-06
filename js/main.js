@@ -42,6 +42,13 @@
     if (e.code === 'KeyM') AudioSys.toggleMute();
     if (e.code === 'KeyF') game.autoFire = !game.autoFire;
     if (e.code === 'KeyP' || e.code === 'Escape') game.togglePause();
+    // 升级选卡快捷键
+    if (game.state === 'levelup') {
+      if (e.code === 'Digit1' || e.code === 'Numpad1') game.chooseCard(0);
+      if (e.code === 'Digit2' || e.code === 'Numpad2') game.chooseCard(1);
+      if (e.code === 'Digit3' || e.code === 'Numpad3') game.chooseCard(2);
+      return;
+    }
     if (game.state === 'menu') {
       if (e.code === 'Enter') game.start();
       if (e.code === 'KeyH') game.showMenuPanel('help');

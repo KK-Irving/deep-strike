@@ -155,6 +155,9 @@ class Player {
     this.shield = false; this.invuln = 2.2;
     this.fireCd = 0; this.alive = true;
     this.engine = 0; this.showHitbox = false;
+    // 肉鸽模组衍生数值(由 game._recalc 刷新)
+    this.dmgBonus = 0; this.fireInterval = 0.12; this.magnetR = 90;
+    this.homingCd = 0; this.webCd = 0; this.shieldCd = 0; this.shieldInterval = 12;
   }
   update(dt, game) {
     const k = game.keys;
@@ -181,7 +184,40 @@ class Player {
     this.fireCd -= dt;
     if ((k.fire || game.autoFire) && this.fireCd <= 0) {
       this._fire(game);
-      this.fireCd = 0.12;
+      this.fireCd = this.fireInterval;
+    }
+    // 追踪导弹:周期自动发射
+    if (game.mods.homing) {
+      this.homingCd -= dt;
+      if (this.homingCd <= 0) {
+        this.homingCd = 2.4 - game.mods.homing * 0.35;
+        this._fireHoming(game);
+      }
+    }
+    // 羁绊「天罗地网」:全向环形弹
+    if (game.bonds.includes('web')) {
+      this.webCd -= dt;
+      if (this.webCd <= 0) {
+        this.webCd = 0.9;
+        const n = 10, dmg = 1 + this.dmgBonus;
+        for (let i = 0; i < n; i++) {
+          const a = i / n * TAU + this.engine * 0.4;
+          game.playerBullets.push({
+            x: this.x, y: this.y, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300,
+            r: 2.6, dmg, color: '#a5ffd6', dead: false, pierce: 0, split: 0
+          });
+        }
+        AudioSys.web();
+      }
+    }
+    // 羁绊装备「护盾发生器」:自动充能护盾
+    if (game.mods.shieldgen && !this.shield) {
+      this.shieldCd -= dt;
+      if (this.shieldCd <= 0) {
+        this.shield = true;
+        AudioSys.powerup();
+        game.floats.push(new FloatText(this.x, this.y - 24, '护盾充能完毕', '#4db8ff', 12));
+      }
     }
     if (Math.random() < 0.6)
       game.particles.push(new Particle(
@@ -193,15 +229,49 @@ class Player {
   _fire(game) {
     AudioSys.shoot();
     const P = game.playerBullets;
-    const add = (ox, oy, vx, vy) =>
-      P.push({ x: this.x + ox, y: this.y + oy, vx, vy, r: 3, dmg: 1, color: '#dffaff', dead: false });
+    const m = game.mods;
+    const dmg = 1 + this.dmgBonus;
+    const pierce = m.pierce || 0;
+    const split = m.split || 0;
+    const mk = (ox, oy, vx, vy) =>
+      P.push({ x: this.x + ox, y: this.y + oy, vx, vy, r: 3, dmg, color: '#dffaff', dead: false, pierce, split });
     switch (this.weapon) {
-      case 1: add(0, -14, 0, -540); break;
-      case 2: add(-6, -10, 0, -540); add(6, -10, 0, -540); break;
-      case 3: add(0, -16, 0, -560); add(-9, -6, -75, -510); add(9, -6, 75, -510); break;
-      case 4: add(-5, -12, 0, -560); add(5, -12, 0, -560); add(-11, -5, -130, -490); add(11, -5, 130, -490); break;
-      default: add(0, -16, 0, -580); add(-7, -11, -45, -545); add(7, -11, 45, -545); add(-13, -4, -160, -480); add(13, -4, 160, -480); break;
+      case 1: mk(0, -14, 0, -540); break;
+      case 2: mk(-6, -10, 0, -540); mk(6, -10, 0, -540); break;
+      case 3: mk(0, -16, 0, -560); mk(-9, -6, -75, -510); mk(9, -6, 75, -510); break;
+      case 4: mk(-5, -12, 0, -560); mk(5, -12, 0, -560); mk(-11, -5, -130, -490); mk(11, -5, 130, -490); break;
+      default: mk(0, -16, 0, -580); mk(-7, -11, -45, -545); mk(7, -11, 45, -545); mk(-13, -4, -160, -480); mk(13, -4, 160, -480); break;
     }
+    // 并列弹道:主炮两侧追加直射弹
+    for (let i = 1; i <= (m.multi || 0); i++) {
+      mk(-7 - i * 8, -8, 0, -540);
+      mk(7 + i * 8, -8, 0, -540);
+    }
+    // 侧翼弹:更开斜角的追加弹对
+    for (let i = 1; i <= (m.side || 0); i++) {
+      const vx = 95 + i * 55;
+      mk(-10, -4, -vx, -500);
+      mk(10, -4, vx, -500);
+    }
+    // 尾炮
+    for (let i = 1; i <= (m.rear || 0); i++) {
+      mk(-5, 10, -70, 380);
+      mk(5, 10, 70, 380);
+    }
+  }
+  _fireHoming(game) {
+    const lvl = game.mods.homing;
+    const n = 1 + lvl;
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + (i - (n - 1) / 2) * 0.55;
+      game.playerBullets.push({
+        x: this.x, y: this.y - 8,
+        vx: Math.cos(a) * 300, vy: Math.sin(a) * 300,
+        r: 4, dmg: 2 + this.dmgBonus, color: '#ffd166', dead: false,
+        homing: true, life: 2.6, pierce: 0, split: 0
+      });
+    }
+    AudioSys.missile();
   }
   draw(ctx) {
     if (!this.alive) return;
@@ -559,8 +629,18 @@ class PowerUp {
     this.x = x; this.y = y; this.type = type;
     this.t = rand(0, TAU); this.dead = false;
   }
-  update(dt) {
+  update(dt, game) {
     this.t += dt;
+    // 引力场:进入吸取范围后飞向玩家
+    const p = game.player;
+    if (p.alive) {
+      const dx = p.x - this.x, dy = p.y - this.y;
+      if (dx * dx + dy * dy < p.magnetR * p.magnetR) {
+        const f = Math.min(1, dt * 6);
+        this.x += dx * f;
+        this.y += dy * f;
+      }
+    }
     this.y += 58 * dt;
     this.x += Math.sin(this.t * 2.2) * 22 * dt;
     if (this.y > H + 24) this.dead = true;
@@ -584,6 +664,48 @@ class PowerUp {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(cfg.label, 0, 1);
+    ctx.restore();
+  }
+}
+
+/* ============================================================
+ * 经验晶体:击坠掉落,受引力场吸引,拾取后转化为升级经验
+ * ============================================================ */
+class XPOrb {
+  constructor(x, y, v) {
+    this.x = x; this.y = y;
+    const a = rand(0, TAU), sp = rand(30, 110);
+    this.vx = Math.cos(a) * sp; this.vy = Math.sin(a) * sp - 40;
+    this.v = v; this.t = rand(0, TAU); this.dead = false;
+  }
+  update(dt, game) {
+    this.t += dt;
+    const p = game.player;
+    const dx = p.x - this.x, dy = p.y - this.y;
+    const d = Math.hypot(dx, dy) || 1;
+    if (p.alive && d < p.magnetR) {
+      const sp = 240 + (p.magnetR - d) * 2.4;
+      const f = Math.min(1, 9 * dt);
+      this.vx += (dx / d * sp - this.vx) * f;
+      this.vy += (dy / d * sp - this.vy) * f;
+    } else {
+      this.vx *= Math.exp(-2.5 * dt);
+      this.vy += (46 - this.vy) * Math.min(1, 2.5 * dt);
+    }
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    if (p.alive && d < 22) { this.dead = true; game.gainXP(this.v); }
+    if (this.y > H + 30) this.dead = true;
+  }
+  draw(ctx) {
+    const s = 3.2 + Math.sin(this.t * 7) * 0.8;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(80,220,255,0.22)';
+    ctx.beginPath(); ctx.arc(this.x, this.y, s * 2.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#8fe8ff';
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.t * 2);
+    ctx.fillRect(-s, -s, s * 2, s * 2);
     ctx.restore();
   }
 }

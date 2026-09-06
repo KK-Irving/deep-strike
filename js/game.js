@@ -39,7 +39,10 @@ class Game {
       stGames: document.getElementById('stGames'),
       stKills: document.getElementById('stKills'),
       stScore: document.getElementById('stScore'),
-      stBoss: document.getElementById('stBoss')
+      stBoss: document.getElementById('stBoss'),
+      levelup: document.getElementById('levelupOverlay'),
+      cardRow: document.getElementById('cardRow'),
+      ownRow: document.getElementById('ownRow')
     };
     this._dom.menuHi.textContent = '最高纪录 ' + this.hi;
     this._showState();
@@ -100,6 +103,14 @@ class Game {
     this.waveQuota = 0; this.waveKills = 0; this.trickleT = 0;
     this.banner = null; this.waveClearT = -1;
     this.deathT = -1; this.newRecord = false;
+    // 肉鸽成长状态
+    this.orbs = [];
+    this.mods = {}; this.bonds = [];
+    this.xp = 0; this.level = 1; this.xpNext = 12; this.pendingLevels = 0;
+    this.xpMult = 1; this.comboWindow = 2;
+    this.bombMeter = 0;
+    this._cardChoices = [];
+    this._recalc();
   }
 
   start() {
@@ -128,6 +139,7 @@ class Game {
     d.menu.classList.toggle('hidden', this.state !== 'menu');
     d.pause.classList.toggle('hidden', this.state !== 'paused');
     d.over.classList.toggle('hidden', this.state !== 'gameover');
+    d.levelup.classList.toggle('hidden', this.state !== 'levelup');
     if (this.state === 'menu') {
       d.menuMain.classList.toggle('hidden', this.menuPanel !== 'main');
       d.menuHelp.classList.toggle('hidden', this.menuPanel !== 'help');
@@ -136,6 +148,94 @@ class Game {
   }
 
   multiplier() { return 1 + Math.min(3, Math.floor(this.combo / 8)); }
+
+  /* ---------------- 肉鸽升级系统 ---------------- */
+  _recalc() {
+    const m = this.mods, p = this.player;
+    p.dmgBonus = m.dmg || 0;
+    let interval = 0.12 * Math.pow(0.85, m.rate || 0);
+    if (this.bonds.includes('overdrive')) interval *= 0.85;
+    p.fireInterval = Math.max(0.045, interval);
+    p.speed = 330 * Math.pow(1.15, m.speed || 0);
+    p.magnetR = 90 + (m.magnet || 0) * 70;
+    this.xpMult = 1 + 0.25 * (m.xpchip || 0);
+    this.comboWindow = 2 + 1.5 * (m.combo || 0);
+    p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
+    if (m.shieldgen && !p.shield && p.shieldCd <= 0) p.shieldCd = p.shieldInterval;
+  }
+
+  gainXP(n) {
+    this.xp += n * this.xpMult;
+    AudioSys.xp();
+    while (this.xp >= this.xpNext) {
+      this.xp -= this.xpNext;
+      this.level++;
+      this.xpNext = Math.round(this.xpNext * 1.3 + 5);
+      this.pendingLevels++;
+    }
+    if (this.pendingLevels > 0 && this.state === 'playing' && this.player.alive) this.openLevelup();
+  }
+
+  openLevelup() {
+    if (this.state !== 'playing' || this.pendingLevels <= 0) return;
+    this.state = 'levelup';
+    this._cardChoices = drawUpgradeCards(this.mods, this.level);
+    AudioSys.levelup();
+    this._renderCards();
+    this._showState();
+  }
+
+  _renderCards() {
+    const row = this._dom.cardRow;
+    row.innerHTML = '';
+    this._cardChoices.forEach((u, i) => {
+      const r = RARITY[u.rar];
+      const cur = this.mods[u.id] || 0;
+      const el = document.createElement('button');
+      el.className = 'card r' + u.rar;
+      el.innerHTML =
+        '<div class="card-rar" style="color:' + r.color + '">' + r.name + (u.rar === 2 ? ' ★' : '') + '</div>' +
+        '<div class="card-icon">' + u.icon + '</div>' +
+        '<div class="card-name">' + u.name + '</div>' +
+        '<div class="card-desc">' + u.desc + '</div>' +
+        '<div class="card-lv">' + (cur > 0 ? 'Lv ' + cur + ' → ' + (cur + 1) : '新能力!') + ' · 按 ' + (i + 1) + '</div>';
+      el.addEventListener('click', () => this.chooseCard(i));
+      row.appendChild(el);
+    });
+    // 已持有强化与羁绊一览
+    let html = '';
+    for (const u of UPGRADES) {
+      const c = this.mods[u.id] || 0;
+      if (c > 0) html += '<span class="chip"><i>' + u.icon + '</i>' + u.name + (u.max > 1 ? ' ×' + c : '') + '</span>';
+    }
+    for (const b of BONDS) {
+      if (this.bonds.includes(b.id)) html += '<span class="chip bond" title="' + b.desc + '">羁绊·' + b.name + '</span>';
+    }
+    this._dom.ownRow.innerHTML = html || '<span class="chip">首次升级 · 选择你的成长路线</span>';
+  }
+
+  chooseCard(i) {
+    if (this.state !== 'levelup') return;
+    const u = this._cardChoices[i];
+    if (!u) return;
+    this.mods[u.id] = (this.mods[u.id] || 0) + 1;
+    AudioSys.cardPick();
+    // 羁绊觉醒
+    for (const b of checkNewBonds(this.mods, this.bonds)) {
+      this.bonds.push(b.id);
+      this.banner = { text: '羁绊觉醒 · ' + b.name, sub: b.desc, life: 2.6, max: 2.6, gold: true };
+      AudioSys.bond();
+    }
+    this._recalc();
+    this.pendingLevels--;
+    if (this.pendingLevels > 0) {
+      this._cardChoices = drawUpgradeCards(this.mods, this.level);
+      this._renderCards();
+    } else {
+      this.state = 'playing';
+      this._showState();
+    }
+  }
 
   /* ---------------- 波次导演 ---------------- */
   startWave(n) {
@@ -211,8 +311,31 @@ class Game {
 
     for (let i = this.playerBullets.length - 1; i >= 0; i--) {
       const b = this.playerBullets[i];
+      if (b.homing) {
+        b.life -= dt;
+        if (b.life <= 0) { this.playerBullets.splice(i, 1); continue; }
+        // 寻的:飞向最近目标
+        let tx = null, ty = 0, best = 1e9;
+        for (const e of this.enemies) {
+          const d = (e.x - b.x) * (e.x - b.x) + (e.y - b.y) * (e.y - b.y);
+          if (d < best) { best = d; tx = e.x; ty = e.y; }
+        }
+        if (this.boss && this.boss.state === 'fight') {
+          const d = (this.boss.x - b.x) * (this.boss.x - b.x) + (this.boss.y - b.y) * (this.boss.y - b.y);
+          if (d < best) { best = d; tx = this.boss.x; ty = this.boss.y; }
+        }
+        if (tx !== null) {
+          const want = Math.atan2(ty - b.y, tx - b.x);
+          const cur = Math.atan2(b.vy, b.vx);
+          let diff = want - cur;
+          while (diff > Math.PI) diff -= TAU;
+          while (diff < -Math.PI) diff += TAU;
+          const na = cur + clamp(diff, -4.2 * dt, 4.2 * dt);
+          b.vx = Math.cos(na) * 400; b.vy = Math.sin(na) * 400;
+        }
+      }
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (b.dead || b.y < -20 || b.x < -20 || b.x > W + 20) this.playerBullets.splice(i, 1);
+      if (b.dead || b.y < -20 || b.x < -20 || b.x > W + 20 || b.y > H + 20) this.playerBullets.splice(i, 1);
     }
     for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
       const b = this.enemyBullets[i];
@@ -221,6 +344,7 @@ class Game {
     }
     this._updateArr(this.enemies, dt);
     this._updateArr(this.powerups, dt);
+    this._updateArr(this.orbs, dt);
     if (this.boss) {
       this.boss.update(dt, this);
       if (this.boss.dead) this.boss = null;
@@ -284,27 +408,19 @@ class Game {
     for (const b of this.playerBullets) {
       if (b.dead) continue;
       for (const e of this.enemies) {
-        if (e.dead) continue;
+        if (e.dead || e === b.lastHit) continue;
         const dx = b.x - e.x, dy = b.y - e.y;
         const rr = e.r + b.r;
         if (dx * dx + dy * dy < rr * rr) {
-          b.dead = true;
-          AudioSys.hit();
-          this._sparks(b.x, b.y, e.color, 4);
-          e.damage(b.dmg, this);
+          this._hitTarget(b, e);
           break;
         }
       }
-      if (!b.dead && this.boss && !this.boss.dead && this.boss.state === 'fight') {
+      if (!b.dead && this.boss && !this.boss.dead && this.boss.state === 'fight' && this.boss !== b.lastHit) {
         const bo = this.boss;
         const dx = b.x - bo.x, dy = b.y - bo.y;
         const rr = bo.r + b.r;
-        if (dx * dx + dy * dy < rr * rr) {
-          b.dead = true;
-          AudioSys.hit();
-          this._sparks(b.x, b.y, '#ff5577', 4);
-          bo.damage(b.dmg, this);
-        }
+        if (dx * dx + dy * dy < rr * rr) this._hitTarget(b, bo);
       }
     }
     if (!p.alive) return;
@@ -350,12 +466,51 @@ class Game {
     }
   }
 
+  /* 单发子弹命中结算:暴击 / 贯穿 / 裂变 */
+  _hitTarget(b, e) {
+    let dmg = b.dmg;
+    const cc = 0.2 * (this.mods.crit || 0);
+    const guaranteed = b.homing && this.bonds.includes('hunt');
+    const crit = guaranteed || (cc > 0 && Math.random() < cc);
+    if (crit) dmg = Math.round(dmg * (this.bonds.includes('execute') ? 4.5 : 3));
+    AudioSys.hit();
+    this._sparks(b.x, b.y, crit ? '#ffd166' : e.color, crit ? 7 : 4);
+    if (crit) this.floats.push(new FloatText(b.x, b.y - 8, '暴击', '#ff5470', 11));
+    // 裂变弹:命中后分裂出 2 枚小弹(羁绊「弹幕风暴」赋予贯穿)
+    if (b.split > 0) {
+      for (let i = 0; i < 2; i++) {
+        const a = -Math.PI / 2 + (i ? 0.55 : -0.55);
+        this.playerBullets.push({
+          x: b.x, y: b.y, vx: Math.cos(a) * 330, vy: Math.sin(a) * 330,
+          r: 2.2, dmg: Math.max(1, Math.round(b.dmg * 0.4)), color: '#a5ffd6', dead: false,
+          pierce: this.bonds.includes('storm') ? 1 : 0, split: 0, child: true
+        });
+      }
+    }
+    // 贯穿:未耗尽穿透数时继续飞行
+    if (b.pierce > 0) { b.pierce--; b.lastHit = e; }
+    else b.dead = true;
+    e.damage(dmg, this);
+  }
+
   /* ---------------- 击杀 / 伤害结算 ---------------- */
   killEnemy(e) {
     this.combo++;
-    this.comboT = 2;
+    this.comboT = this.comboWindow;
     this.stats.kills = this._stat('kills', 0) + 1;
     this.waveKills++;
+    // 歼灭装填:击坠积累炸弹
+    if (this.mods.bombkill) {
+      this.bombMeter++;
+      const need = this.mods.bombkill === 1 ? 25 : 15;
+      if (this.bombMeter >= need) {
+        this.bombMeter = 0;
+        if (this.player.bombs < 5) {
+          this.player.bombs++;
+          this.floats.push(new FloatText(this.player.x, this.player.y - 30, '歼灭装填 炸弹+1', '#51e08a', 12));
+        }
+      }
+    }
     const mult = this.multiplier();
     const pts = Math.round(e.score * mult);
     this.score += pts;
@@ -363,6 +518,18 @@ class Game {
     this._explode(e.x, e.y, e.r, e.color, 1);
     AudioSys.explode(e.r >= 18);
     this.shake(Math.min(9, 1.5 + e.r * 0.18), 0.22);
+    // 掉落经验晶体(精英 ×4)
+    const xpTable = { drone: 2, waver: 3, sniper: 4, tank: 8 };
+    let xp = (xpTable[e.type] || 2) * (e.elite ? 4 : 1);
+    while (xp > 0) {
+      const v = Math.min(4, xp);
+      xp -= v;
+      this.orbs.push(new XPOrb(e.x + rand(-10, 10), e.y + rand(-10, 10), v));
+    }
+    if (this.orbs.length > 140) {
+      const overflow = this.orbs.splice(0, this.orbs.length - 140);
+      for (const o of overflow) this.gainXP(o.v);
+    }
     if (e.type === 'tank') this._dropPower(e.x, e.y);
     else if (e.elite) {
       // 精英必掉道具 + 额外奖励分
@@ -376,7 +543,7 @@ class Game {
 
   killBoss(b) {
     this.combo++;
-    this.comboT = 2;
+    this.comboT = this.comboWindow;
     this.stats.bossKills = this._stat('bossKills', 0) + 1;
     this.waveKills++;
     const pts = Math.round(b.score * this.multiplier());
@@ -392,6 +559,11 @@ class Game {
     this._dropPower(b.x - 40, b.y, 'power');
     this._dropPower(b.x + 40, b.y, 'bomb');
     this._dropPower(b.x, b.y - 20, Math.random() < 0.5 ? 'life' : 'shield');
+    // 旗舰核心大量经验:环形散落晶体
+    for (let i = 0; i < 15; i++) {
+      const a = i / 15 * TAU;
+      this.orbs.push(new XPOrb(b.x + Math.cos(a) * 40, b.y + Math.sin(a) * 24, 4));
+    }
   }
 
   _dropPower(x, y, force) {
@@ -442,9 +614,11 @@ class Game {
     if (p.shield) {
       p.shield = false;
       p.invuln = 1.2;
+      if (this.mods.shieldgen) p.shieldCd = p.shieldInterval; // 重启护盾充能
       AudioSys.shieldBreak();
       this.shake(7, 0.3);
       this.rings.push(new Ring(p.x, p.y, '#4db8ff', 60, 0.4));
+      this._thornBlast();
       return;
     }
     p.lives--;
@@ -453,6 +627,7 @@ class Game {
     this.flashT = 0.35; this.flashColor = 'rgba(255,70,90,';
     this._explode(p.x, p.y, 16, '#7ef3ff', 1.4);
     this.combo = 0;
+    this._thornBlast();
     if (p.lives <= 0) {
       p.alive = false;
       this._explode(p.x, p.y, 26, '#7ef3ff', 2);
@@ -463,6 +638,25 @@ class Game {
       p.x = W / 2;
       p.y = H - 90;
     }
+  }
+
+  /* 反击风暴:受击时清除周围弹幕并放出冲击波 */
+  _thornBlast() {
+    if (!this.mods.thorn || !this.player.alive) return;
+    const p = this.player, R = 150;
+    for (const b of this.enemyBullets) {
+      const dx = b.x - p.x, dy = b.y - p.y;
+      if (dx * dx + dy * dy < R * R) {
+        this._sparks(b.x, b.y, '#a5ffd6', 2);
+        b.dead = true;
+      }
+    }
+    for (const e of this.enemies) {
+      const dx = e.x - p.x, dy = e.y - p.y;
+      if (dx * dx + dy * dy < R * R) e.damage(4, this);
+    }
+    this.rings.push(new Ring(p.x, p.y, '#a5ffd6', R, 0.45));
+    AudioSys.web();
   }
 
   /* ---------------- 炸弹 ---------------- */
@@ -550,6 +744,7 @@ class Game {
     if (off) ctx.translate(off[0], off[1]);
 
     for (const pu of this.powerups) pu.draw(ctx);
+    for (const o of this.orbs) o.draw(ctx);
     for (const e of this.enemies) e.draw(ctx);
     if (this.boss) this.boss.draw(ctx);
     this.player.draw(ctx);
@@ -680,14 +875,32 @@ class Game {
       ctx.lineWidth = 1;
       ctx.strokeRect(bx - 2.5, by - 2.5, bw + 5, 13);
     }
+    // 经验条与等级
+    if (this.level > 1 || this.xp > 0 || this.mods && Object.keys(this.mods).length) {
+      const bw = 170, bx = (W - bw) / 2, by = 12;
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#8fe8ff';
+      ctx.font = 'bold 12px Consolas, monospace';
+      ctx.fillText('LV ' + this.level, bx - 8, by - 1);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(bx - 1, by - 1, bw + 2, 9);
+      const xf = clamp(this.xp / this.xpNext, 0, 1);
+      ctx.fillStyle = '#37e2ff';
+      ctx.fillRect(bx, by, bw * xf, 7);
+      ctx.strokeStyle = 'rgba(143,232,255,0.4)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx - 1.5, by - 1.5, bw + 3, 10);
+    }
     // 波次横幅
     if (this.banner && this.banner.life > 0) {
       const b = this.banner;
       const a = Math.min(1, b.life / 0.5) * Math.min(1, (b.max - b.life) * 4);
       ctx.globalAlpha = clamp(a, 0, 1);
-      ctx.fillStyle = b.red ? '#ff3355' : '#7ef3ff';
+      const col = b.red ? '#ff3355' : (b.gold ? '#ffd166' : '#7ef3ff');
+      const glow = b.red ? '#ff3355' : (b.gold ? '#ffae30' : '#37e2ff');
+      ctx.fillStyle = col;
       ctx.font = 'bold 34px "Segoe UI", "Microsoft YaHei", sans-serif';
-      ctx.shadowColor = b.red ? '#ff3355' : '#37e2ff';
+      ctx.shadowColor = glow;
       ctx.shadowBlur = 18;
       ctx.fillText(b.text, W / 2, H * 0.38);
       ctx.shadowBlur = 0;
@@ -695,6 +908,30 @@ class Game {
       ctx.font = '15px "Segoe UI", "Microsoft YaHei", sans-serif';
       ctx.fillText(b.sub, W / 2, H * 0.38 + 42);
       ctx.globalAlpha = 1;
+    }
+    // 已获强化图标与羁绊
+    const owned = UPGRADES.filter(u => this.mods[u.id]);
+    if (owned.length) {
+      ctx.textAlign = 'center';
+      ctx.font = '11px "Segoe UI", sans-serif';
+      const total = owned.length * 18 - 6;
+      let ox = W / 2 - total / 2 + 7;
+      for (const u of owned) {
+        const cnt = this.mods[u.id];
+        ctx.fillStyle = RARITY[u.rar].color;
+        ctx.fillText(u.icon, ox, H - 38);
+        if (u.max > 1) {
+          ctx.fillStyle = 'rgba(230,245,255,0.75)';
+          ctx.fillText(String(cnt), ox + 5, H - 30);
+        }
+        ox += 18;
+      }
+    }
+    if (this.bonds.length) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
+      ctx.fillText('羁绊 ' + this.bonds.map(id => BONDS.find(b => b.id === id).name).join(' · '), 14, H - 44);
     }
   }
 

@@ -108,6 +108,31 @@ const AudioSys = {
     this.tone({ freq: 330, end: 550, dur: 0.3, type: 'sawtooth', vol: 0.16 });
     this.tone({ freq: 440, end: 700, dur: 0.3, type: 'sawtooth', vol: 0.12, delay: 0.18 });
   },
+  _lastXpT: 0,
+  xp() {
+    // 拾取音限频,避免成串晶体同时拾取时爆音
+    if (!this.ctx || this.ctx.currentTime - this._lastXpT < 0.05) return;
+    this._lastXpT = this.ctx.currentTime;
+    this.tone({ freq: 760 + rand(0, 160), end: 1300, dur: 0.06, type: 'sine', vol: 0.06 });
+  },
+  missile() {
+    this.tone({ freq: 240, end: 620, dur: 0.18, type: 'sawtooth', vol: 0.07 });
+  },
+  web() {
+    this.tone({ freq: 520, end: 300, dur: 0.12, type: 'triangle', vol: 0.09 });
+  },
+  levelup() {
+    [523, 659, 784, 1047, 1319].forEach((f, i) =>
+      this.tone({ freq: f, dur: 0.14, type: 'square', vol: 0.16, delay: i * 0.08 }));
+  },
+  cardPick() {
+    this.tone({ freq: 880, end: 1200, dur: 0.08, type: 'triangle', vol: 0.14 });
+  },
+  bond() {
+    [392, 523, 659, 784, 1047, 1319].forEach((f, i) =>
+      this.tone({ freq: f, dur: 0.2, type: 'square', vol: 0.15, delay: i * 0.07 }));
+    this.noise({ dur: 0.4, vol: 0.1, from: 6000, to: 2000, delay: 0.1 });
+  },
   gameover() {
     [392, 330, 262, 196].forEach((f, i) =>
       this.tone({ freq: f, dur: 0.3, type: 'triangle', vol: 0.25, delay: i * 0.25 }));
