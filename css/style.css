@@ -170,6 +170,29 @@ h2 {
   animation: blink 1.6s steps(2) infinite;
 }
 
+/* ---------- 成就 ---------- */
+.ach-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; text-align: left; }
+.ach-head {
+  grid-column: 1 / -1; font-size: 12px; letter-spacing: 2px;
+  color: rgba(255, 209, 102, 0.85); font-family: Consolas, monospace;
+  margin-bottom: 2px;
+}
+.ach-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 9px; border-radius: 8px;
+  border: 1px solid rgba(126, 243, 255, 0.16);
+  background: rgba(10, 20, 45, 0.5);
+}
+.ach-item i { font-style: normal; font-size: 14px; }
+.ach-item b { display: block; font-size: 12px; letter-spacing: 1px; }
+.ach-item span { display: block; font-size: 10.5px; line-height: 1.4; }
+.ach-item.on { border-color: rgba(255, 209, 102, 0.45); }
+.ach-item.on b { color: #ffd166; }
+.ach-item.on span { color: rgba(207, 232, 255, 0.8); }
+.ach-item.off { opacity: 0.45; }
+.ach-item.off b { color: rgba(207, 232, 255, 0.6); }
+.ach-item.off span { color: rgba(159, 184, 208, 0.6); }
+
 .hi-score { margin-top: 16px; font-size: 13px; color: rgba(255, 209, 102, 0.8); letter-spacing: 2px; }
 
 .new-record {

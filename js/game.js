@@ -40,6 +40,7 @@ class Game {
       stKills: document.getElementById('stKills'),
       stScore: document.getElementById('stScore'),
       stBoss: document.getElementById('stBoss'),
+      achList: document.getElementById('achList'),
       levelup: document.getElementById('levelupOverlay'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
@@ -68,6 +69,16 @@ class Game {
     d.stKills.textContent = this._stat('kills', 0);
     d.stScore.textContent = this._stat('totalScore', 0);
     d.stBoss.textContent = this._stat('bossKills', 0);
+    // 成就列表
+    const on = Ach.count();
+    d.achList.innerHTML =
+      '<div class="ach-head">' + on + ' / ' + ACHIEVEMENTS.length + '</div>' +
+      ACHIEVEMENTS.map(a => {
+        const got = !!Ach.unlocked[a.id];
+        return '<div class="ach-item ' + (got ? 'on' : 'off') + '">' +
+          '<i>' + (got ? '🏆' : '🔒') + '</i>' +
+          '<div><b>' + a.name + '</b><span>' + a.desc + '</span></div></div>';
+      }).join('');
   }
 
   /* ---- 菜单子页面切换 ---- */
@@ -110,6 +121,7 @@ class Game {
     this.xpMult = 1; this.comboWindow = 2;
     this.bombMeter = 0;
     this.wingmen = []; this.rifts = []; this.riftCd = 0;
+    this.runKills = 0; this.runEliteKills = 0;
     this._cardChoices = [];
     this._recalc();
   }
@@ -179,6 +191,7 @@ class Game {
       this.level++;
       this.xpNext = Math.round(this.xpNext * 1.3 + 5);
       this.pendingLevels++;
+      if (this.level >= 10) Ach.unlock('level_10', this);
     }
     if (this.pendingLevels > 0 && this.state === 'playing' && this.player.alive) this.openLevelup();
   }
@@ -240,6 +253,7 @@ class Game {
       this.bonds.push(b.id);
       this.banner = { text: '羁绊觉醒 · ' + b.name, sub: b.desc, life: 2.6, max: 2.6, gold: true };
       AudioSys.bond();
+      if (this.bonds.length >= 3) Ach.unlock('bond_3', this);
     }
     this._recalc();
     this.pendingLevels--;
@@ -256,6 +270,9 @@ class Game {
   startWave(n) {
     this.wave = n; this.waveTime = 0; this.spawnQueue = []; this.waveClearT = -1;
     this.waveKills = 0; this.trickleT = 0;
+    if (n >= 5) Ach.unlock('wave_5', this);
+    if (n >= 10) Ach.unlock('wave_10', this);
+    if (n >= 15) Ach.unlock('wave_15', this);
     if (n % 5 === 0) {
       this.waveQuota = 1; // 目标:击毁旗舰
       const bname = BOSS_VARIANTS[bossVariant(n)].name;
@@ -536,6 +553,15 @@ class Game {
     this.comboT = this.comboWindow;
     this.stats.kills = this._stat('kills', 0) + 1;
     this.waveKills++;
+    this.runKills++;
+    // 成就
+    Ach.unlock('first_kill', this);
+    if (this.runKills >= 60) Ach.unlock('run_kill60', this);
+    if (this.combo >= 30) Ach.unlock('combo_30', this);
+    if (e.elite) {
+      this.runEliteKills++;
+      if (this._stat('eliteKills', 0) + this.runEliteKills >= 10) Ach.unlock('elite_10', this);
+    }
     // 歼灭装填:击坠积累炸弹
     if (this.mods.bombkill) {
       this.bombMeter++;
@@ -583,6 +609,8 @@ class Game {
     this.comboT = this.comboWindow;
     this.stats.bossKills = this._stat('bossKills', 0) + 1;
     this.waveKills++;
+    Ach.unlock('boss_1', this);
+    if (this.stats.bossKills >= 5) Ach.unlock('boss_5', this);
     const pts = Math.round(b.score * this.multiplier());
     this.score += pts;
     this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
@@ -619,6 +647,7 @@ class Game {
       if (p.weapon < 5) {
         p.weapon++;
         this._addFloat(new FloatText(p.x, p.y - 24, '火力提升!', '#ff5470'));
+        if (p.weapon >= 5) Ach.unlock('max_weapon', this);
       } else {
         this.score += 300;
         this._addFloat(new FloatText(p.x, p.y - 24, '+300', '#ffd166'));
@@ -992,6 +1021,7 @@ class Game {
     s.games = this._stat('games', 0) + 1;
     s.kills = this._stat('kills', 0);
     s.bossKills = this._stat('bossKills', 0);
+    s.eliteKills = this._stat('eliteKills', 0) + this.runEliteKills;
     s.totalScore = this._stat('totalScore', 0) + this.score;
     s.bestWave = Math.max(this._stat('bestWave', 0), this.wave);
     this.saveStats();
