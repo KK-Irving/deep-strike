@@ -90,6 +90,10 @@ function initSprites() {
       path: (g) => { g.moveTo(0, 14); g.lineTo(11, 0); g.lineTo(0, -11); g.lineTo(-11, 0); } },
     tank:   { color: '#ff9a3c', fill: '#40230c', half: 32, baseR: 21, dotR: 6, dotY: 1,
       path: (g) => { for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + Math.PI / 6; const px = Math.cos(a) * 21, py = Math.sin(a) * 21; i ? g.lineTo(px, py) : g.moveTo(px, py); } } },
+    bomber: { color: '#ff6a3c', fill: '#40180c', half: 18, baseR: 9, dotR: 2.5, dotY: -1,
+      path: (g) => { g.moveTo(0, 11); g.lineTo(9, -8); g.lineTo(0, -3); g.lineTo(-9, -8); } },
+    shielder: { color: '#5ad0ff', fill: '#0e2c40', half: 26, baseR: 15, dotR: 5, dotY: 0,
+      path: (g) => { for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; const px = Math.cos(a) * 15, py = Math.sin(a) * 15; i ? g.lineTo(px, py) : g.moveTo(px, py); } } },
     sniper: { color: '#c86bff', fill: '#2a1240', half: 24, baseR: 13, dotR: 3, dotY: 1,
       path: (g) => { g.moveTo(0, 13); g.lineTo(10, -10); g.lineTo(0, -3); g.lineTo(-10, -10); } }
   };
@@ -477,6 +481,19 @@ class Enemy {
       this.r = 21; this.hp = Math.max(5, Math.round(6 * hpM)); this.score = 300;
       this.vy = 42 * spM; this.fireCd = 1.4;
       this.color = '#ff9a3c'; this.fill = '#40230c';
+    } else if (type === 'bomber') {
+      // 自爆蜂:追踪俯冲,接近玩家或引信耗尽时自爆成环弹;击坠可拆除
+      this.r = 9; this.hp = Math.max(1, Math.round(1 * hpM)); this.score = 200;
+      this.vy = (150 + wave * 4) * spM;
+      this.fuse = rand(2.6, 3.6);
+      this.dvx = 0; this.dvy = this.vy;
+      this.color = '#ff6a3c'; this.fill = '#40180c';
+    } else if (type === 'shielder') {
+      // 护盾兵:正面护盾周期开合,格挡自下而上的陡角弹道
+      this.r = 15; this.hp = Math.max(8, Math.round(9 * hpM)); this.score = 400;
+      this.vy = 34 * spM;
+      this.shieldCycle = 2.4; this.shieldOff = 0;
+      this.color = '#5ad0ff'; this.fill = '#0e2c40';
     } else { // sniper
       this.r = 13; this.hp = Math.max(2, Math.round(3 * hpM)); this.score = 250;
       this.vy = 170 * spM; this.stopY = rand(90, 210); this.stopped = false;
@@ -535,6 +552,33 @@ class Enemy {
         for (let i = -1; i <= 1; i++)
           game.enemyShot(this.x, this.y + this.r, Math.PI / 2 + i * 0.4, 140 + game.wave * 4, 'orange');
         AudioSys.enemyShoot();
+      }
+    } else if (this.type === 'bomber') {
+      // 追踪俯冲 + 引信
+      const aim = game.aimedAngle(this.x, this.y);
+      const f = Math.min(1, 3.2 * dt);
+      this.dvx += (Math.cos(aim) * this.vy - this.dvx) * f;
+      this.dvy += (Math.sin(aim) * this.vy - this.dvy) * f;
+      this.x = clamp(this.x + this.dvx * dt, 14, W - 14);
+      this.y += this.dvy * dt;
+      this.fuse -= dt;
+      const pdx = game.player.x - this.x, pdy = game.player.y - this.y;
+      if (!this.dead && (pdx * pdx + pdy * pdy < 8100 || this.fuse <= 0)) {
+        this.dead = true;
+        for (let i = 0; i < 8; i++)
+          game.enemyShot(this.x, this.y, i / 8 * TAU + 0.3, 130 + game.wave * 3);
+        game._explode(this.x, this.y, 14, '#ff9a3c', 0.9);
+        game.shake(5, 0.2);
+        AudioSys.explode(false);
+      }
+    } else if (this.type === 'shielder') {
+      this.y += this.vy * dt;
+      this.x = clamp(this.baseX + Math.sin(this.t * 0.7) * 30, 20, W - 20);
+      if (this.shieldOff > 0) {
+        this.shieldOff -= dt;
+      } else {
+        this.shieldCycle -= dt;
+        if (this.shieldCycle <= 0) { this.shieldOff = 1.2; this.shieldCycle = 2.4; }
       }
     } else { // sniper
       if (!this.stopped) {
@@ -599,6 +643,15 @@ class Enemy {
     ctx.scale(this.r / spr.baseR, this.r / spr.baseR);
     const img = this.flash > 0 ? spr.flash : spr.body;
     ctx.drawImage(img, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
+    // 护盾兵:正面护盾弧
+    if (this.type === 'shielder' && this.shieldOff <= 0) {
+      const warn = this.shieldCycle < 0.5 && Math.floor(this.shieldCycle * 10) % 2 === 0;
+      ctx.strokeStyle = warn ? 'rgba(90,208,255,0.35)' : 'rgba(90,208,255,0.9)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 3, this.r + 8, Math.PI * 0.12, Math.PI * 0.88);
+      ctx.stroke();
+    }
     ctx.restore();
     // 血条(屏幕坐标)
     if (this.elite || (this.hp < this.maxHp && this.maxHp >= 3)) {

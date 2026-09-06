@@ -227,7 +227,9 @@ class Game {
       for (const e of this.enemies) {
         if (e.dead || e.elitePhased) continue;
         if (e.y < p.y - 6 && Math.abs(e.x - bx) < e.r + halfW) {
-          e.damage(dps * dt, this, true);
+          // 护盾开启的护盾兵:激光仅 30% 烧蚀通过
+          const mul = (e.type === 'shielder' && e.shieldOff <= 0) ? 0.3 : 1;
+          e.damage(dps * dt * mul, this, true);
           hitAny = true;
         }
       }
@@ -348,10 +350,12 @@ class Game {
     while (budget > 0) {
       const roll = RNG();
       let type = 'drone';
-      if (n >= 3 && roll < 0.18) type = 'tank';
-      else if (n >= 2 && roll < 0.48) type = 'waver';
-      else if (n >= 4 && roll < 0.62) type = 'sniper';
-      let cost = type === 'tank' ? 3 : (type === 'drone' ? 1 : 2);
+      if (n >= 3 && roll < 0.16) type = 'tank';
+      else if (n >= 4 && roll < 0.30) type = 'bomber';
+      else if (n >= 5 && roll < 0.38) type = 'shielder';
+      else if (n >= 2 && roll < 0.66) type = 'waver';
+      else if (n >= 4 && roll < 0.80) type = 'sniper';
+      let cost = type === 'tank' ? 3 : (type === 'shielder' ? 4 : (type === 'drone' ? 1 : 2));
       if (cost > budget) { type = 'drone'; cost = 1; }
       if (type === 'drone') {
         const cnt = Math.min(budget, irand(2, 4));
@@ -489,9 +493,11 @@ class Game {
         if (this.trickleT <= 0) {
           this.trickleT = Math.max(0.7, 1.6 - this.wave * 0.06);
           const roll = RNG();
-          const type = this.wave >= 3 && roll < 0.16 ? 'tank'
-            : this.wave >= 2 && roll < 0.5 ? 'waver'
-            : this.wave >= 4 && roll < 0.65 ? 'sniper' : 'drone';
+          const type = this.wave >= 3 && roll < 0.14 ? 'tank'
+            : this.wave >= 4 && roll < 0.26 ? 'bomber'
+            : this.wave >= 5 && roll < 0.34 ? 'shielder'
+            : this.wave >= 2 && roll < 0.62 ? 'waver'
+            : this.wave >= 4 && roll < 0.78 ? 'sniper' : 'drone';
           this.enemies.push(new Enemy(type, rand(60, W - 60), this.wave));
         }
       } else if (this.waveClearT < 0) {
@@ -532,6 +538,16 @@ class Game {
         const dx = b.x - e.x, dy = b.y - e.y;
         const rr = e.r + b.r;
         if (dx * dx + dy * dy < rr * rr) {
+          // 护盾兵正面护盾:仅格挡来自下半球的弹道(绕至上方攻击可破盾)
+          if (e.type === 'shielder' && e.shieldOff <= 0) {
+            const ang = Math.atan2(b.y - e.y, b.x - e.x);
+            if (ang > Math.PI * 0.2 && ang < Math.PI * 0.8) {
+              b.dead = true;
+              this._sparks(b.x, b.y, '#5ad0ff', 3);
+              AudioSys.hit();
+              break;
+            }
+          }
           this._hitTarget(b, e);
           break;
         }
@@ -648,7 +664,7 @@ class Game {
     AudioSys.explode(e.r >= 18);
     this.shake(Math.min(9, 1.5 + e.r * 0.18), 0.22);
     // 掉落经验晶体(精英 ×4)
-    const xpTable = { drone: 2, waver: 3, sniper: 4, tank: 8 };
+    const xpTable = { drone: 2, waver: 3, sniper: 4, tank: 8, bomber: 3, shielder: 10 };
     let xp = (xpTable[e.type] || 2) * (e.elite ? 4 : 1);
     while (xp > 0) {
       const v = Math.min(4, xp);
