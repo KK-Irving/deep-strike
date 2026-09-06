@@ -219,12 +219,13 @@ class FloatText {
     if (this.life <= 0) this.dead = true;
   }
   draw(ctx) {
+    ctx.save();
     ctx.globalAlpha = clamp(this.life / 0.4, 0, 1);
     ctx.fillStyle = this.color;
     ctx.font = 'bold ' + this.size + 'px "Segoe UI", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(this.text, this.x, this.y);
-    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 }
 

@@ -1615,6 +1615,7 @@ class Game {
     }
     // 连击
     if (this.combo >= 4) {
+      ctx.textAlign = 'center';
       ctx.fillStyle = '#ffd166';
       ctx.font = 'bold 15px Consolas, monospace';
       ctx.fillText(this.combo + ' COMBO  ×' + this.multiplier(), W / 2, 60);
@@ -1664,15 +1665,24 @@ class Game {
       ctx.globalAlpha = clamp(a, 0, 1);
       const col = b.red ? '#ff3355' : (b.gold ? '#ffd166' : '#7ef3ff');
       const glow = b.red ? '#ff3355' : (b.gold ? '#ffae30' : '#37e2ff');
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const maxW = W - 36;
       ctx.fillStyle = col;
       ctx.font = 'bold 34px "Segoe UI", "Microsoft YaHei", sans-serif';
+      const mainW = ctx.measureText(b.text).width;
+      if (mainW > maxW) ctx.font = 'bold ' + Math.max(16, Math.floor(34 * maxW / mainW)) + 'px "Segoe UI", "Microsoft YaHei", sans-serif';
       ctx.shadowColor = glow;
       ctx.shadowBlur = 18;
       ctx.fillText(b.text, W / 2, H * 0.38);
       ctx.shadowBlur = 0;
       ctx.fillStyle = 'rgba(230,245,255,0.85)';
       ctx.font = '15px "Segoe UI", "Microsoft YaHei", sans-serif';
+      const subW = ctx.measureText(b.sub).width;
+      if (subW > maxW) ctx.font = Math.max(10, Math.floor(15 * maxW / subW)) + 'px "Segoe UI", "Microsoft YaHei", sans-serif';
       ctx.fillText(b.sub, W / 2, H * 0.38 + 42);
+      ctx.restore();
       ctx.globalAlpha = 1;
     }
     // 已获强化图标与羁绊
