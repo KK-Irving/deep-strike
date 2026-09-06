@@ -4,6 +4,20 @@
  * 状态机 / 波次导演 / 碰撞 / 特效 / HUD 渲染
  * ============================================================ */
 
+/* 遗物:旗舰击毁后掉落的被动神器(唯一,不占卡槽) */
+const RELICS = [
+  { id: 'r_thorn_crown', icon: '👑', name: '荆棘王冠', desc: '接触伤害 ×2,撞击敌机更疼' },
+  { id: 'r_voidwatch',   icon: '⌛', name: '虚空怀表', desc: '全部敌方弹幕额外减速 10%' },
+  { id: 'r_hunter',      icon: '🎯', name: '猎手徽记', desc: '暴击率 +10%' },
+  { id: 'r_belt',        icon: '💊', name: '巨人药剂', desc: '生命上限 +30,拾取时回满' },
+  { id: 'r_horn',        icon: '📯', name: '补给号角', desc: '每波开始时掉落一枚随机道具' },
+  { id: 'r_dragon',      icon: '🐲', name: '龙魂核心', desc: '炸弹上限 +2,炸弹伤害 +15' },
+  { id: 'r_grail',       icon: '🏆', name: '贪婪圣杯', desc: '星晶获取 ×2' },
+  { id: 'r_bloodmoon',   icon: '🌙', name: '血月初刃', desc: '击坠 8% 概率回复 8 点生命' },
+  { id: 'r_cloak',       icon: '🧿', name: '相位斗篷', desc: '受击后的无敌时间 +0.7 秒' },
+  { id: 'r_thor',        icon: '⚡', name: '雷神之锤', desc: '击坠时 15% 概率引落闪电,重创 3 个随机敌人' }
+];
+
 /* 无尽模式波次词缀:第 6 波起概率出现(BOSS 波除外) */
 const WAVE_MODS = [
   { id: 'horde',   icon: '✸', name: '狂潮', desc: '出怪配额 +40%' },
@@ -153,6 +167,7 @@ class Game {
     this._cardChoices = [];
     this._pendingSwap = null; this._swapList = null;
     this.evo = {}; this.bulletFreezeT = 0;
+    this.relics = {}; this.pendingRelic = false; this._relicMode = false; this._relicChoices = [];
     this.waveMod = null; this._env = { hpMul: 1, spdMul: 1, fireMul: 1 };
     this._recalc();
   }
@@ -255,11 +270,12 @@ class Game {
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
     const timePerStack = this.bonds.includes('chrono') ? 0.30 : 0.18;
     this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
+    if (this.relics.r_voidwatch) this.bulletSlow = Math.max(0.3, this.bulletSlow * 0.9);
     // 卡槽系统:基础 5 槽,隐藏卡扩展
     this.maxSlots = 5 + (m.slotplus || 0);
     // 生命值系统:上限 = 机体基础 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
     p.maxHp = (sh.hp || 100) + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
-      + (Shop.boosts.hp25 ? 25 : 0);
+      + (Shop.boosts.hp25 ? 25 : 0) + (this.relics.r_belt ? 30 : 0);
     p.armorPct = Math.min(0.5, 0.15 * (m.armor || 0) + (sh.perkArmor || 0));
     p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1);
     p.leechPer = 0.7 * (m.leech || 0);
@@ -407,6 +423,62 @@ class Game {
     this._dom.ownRow.innerHTML = html || '<span class="chip">首次升级 · 选择你的成长路线</span>';
   }
 
+  /* 遗物三选一:复用升级界面 */
+  _openRelicChoice() {
+    if (this.state !== 'playing') return;
+    const avail = RELICS.filter(x => !this.relics[x.id]);
+    if (!avail.length) return;
+    const picks = [];
+    const pool = avail.slice();
+    for (let i = 0; i < 3 && pool.length; i++) {
+      picks.push(pool.splice(irand(0, pool.length - 1), 1)[0]);
+    }
+    this._relicMode = true;
+    this._relicChoices = picks;
+    this.state = 'levelup';
+    AudioSys.levelup();
+    this._renderRelics();
+    this._showState();
+  }
+
+  chooseRelic(i) {
+    if (!this._relicMode || this.state !== 'levelup') return;
+    const r = this._relicChoices[i];
+    if (!r) return;
+    this.relics[r.id] = true;
+    AudioSys.bond();
+    this.banner = { text: '遗物获得 · ' + r.name, sub: r.desc, life: 2.6, max: 2.6, gold: true };
+    this._relicMode = false;
+    this._relicChoices = [];
+    this._recalc();
+    if (r.id === 'r_belt') this.player.hp = this.player.maxHp;
+    this.state = 'playing';
+    this._showState();
+  }
+
+  _renderRelics() {
+    const row = this._dom.cardRow;
+    row.innerHTML = '';
+    this._dom.lvSub.innerHTML = '旗舰遗落了远古造物 · <b style="color:#ffd166">选择一件遗物</b>(按 1 / 2 / 3)';
+    this._relicChoices.forEach((r, i) => {
+      const el = document.createElement('button');
+      el.className = 'card r3 evo-card';
+      el.innerHTML =
+        '<div class="card-rar" style="color:#ffd166">遗 物 ✦</div>' +
+        '<div class="card-icon">' + r.icon + '</div>' +
+        '<div class="card-name">' + r.name + '</div>' +
+        '<div class="card-desc">' + r.desc + '</div>' +
+        '<div class="card-lv">被动生效 · 按 ' + (i + 1) + '</div>';
+      el.addEventListener('click', () => this.chooseRelic(i));
+      row.appendChild(el);
+    });
+    let html = '';
+    for (const r0 of RELICS) {
+      if (this.relics[r0.id]) html += '<span class="chip evo"><i>' + r0.icon + '</i>' + r0.name + '</span>';
+    }
+    this._dom.ownRow.innerHTML = html || '<span class="chip">尚无遗物</span>';
+  }
+
   /* 取消替换:回到三选一界面 */
   cancelSwap() {
     if (this.state !== 'levelup' || !this._pendingSwap) return;
@@ -535,6 +607,11 @@ class Game {
       this._swapList = null;
       this.state = 'playing';
       this._showState();
+      // 升级链结束:若旗舰遗落遗物,弹出三选一
+      if (this.pendingRelic && this.state === 'playing' && this.player.alive) {
+        this.pendingRelic = false;
+        this._openRelicChoice();
+      }
     }
   }
 
@@ -544,6 +621,8 @@ class Game {
     this.waveKills = 0; this.trickleT = 0;
     // 时间冻结:每波开始静止敌方弹幕
     if (this.evo.time) this.bulletFreezeT = 2.5;
+    // 补给号角:波首掉落随机道具
+    if (this.relics.r_horn) this._dropPower(rand(60, W - 60), -20);
     const threat = this.threatLevel();
     // 波次词缀:第 6 波起 40% 概率(BOSS 波除外)
     this.waveMod = null;
@@ -559,7 +638,8 @@ class Game {
     // 里程碑:每 10 波投放补给(炸弹+1 与 25% 生命修复)
     const milestone = n > 10 && (n - 1) % 10 === 0;
     if (milestone) {
-      if (this.player.bombs < 5) this.player.bombs++;
+      const bombCap = this.relics.r_dragon ? 7 : 5;
+      if (this.player.bombs < bombCap) this.player.bombs++;
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + Math.round(this.player.maxHp * 0.25));
     }
     if (n >= 5) Ach.unlock('wave_5', this);
@@ -857,7 +937,7 @@ class Game {
           const dx = e.x - p.x, dy = e.y - p.y;
           const rr = e.r + p.r;
           if (dx * dx + dy * dy < rr * rr) {
-            e.damage(3, this);
+            e.damage(this.relics.r_thorn_crown ? 6 : 3, this);
             this._playerHit(35);
             break;
           }
@@ -909,7 +989,7 @@ class Game {
   /* 单发子弹命中结算:暴击 / 贯穿 / 裂变 */
   _hitTarget(b, e) {
     let dmg = b.dmg;
-    const cc = 0.2 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0);
+    const cc = 0.2 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0);
     const guaranteed = b.homing && this.bonds.includes('hunt');
     const crit = guaranteed || (cc > 0 && RNG() < cc);
     if (crit) dmg = Math.round(dmg * (this.bonds.includes('execute') ? 4.5 : 3));
@@ -970,6 +1050,20 @@ class Game {
       Shop.addCrystal(2);
       this._addFloat(new FloatText(e.x, e.y - 40, '★+2', '#ffd166', 11));
     }
+    // 血月初刃:8% 回血
+    if (this.relics.r_bloodmoon && RNG() < 0.08 && this.player.alive) {
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + 8);
+      this._addFloat(new FloatText(this.player.x, this.player.y - 26, '血月回血 +8', '#ff77a9', 11));
+    }
+    // 雷神之锤:15% 引落闪电
+    if (this.relics.r_thor && RNG() < 0.15 && this.enemies.length) {
+      const targets = this.enemies.filter(x => !x.dead).sort(() => RNG() - 0.5).slice(0, 3);
+      for (const t of targets) {
+        t.damage(5, this);
+        this.rings.push(new Ring(t.x, t.y, '#ffe98a', 30, 0.3));
+      }
+      AudioSys.beam();
+    }
     this.stats.kills = this._stat('kills', 0) + 1;
     this.waveKills++;
     this.runKills++;
@@ -1005,7 +1099,7 @@ class Game {
       const need = this.mods.bombkill === 1 ? 25 : 15;
       if (this.bombMeter >= need) {
         this.bombMeter = 0;
-        if (this.player.bombs < 5) {
+        if (this.player.bombs < (this.relics.r_dragon ? 7 : 5)) {
           this.player.bombs++;
           this._addFloat(new FloatText(this.player.x, this.player.y - 30, '歼灭装填 炸弹+1', '#51e08a', 12));
         }
@@ -1047,8 +1141,9 @@ class Game {
     this.stats.bossKills = this._stat('bossKills', 0) + 1;
     this.runBossKills = (this.runBossKills || 0) + 1;
     this.waveKills++;
-    // 旗舰奖励:击毁后获得一次额外升级机会
+    // 旗舰奖励:击毁后获得一次额外升级机会 + 一件遗物三选一
     this.pendingLevels++;
+    this.pendingRelic = true;
     if (this.state === 'playing' && this.player.alive) this.openLevelup();
     Ach.unlock('boss_1', this);
     if (this.stats.bossKills >= 5) Ach.unlock('boss_5', this);
@@ -1101,7 +1196,7 @@ class Game {
       p.shield = true;
       this._addFloat(new FloatText(p.x, p.y - 24, '护盾展开!', '#4db8ff'));
     } else if (type === 'bomb') {
-      if (p.bombs < 5) {
+      if (p.bombs < (this.relics.r_dragon ? 7 : 5)) {
         p.bombs++;
         this._addFloat(new FloatText(p.x, p.y - 24, '炸弹 +1', '#51e08a'));
       } else {
@@ -1125,7 +1220,7 @@ class Game {
     if (p.invuln > 0 || !p.alive) return;
     if (p.shield) {
       p.shield = false;
-      p.invuln = 1.2;
+      p.invuln = 1.2 + (this.relics.r_cloak ? 0.7 : 0);
       if (this.mods.shieldgen) p.shieldCd = p.shieldInterval; // 重启护盾充能
       // 圣盾爆发:护盾破碎时清屏+重创
       if (this.evo.shieldgen) {
@@ -1171,7 +1266,7 @@ class Game {
       this._explode(p.x, p.y, 26, '#7ef3ff', 2);
       this.shake(20, 0.8);
     } else {
-      p.invuln = 1.5;
+      p.invuln = 1.5 + (this.relics.r_cloak ? 0.7 : 0);
       if (this.bonds.includes('ironwill')) {
         p.hp = Math.min(p.maxHp, p.hp + 5);
         this._addFloat(new FloatText(p.x, p.y - 26, '荆棘装甲 +5', '#a5ffd6', 11));
@@ -1214,9 +1309,10 @@ class Game {
     p.invuln = Math.max(p.invuln, 1.2); // 炸弹瞬间无敌,可作保命键
     for (const b of this.enemyBullets) this._sparks(b.x, b.y, '#9fe8ff', 3);
     this.enemyBullets.length = 0;
-    for (const e of this.enemies) e.damage(8, this);
+    const bombDmg = this.relics.r_dragon ? 23 : 8;
+    for (const e of this.enemies) e.damage(bombDmg, this);
     for (const a of this.asteroids) a.damage(6, this);
-    if (this.boss) this.boss.damage(20, this);
+    if (this.boss) this.boss.damage(this.relics.r_dragon ? 35 : 20, this);
     this.rings.push(new Ring(p.x, p.y, '#aef3ff', 300, 0.7));
   }
 
@@ -1534,6 +1630,18 @@ class Game {
       ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
       ctx.fillText('羁绊 ' + this.bonds.map(id => BONDS.find(b => b.id === id).name).join(' · '), 14, H - 44);
     }
+    // 遗物图标
+    const ownedRelics = RELICS.filter(r0 => this.relics[r0.id]);
+    if (ownedRelics.length) {
+      ctx.textAlign = 'left';
+      ctx.font = '12px "Segoe UI", sans-serif';
+      let rx = 14;
+      for (const r0 of ownedRelics) {
+        ctx.fillStyle = '#ffd166';
+        ctx.fillText(r0.icon, rx, H - 60);
+        rx += 20;
+      }
+    }
     if (owned.length) {
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(159,232,255,0.6)';
@@ -1593,6 +1701,7 @@ class Game {
     this._refreshMenuHi();
     // 星晶结算:得分/1000 + 旗舰 10 + 精英 2
     Shop.lastEarn = Math.floor(this.score / 1000) + (this.runBossKills || 0) * 10 + (this.runEliteKills || 0) * 2;
+    if (this.relics.r_grail) Shop.lastEarn *= 2;
     Shop.addCrystal(Shop.lastEarn);
     d.overCrystals.textContent = '★ +' + Shop.lastEarn + '(星晶 ' + Shop.crystal + ')';
     d.overRunStats.textContent = this._runStatsText();
