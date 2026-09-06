@@ -46,6 +46,7 @@
     if (e.code === 'KeyR' && (game.state === 'paused' || game.state === 'gameover')) game.start(game.daily);
     // 升级选卡快捷键(满槽替换模式下数字键选择要丢弃的模块)
     if (game.state === 'levelup') {
+      if (e.code === 'Escape' && game._pendingSwap) { game.cancelSwap(); return; }
       if (game._pendingSwap) {
         const keys = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'];
         const idx = keys.indexOf(e.code);

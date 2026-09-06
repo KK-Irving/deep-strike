@@ -91,11 +91,3 @@ function drawUpgradeCards(mods, maxSlots, level, count = 3) {
   }
   return picks;
 }
-
-/* 检查 newly 达成的羁绊(之前未激活 + 现在条件满足) */
-function checkNewBonds(mods, activeBonds) {
-  return BONDS.filter(b =>
-    !activeBonds.includes(b.id) &&
-    b.req.every(id => (mods[id] || 0) > 0)
-  );
-}

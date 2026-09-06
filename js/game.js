@@ -368,12 +368,20 @@ class Game {
     this._dom.ownRow.innerHTML = html || '<span class="chip">首次升级 · 选择你的成长路线</span>';
   }
 
+  /* 取消替换:回到三选一界面 */
+  cancelSwap() {
+    if (this.state !== 'levelup' || !this._pendingSwap) return;
+    this._pendingSwap = null;
+    this._swapList = null;
+    this._renderCards();
+  }
+
   /* 满槽替换界面:展示已持有模块,点击丢弃 */
   _renderSwap() {
     const row = this._dom.cardRow;
     row.innerHTML = '';
     const u = this._pendingSwap;
-    this._dom.lvSub.innerHTML = '<b style="color:#ff8fa5">槽位已满</b> · 选择要丢弃的模块以装备「' + u.icon + ' ' + u.name + '」';
+    this._dom.lvSub.innerHTML = '<b style="color:#ff8fa5">槽位已满</b> · 选择要丢弃的模块以装备「' + u.icon + ' ' + u.name + '」 <span style="color:rgba(159,232,255,0.5)">(Esc 取消)</span>';
     this._swapList.forEach((id, i) => {
       const owned = UPGRADE_MAP[id];
       const r = RARITY[owned.rar];
@@ -388,6 +396,12 @@ class Game {
       el.addEventListener('click', () => this.swapPick(id));
       row.appendChild(el);
     });
+    const cancel = document.createElement('button');
+    cancel.className = 'menu-btn';
+    cancel.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center';
+    cancel.innerHTML = '▸ 放弃本次选择(不消耗升级)';
+    cancel.addEventListener('click', () => this.cancelSwap());
+    row.appendChild(cancel);
   }
 
   chooseCard(i) {
@@ -445,8 +459,16 @@ class Game {
     this.pendingLevels--;
     if (this.pendingLevels > 0) {
       this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level);
+      // 升级链中途卡池耗尽兜底:剩余等级转化为奖励分
+      if (this._cardChoices.length === 0) {
+        const bonus = 500 * this.pendingLevels;
+        this.score += bonus;
+        this._addFloat(new FloatText(this.player.x, this.player.y - 30, '全模块满级 +' + bonus, '#ffd166', 14));
+        this.pendingLevels = 0;
+      }
       this._renderCards();
-    } else {
+    }
+    if (this.pendingLevels <= 0) {
       this._pendingSwap = null;
       this._swapList = null;
       this.state = 'playing';
@@ -550,7 +572,7 @@ class Game {
     }
 
     if (this.player.alive) this.player.update(dt, this);
-    if (!this.player.beamOn) this.beams = null;
+    if (!this.player.alive || !this.player.beamOn) { this.beams = null; this.player.beamOn = false; }
 
     for (let i = this.playerBullets.length - 1; i >= 0; i--) {
       const b = this.playerBullets[i];
@@ -973,10 +995,6 @@ class Game {
     this.flashT = 0.35; this.flashColor = 'rgba(255,70,90,';
     this._explode(p.x, p.y, 16, '#7ef3ff', 1.4);
     this._thornBlast();
-    if (this.bonds.includes('ironwill') && this.mods.armor && p.alive) {
-      p.hp = Math.min(p.maxHp, p.hp + 5);
-      this._addFloat(new FloatText(p.x, p.y - 26, '荆棘装甲 +5', '#a5ffd6', 11));
-    }
     if (p.hp <= 0) {
       // 不屈意志:每局一次,保留 1 点生命并清除全屏弹幕
       if (this.mods.undying && !p.undyingUsed) {
@@ -995,6 +1013,10 @@ class Game {
       this.shake(20, 0.8);
     } else {
       p.invuln = 1.5;
+      if (this.bonds.includes('ironwill')) {
+        p.hp = Math.min(p.maxHp, p.hp + 5);
+        this._addFloat(new FloatText(p.x, p.y - 26, '荆棘装甲 +5', '#a5ffd6', 11));
+      }
     }
   }
 

@@ -276,6 +276,7 @@ class Player {
     this.weapon = 1; this.bombs = 2;
     this.shield = false; this.invuln = 2.2;
     this.fireCd = 0; this.alive = true;
+    this.beamOn = false;
     this.engine = 0; this.showHitbox = false;
     // 肉鸽模组衍生数值(由 game._recalc 刷新)
     this.dmgBonus = 0; this.fireInterval = 0.12; this.magnetR = 140;
@@ -1122,6 +1123,15 @@ class SupplyDrop {
     this.y += 30 * dt;
     this.x += Math.sin(this.t * 1.4) * 14 * dt;
     const p = game.player;
+    // 引力场:进入吸取范围后飞向玩家
+    if (p.alive) {
+      const dx2 = p.x - this.x, dy2 = p.y - this.y;
+      if (dx2 * dx2 + dy2 * dy2 < p.magnetR * p.magnetR) {
+        const f = Math.min(1, dt * 6);
+        this.x += dx2 * f;
+        this.y += dy2 * f;
+      }
+    }
     const dx = p.x - this.x, dy = p.y - this.y;
     if (p.alive && dx * dx + dy * dy < 460) {
       this.dead = true;
