@@ -114,11 +114,18 @@
   // 版本号
   $('verTag').textContent = window.GAME_VERSION || 'dev';
 
-  // 触屏:单指拖动移动并连发,双指点按放炸弹
+  // 触屏:单指拖动移动并连发,双指点按放炸弹;显示触屏专用炸弹键
   function toLogical(t) {
     const r = canvas.getBoundingClientRect();
     return { x: (t.clientX - r.left) / r.width * W, y: (t.clientY - r.top) / r.height * H };
   }
+  $('btnBomb').addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    AudioSys.init();
+    game.tryBomb();
+  }, { passive: false });
+  document.body.addEventListener('touchstart', () => document.body.classList.add('touch-ui'), { once: true, passive: true });
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     AudioSys.init();

@@ -13,6 +13,21 @@ body {
   touch-action: none;
 }
 
+/* 触屏炸弹键:仅在检测到触屏输入后显示 */
+.bomb-btn {
+  display: none;
+  position: fixed; right: 18px; bottom: 90px; z-index: 9;
+  width: 58px; height: 58px; border-radius: 50%;
+  font-size: 24px; line-height: 1;
+  color: #51e08a; background: rgba(10, 30, 24, 0.75);
+  border: 2px solid rgba(81, 224, 138, 0.6);
+  box-shadow: 0 0 18px rgba(81, 224, 138, 0.35);
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  align-items: center; justify-content: center;
+}
+body.touch-ui .bomb-btn { display: flex; }
+.bomb-btn:active { transform: scale(0.92); background: rgba(20, 50, 36, 0.85); }
+
 .overlay {
   position: fixed; inset: 0; z-index: 10;
   display: flex; flex-direction: column; align-items: center; justify-content: center;

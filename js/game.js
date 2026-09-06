@@ -200,6 +200,9 @@ class Game {
 
   multiplier() { return 1 + Math.min(3, Math.floor(this.combo / 8)); }
 
+  /* 弹速增长封顶波数:防止后期弹速无限膨胀 */
+  effWave() { return Math.min(this.wave, 18); }
+
   /* ---------------- 肉鸽升级系统 ---------------- */
   _recalc() {
     const m = this.mods, p = this.player;
@@ -279,7 +282,7 @@ class Game {
     while (this.xp >= this.xpNext) {
       this.xp -= this.xpNext;
       this.level++;
-      this.xpNext = Math.round(this.xpNext * 1.3 + 5);
+      this.xpNext = Math.round(this.xpNext * 1.22 + 4);
       this.pendingLevels++;
       if (this.level >= 10) Ach.unlock('level_10', this);
     }

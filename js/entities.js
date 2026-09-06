@@ -541,7 +541,7 @@ class Enemy {
       this.fireCd -= dt;
       if (canFire && this.fireCd <= 0) {
         this.fireCd = rand(1.8, 3.2);
-        game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 150 + game.wave * 5);
+        game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 150 + game.effWave() * 5);
         AudioSys.enemyShoot();
       }
     } else if (this.type === 'tank') {
@@ -550,7 +550,7 @@ class Enemy {
       if (canFire && this.fireCd <= 0) {
         this.fireCd = 2.4;
         for (let i = -1; i <= 1; i++)
-          game.enemyShot(this.x, this.y + this.r, Math.PI / 2 + i * 0.4, 140 + game.wave * 4, 'orange');
+          game.enemyShot(this.x, this.y + this.r, Math.PI / 2 + i * 0.4, 140 + game.effWave() * 4, 'orange');
         AudioSys.enemyShoot();
       }
     } else if (this.type === 'bomber') {
@@ -566,7 +566,7 @@ class Enemy {
       if (!this.dead && (pdx * pdx + pdy * pdy < 8100 || this.fuse <= 0)) {
         this.dead = true;
         for (let i = 0; i < 8; i++)
-          game.enemyShot(this.x, this.y, i / 8 * TAU + 0.3, 130 + game.wave * 3);
+          game.enemyShot(this.x, this.y, i / 8 * TAU + 0.3, 130 + game.effWave() * 3);
         game._explode(this.x, this.y, 14, '#ff9a3c', 0.9);
         game.shake(5, 0.2);
         AudioSys.explode(false);
@@ -589,7 +589,7 @@ class Enemy {
         this.fireCd -= dt;
         if (canFire && this.fireCd <= 0) {
           this.fireCd = Math.max(1.2, 2.6 - game.wave * 0.12);
-          game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 210 + game.wave * 6);
+          game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 210 + game.effWave() * 6);
           AudioSys.enemyShoot();
         }
       }
@@ -612,7 +612,7 @@ class Enemy {
       if (this.elite && this.elite.includes('vengeance')) {
         const n = 12;
         for (let i = 0; i < n; i++)
-          game.enemyShot(this.x, this.y, i / n * TAU, 140 + game.wave * 4);
+          game.enemyShot(this.x, this.y, i / n * TAU, 140 + game.effWave() * 4);
         AudioSys.enemyShoot();
       }
       game.killEnemy(this);
@@ -722,7 +722,7 @@ class Boss {
         // 高速窄角狙击三连
         const a = game.aimedAngle(x, y);
         for (let i = -1; i <= 1; i++)
-          game.enemyShot(x, y, a + i * 0.1, 240 + this.wave * 4, 'orange');
+          game.enemyShot(x, y, a + i * 0.1, 240 + Math.min(this.wave, 18) * 4, 'orange');
         this.fireCd = 0.8;
       } else if (this.phase === 1) {
         // 双臂旋转螺旋
@@ -739,7 +739,7 @@ class Boss {
         if (this.burstCycle % 9 === 0) {
           const aim = game.aimedAngle(x, y);
           for (let i = -1; i <= 1; i++)
-            game.enemyShot(x, y, aim + i * 0.16, 220 + this.wave * 3);
+            game.enemyShot(x, y, aim + i * 0.16, 220 + Math.min(this.wave, 18) * 3);
         }
         this.fireCd = 0.18;
       }
@@ -749,7 +749,7 @@ class Boss {
     if (this.phase === 0) {
       const a = game.aimedAngle(x, y);
       for (let i = -1; i <= 1; i++)
-        game.enemyShot(x, y, a + i * 0.18, 210 + this.wave * 4, 'orange');
+        game.enemyShot(x, y, a + i * 0.18, 210 + Math.min(this.wave, 18) * 4, 'orange');
       this.fireCd = 1.05;
     } else if (this.phase === 1) {
       const n = 16;
