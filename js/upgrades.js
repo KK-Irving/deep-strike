@@ -27,7 +27,10 @@ const UPGRADES = [
   { id: 'thorn',    icon: '☢',  name: '反击风暴',   max: 1, rar: 1, desc: '受击时清除周围弹幕并放出冲击波' },
   { id: 'split',    icon: '✷',  name: '裂变弹',     max: 2, rar: 2, desc: '子弹命中后分裂出 2 枚小弹' },
   { id: 'homing',   icon: '➤',  name: '追踪导弹',   max: 3, rar: 2, desc: '周期性自动发射追踪导弹' },
-  { id: 'shieldgen',icon: '◇',  name: '护盾发生器', max: 1, rar: 2, desc: '每 12 秒自动展开一层护盾' }
+  { id: 'shieldgen',icon: '◇',  name: '护盾发生器', max: 1, rar: 2, desc: '每 12 秒自动展开一层护盾' },
+  { id: 'time',     icon: '⏳', name: '时滞力场',   max: 2, rar: 2, desc: '全部敌方弹幕减速 18%' },
+  { id: 'wingman',  icon: '🛰', name: '幻影僚机',   max: 2, rar: 2, desc: '召唤僚机环绕,自动索敌射击' },
+  { id: 'rift',     icon: '🌀', name: '空间裂隙',   max: 2, rar: 2, desc: '周期生成黑洞,撕碎弹幕并灼烧敌机' }
 ];
 
 /* 羁绊:同时拥有指定技能后觉醒,提供额外特效 */
@@ -37,7 +40,10 @@ const BONDS = [
   { id: 'hunt',     name: '猎杀时刻', req: ['homing', 'crit'],      desc: '追踪导弹必定暴击' },
   { id: 'fortress', name: '移动堡垒', req: ['shieldgen', 'thorn'],  desc: '护盾充能时间减半' },
   { id: 'overdrive',name: '超载核心', req: ['rate', 'dmg'],         desc: '射击间隔额外 -15%' },
-  { id: 'execute',  name: '歼灭协议', req: ['crit', 'dmg'],         desc: '暴击倍率提升至 4.5 倍' }
+  { id: 'execute',  name: '歼灭协议', req: ['crit', 'dmg'],         desc: '暴击倍率提升至 4.5 倍' },
+  { id: 'ghostNet', name: '维度撕裂', req: ['time', 'rift'],        desc: '裂隙范围 +60%,撕碎弹幕更快' },
+  { id: 'squad',    name: '僚机协议', req: ['wingman', 'homing'],   desc: '僚机改射追踪导弹' },
+  { id: 'chrono',   name: '时间领主', req: ['time', 'rate'],        desc: '时滞效果提升至每层 30%' }
 ];
 
 const UPGRADE_MAP = {};

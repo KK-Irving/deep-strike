@@ -254,8 +254,9 @@ class Player {
     this.fireCd = 0; this.alive = true;
     this.engine = 0; this.showHitbox = false;
     // 肉鸽模组衍生数值(由 game._recalc 刷新)
-    this.dmgBonus = 0; this.fireInterval = 0.12; this.magnetR = 90;
+    this.dmgBonus = 0; this.fireInterval = 0.12; this.magnetR = 140;
     this.homingCd = 0; this.webCd = 0; this.shieldCd = 0; this.shieldInterval = 12;
+    this.wingAngle = 0;
   }
   update(dt, game) {
     const k = game.keys;
@@ -505,14 +506,14 @@ class Enemy {
     if (this.y > H + 40) this.dead = true;
   }
 
-  damage(n, game) {
-    if (this.dead) return;
+  damage(n, game, silent) {
+    if (this.dead || this.elitePhased) return;
     this.hp -= n;
-    this.flash = 0.08;
+    if (!silent) this.flash = 0.08;
     if (this.hp <= 0) {
       this.dead = true;
       // 分裂词缀:死亡时裂解为 3 架无人机
-      if (this.elite === 'splitter') {
+      if (this.elite && this.elite.includes('splitter')) {
         for (let i = -1; i <= 1; i++)
           game.enemies.push(new Enemy('drone', clamp(this.x + i * 30, 30, W - 30), game.wave));
       }
@@ -750,6 +751,136 @@ class XPOrb {
     ctx.translate(this.x, this.y);
     ctx.rotate(this.t * 2);
     ctx.fillRect(-s, -s, s * 2, s * 2);
+    ctx.restore();
+  }
+}
+
+/* ============================================================
+ * 幻影僚机:环绕玩家,自动索敌射击(「僚机协议」羁绊改射导弹)
+ * ============================================================ */
+class Wingman {
+  constructor(slot) {
+    this.slot = slot;         // 0/1 → 环绕相位差半圈
+    this.fireCd = rand(0.2, 0.6);
+    this.t = 0; this.dead = false;
+    this.x = W / 2; this.y = H - 120;
+  }
+  update(dt, game) {
+    this.t += dt;
+    const p = game.player;
+    const a = p.wingAngle + this.slot * Math.PI;
+    this.x = p.x + Math.cos(a) * 36;
+    this.y = p.y + Math.sin(a) * 36 - 4;
+    this.fireCd -= dt;
+    if (this.fireCd <= 0) {
+      this.fireCd = 0.85;
+      // 索敌:最近的敌机/BOSS
+      let tx = null, ty = 0, best = 340 * 340;
+      for (const e of game.enemies) {
+        if (e.elitePhased) continue;
+        const d = (e.x - this.x) ** 2 + (e.y - this.y) ** 2;
+        if (d < best) { best = d; tx = e.x; ty = e.y; }
+      }
+      if (game.boss && game.boss.state === 'fight') {
+        const d = (game.boss.x - this.x) ** 2 + (game.boss.y - this.y) ** 2;
+        if (d < best) { best = d; tx = game.boss.x; ty = game.boss.y; }
+      }
+      if (tx !== null) {
+        const aim = Math.atan2(ty - this.y, tx - this.x);
+        const missile = game.bonds.includes('squad');
+        game.playerBullets.push(missile
+          ? { x: this.x, y: this.y, vx: Math.cos(aim) * 300, vy: Math.sin(aim) * 300, r: 4, dmg: 2 + game.player.dmgBonus, color: '#ffd166', dead: false, homing: true, life: 2.2, pierce: 0, split: 0 }
+          : { x: this.x, y: this.y, vx: Math.cos(aim) * 480, vy: Math.sin(aim) * 480, r: 2.6, dmg: 1 + game.player.dmgBonus, color: '#9ffcf0', dead: false, pierce: 0, split: 0 });
+        AudioSys.missile();
+      }
+    }
+  }
+  draw(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(Math.PI / 2);
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = '#0f4b66';
+    ctx.strokeStyle = '#7ef3ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -8); ctx.lineTo(5, 5); ctx.lineTo(0, 2); ctx.lineTo(-5, 5);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/* ============================================================
+ * 空间裂隙:黑洞吸附敌弹并灼烧敌机(「维度撕裂」羁绊强化)
+ * ============================================================ */
+class Rift {
+  constructor(x, y, game) {
+    this.x = x; this.y = y;
+    this.r = 70 + game.mods.rift * 25;
+    if (game.bonds.includes('ghostNet')) this.r *= 1.6;
+    this.life = this.max = 3.2;
+    this.t = 0; this.dead = false;
+  }
+  update(dt, game) {
+    this.t += dt;
+    this.life -= dt;
+    if (this.life <= 0) { this.dead = true; return; }
+    // 吸附并撕碎附近敌弹
+    for (const b of game.enemyBullets) {
+      if (b.dead) continue;
+      const dx = this.x - b.x, dy = this.y - b.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d < this.r * 1.6) {
+        const pull = 320 * dt * (1 - d / (this.r * 1.8));
+        b.x += dx / d * pull * 8;
+        b.y += dy / d * pull * 8;
+        if (d < 16) {
+          b.dead = true;
+          game._sparks(b.x, b.y, '#c2a8ff', 2);
+        }
+      }
+    }
+    // 灼烧范围内敌机(静默伤害,不闪白)
+    for (const e of game.enemies) {
+      const dx = e.x - this.x, dy = e.y - this.y;
+      if (dx * dx + dy * dy < this.r * this.r && !e.elitePhased) e.damage(5 * dt, game, true);
+    }
+    if (game.boss && game.boss.state === 'fight') {
+      const dx = game.boss.x - this.x, dy = game.boss.y - this.y;
+      if (dx * dx + dy * dy < (this.r + game.boss.r) * (this.r + game.boss.r)) game.boss.damage(6 * dt, game);
+    }
+  }
+  draw(ctx) {
+    const f = this.life / this.max;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.globalCompositeOperation = 'lighter';
+    // 吸积盘
+    ctx.globalAlpha = 0.55 * f;
+    ctx.strokeStyle = '#c2a8ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, this.r * (0.75 + 0.1 * Math.sin(this.t * 5)), 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 0.3 * f;
+    ctx.beginPath(); ctx.arc(0, 0, this.r * 1.25, 0, TAU); ctx.stroke();
+    // 旋臂
+    ctx.globalAlpha = 0.7 * f;
+    ctx.rotate(this.t * 3);
+    for (let i = 0; i < 2; i++) {
+      ctx.rotate(Math.PI);
+      ctx.beginPath();
+      for (let k = 0; k <= 20; k++) {
+        const a = k / 20 * Math.PI * 1.6, r = 8 + k / 20 * this.r * 0.8;
+        const px = Math.cos(a) * r, py = Math.sin(a) * r;
+        k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    // 核心
+    ctx.globalAlpha = f;
+    ctx.fillStyle = '#e8dcff';
+    ctx.beginPath(); ctx.arc(0, 0, 6, 0, TAU); ctx.fill();
     ctx.restore();
   }
 }

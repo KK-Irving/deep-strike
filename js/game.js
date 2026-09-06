@@ -109,6 +109,7 @@ class Game {
     this.xp = 0; this.level = 1; this.xpNext = 12; this.pendingLevels = 0;
     this.xpMult = 1; this.comboWindow = 2;
     this.bombMeter = 0;
+    this.wingmen = []; this.rifts = []; this.riftCd = 0;
     this._cardChoices = [];
     this._recalc();
   }
@@ -161,6 +162,12 @@ class Game {
     this.xpMult = 1 + 0.25 * (m.xpchip || 0);
     this.comboWindow = 2 + 1.5 * (m.combo || 0);
     p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
+    // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
+    const timePerStack = this.bonds.includes('chrono') ? 0.30 : 0.18;
+    this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
+    // 幻影僚机:数量同步
+    while (this.wingmen.length < (m.wingman || 0)) this.wingmen.push(new Wingman(this.wingmen.length));
+    while (this.wingmen.length > (m.wingman || 0)) this.wingmen.pop();
     if (m.shieldgen && !p.shield && p.shieldCd <= 0) p.shieldCd = p.shieldInterval;
   }
 
@@ -178,8 +185,16 @@ class Game {
 
   openLevelup() {
     if (this.state !== 'playing' || this.pendingLevels <= 0) return;
-    this.state = 'levelup';
     this._cardChoices = drawUpgradeCards(this.mods, this.level);
+    // 卡池耗尽兜底(全部满级):转化为奖励分,避免软锁
+    if (this._cardChoices.length === 0) {
+      const bonus = 500 * this.pendingLevels;
+      this.score += bonus;
+      this._addFloat(new FloatText(this.player.x, this.player.y - 30, '全模块满级 +' + bonus, '#ffd166', 14));
+      this.pendingLevels = 0;
+      return;
+    }
+    this.state = 'levelup';
     AudioSys.levelup();
     this._renderCards();
     this._showState();
@@ -339,12 +354,28 @@ class Game {
     }
     for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
       const b = this.enemyBullets[i];
-      b.x += b.vx * dt; b.y += b.vy * dt;
+      // 时滞力场
+      const sdt = dt * this.bulletSlow;
+      b.x += b.vx * sdt; b.y += b.vy * sdt;
       if (b.dead || b.y > H + 20 || b.y < -30 || b.x < -20 || b.x > W + 20) this.enemyBullets.splice(i, 1);
     }
     this._updateArr(this.enemies, dt);
     this._updateArr(this.powerups, dt);
     this._updateArr(this.orbs, dt);
+    this._updateArr(this.rifts, dt);
+    if (this.wingmen.length) {
+      this.player.wingAngle += dt * 2.2;
+      for (const w of this.wingmen) w.update(dt, this);
+    }
+    // 空间裂隙:周期生成黑洞
+    if (this.mods.rift) {
+      this.riftCd -= dt;
+      if (this.riftCd <= 0) {
+        this.riftCd = 8.5;
+        this.rifts.push(new Rift(rand(70, W - 70), rand(130, 320), this));
+        AudioSys.rift();
+      }
+    }
     if (this.boss) {
       this.boss.update(dt, this);
       if (this.boss.dead) this.boss = null;
@@ -749,9 +780,11 @@ class Game {
 
     for (const pu of this.powerups) pu.draw(ctx);
     for (const o of this.orbs) o.draw(ctx);
+    for (const rf of this.rifts) rf.draw(ctx);
     for (const e of this.enemies) e.draw(ctx);
     if (this.boss) this.boss.draw(ctx);
     this.player.draw(ctx);
+    for (const w of this.wingmen) w.draw(ctx);
 
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';

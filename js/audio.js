@@ -133,6 +133,10 @@ const AudioSys = {
       this.tone({ freq: f, dur: 0.2, type: 'square', vol: 0.15, delay: i * 0.07 }));
     this.noise({ dur: 0.4, vol: 0.1, from: 6000, to: 2000, delay: 0.1 });
   },
+  rift() {
+    this.tone({ freq: 70, end: 180, dur: 0.8, type: 'sine', vol: 0.3 });
+    this.noise({ dur: 0.8, vol: 0.12, from: 500, to: 2200 });
+  },
   gameover() {
     [392, 330, 262, 196].forEach((f, i) =>
       this.tone({ freq: f, dur: 0.3, type: 'triangle', vol: 0.25, delay: i * 0.25 }));
