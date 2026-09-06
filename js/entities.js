@@ -256,9 +256,17 @@ class Player {
 
 /* ============================================================
  * 敌机:drone 直冲 / waver 蛇形 / tank 重装 / sniper 狙击
+ * 精英词缀:swift 迅捷 / iron 铁壁 / splitter 分裂 / berserk 狂暴
  * ============================================================ */
+const ELITE_CFG = {
+  swift:    { name: '迅捷', color: '#37e2ff', desc: '高速机动' },
+  iron:     { name: '铁壁', color: '#c9d4e3', desc: '装甲强化' },
+  splitter: { name: '分裂', color: '#51e08a', desc: '死亡分裂' },
+  berserk:  { name: '狂暴', color: '#ff6a3c', desc: '火力狂暴' }
+};
+
 class Enemy {
-  constructor(type, x, wave) {
+  constructor(type, x, wave, elite) {
     this.type = type;
     this.x = x; this.y = -26; this.baseX = x;
     this.t = 0; this.dead = false; this.flash = 0;
@@ -283,6 +291,20 @@ class Enemy {
       this.vy = 170 * spM; this.stopY = rand(90, 210); this.stopped = false;
       this.fireCd = rand(0.8, 1.6);
       this.color = '#c86bff'; this.fill = '#2a1240';
+    }
+    // 精英强化:血量 ×4、体型 ×1.3、分数 ×4,词缀附加特性
+    this.elite = elite || null;
+    if (this.elite) {
+      this.hp = Math.round(this.hp * 4);
+      this.r = this.r * 1.3;
+      this.score *= 4;
+      const cfg = ELITE_CFG[this.elite];
+      this.eliteName = '精英·' + cfg.name;
+      this.eliteColor = cfg.color;
+      if (this.elite === 'swift') this.vy *= 1.6;
+      if (this.elite === 'iron') { this.hp *= 1.6; this.vy *= 0.7; }
+      if (this.elite === 'berserk') this.vy *= 1.2;
+      if (this.fireCd !== undefined) this.fireCd *= this.elite === 'berserk' ? 0.45 : 0.6;
     }
     this.maxHp = this.hp;
   }
@@ -335,6 +357,11 @@ class Enemy {
     this.flash = 0.08;
     if (this.hp <= 0) {
       this.dead = true;
+      // 分裂词缀:死亡时裂解为 3 架无人机
+      if (this.elite === 'splitter') {
+        for (let i = -1; i <= 1; i++)
+          game.enemies.push(new Enemy('drone', clamp(this.x + i * 30, 30, W - 30), game.wave));
+      }
       game.killEnemy(this);
     }
   }
@@ -342,6 +369,21 @@ class Enemy {
   draw(ctx) {
     ctx.save();
     ctx.translate(this.x, this.y);
+    // 精英光环与名牌
+    if (this.elite) {
+      const pr = this.r + 8 + Math.sin(this.t * 5) * 2.5;
+      ctx.strokeStyle = this.eliteColor;
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(0, 0, pr, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 0.28;
+      ctx.beginPath(); ctx.arc(0, 0, pr + 5, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = this.eliteColor;
+      ctx.font = 'bold 10px "Segoe UI", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(this.eliteName, 0, -this.r - 16);
+    }
     ctx.shadowColor = this.color;
     ctx.shadowBlur = 9;
     ctx.beginPath();
@@ -369,7 +411,7 @@ class Enemy {
     ctx.beginPath();
     ctx.arc(0, this.type === 'drone' ? 0 : 1, this.type === 'tank' ? 6 : 3, 0, TAU);
     ctx.fill();
-    if (this.hp < this.maxHp && this.maxHp >= 3) {
+    if (this.elite || (this.hp < this.maxHp && this.maxHp >= 3)) {
       const w = this.r * 2;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(-w / 2, -this.r - 9, w, 4);

@@ -175,6 +175,17 @@ class Game {
     // 关卡目标:必须击坠足够数量的敌机才能过关,躲避无法通关
     this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65);
     this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机';
+    // 精英机:第 3 波起概率随队,高波次可能双精英
+    this._eliteQueue = [];
+    if (n >= 3 && Math.random() < 0.65) {
+      const count = n >= 7 && Math.random() < 0.35 ? 2 : 1;
+      const affixes = Object.keys(ELITE_CFG);
+      for (let i = 0; i < count; i++) {
+        const idx = irand(0, this.spawnQueue.length - 1);
+        this.spawnQueue[idx].elite = affixes[irand(0, affixes.length - 1)];
+      }
+      this.banner.sub += ' · ⚠ 精英机随队';
+    }
   }
 
   /* ---------------- 主更新 ---------------- */
@@ -188,7 +199,10 @@ class Game {
       const s = this.spawnQueue[i];
       if (s.t <= this.waveTime) {
         if (s.boss) this.boss = new Boss(this.wave);
-        else this.enemies.push(new Enemy(s.type, s.x, this.wave));
+        else {
+          this.enemies.push(new Enemy(s.type, s.x, this.wave, s.elite));
+          if (s.elite) AudioSys.elite();
+        }
         this.spawnQueue.splice(i, 1);
       }
     }
@@ -350,6 +364,13 @@ class Game {
     AudioSys.explode(e.r >= 18);
     this.shake(Math.min(9, 1.5 + e.r * 0.18), 0.22);
     if (e.type === 'tank') this._dropPower(e.x, e.y);
+    else if (e.elite) {
+      // 精英必掉道具 + 额外奖励分
+      this._dropPower(e.x, e.y);
+      const bonus = 150 + this.wave * 25;
+      this.score += bonus;
+      this.floats.push(new FloatText(e.x, e.y - 26, '精英击坠 +' + bonus, e.eliteColor, 13));
+    }
     else if (Math.random() < 0.13) this._dropPower(e.x, e.y);
   }
 

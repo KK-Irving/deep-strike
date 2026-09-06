@@ -104,6 +104,10 @@ const AudioSys = {
     for (let i = 0; i < 3; i++)
       this.tone({ freq: 440, end: 660, dur: 0.22, type: 'sawtooth', vol: 0.2, delay: i * 0.4 });
   },
+  elite() {
+    this.tone({ freq: 330, end: 550, dur: 0.3, type: 'sawtooth', vol: 0.16 });
+    this.tone({ freq: 440, end: 700, dur: 0.3, type: 'sawtooth', vol: 0.12, delay: 0.18 });
+  },
   gameover() {
     [392, 330, 262, 196].forEach((f, i) =>
       this.tone({ freq: f, dur: 0.3, type: 'triangle', vol: 0.25, delay: i * 0.25 }));
