@@ -993,7 +993,9 @@ class Game {
     }
     if (e.elite) {
       this.runEliteKills++;
-      if (this._stat('eliteKills', 0) + this.runEliteKills >= 10) Ach.unlock('elite_10', this);
+      const totalElite = this._stat('eliteKills', 0) + this.runEliteKills;
+      if (totalElite >= 10) Ach.unlock('elite_10', this);
+      if (totalElite >= 50) Ach.unlock('elite_50', this);
     }
     // 歼灭装填:击坠积累炸弹
     if (this.mods.bombkill) {
