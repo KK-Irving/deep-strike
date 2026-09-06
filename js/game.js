@@ -414,7 +414,7 @@ class Game {
     const owned = this._ownedIds().length;
     const slotsFull = owned >= this.maxSlots;
     this._dom.lvSub.innerHTML = '槽位 <b style="color:#ffd166">' + owned + ' / ' + this.maxSlots + '</b>' +
-      (slotsFull ? ' · 已满,选择新卡需替换' : ' · 按 1 / 2 / 3 或点击卡片');
+      (slotsFull ? ' · 已满,选新卡需替换(也可跳过)' : ' · 按 1 / 2 / 3 或点击卡片');
     this._cardChoices.forEach((u, i) => {
       const r = RARITY[u.rar];
       const cur = this.mods[u.id] || 0;
@@ -533,21 +533,25 @@ class Game {
     const row = this._dom.cardRow;
     row.innerHTML = '';
     const u = this._pendingSwap;
-    this._dom.lvSub.innerHTML = '<b style="color:#ff8fa5">槽位已满</b> · 选择要丢弃的模块以装备「' + u.icon + ' ' + u.name + '」 <span style="color:rgba(159,232,255,0.5)">(Esc 取消)</span>';
+    this._dom.lvSub.innerHTML = '<b style="color:#ff8fa5">槽位已满</b> · 点击卡片替换为「' + u.icon + ' ' + u.name + '」 · 或仅丢弃腾出槽位 <span style="color:rgba(159,232,255,0.5)">(Esc 返回)</span>';
     this._swapList.forEach((id, i) => {
       const owned = UPGRADE_MAP[id];
       const r = RARITY[owned.rar];
-      const el = document.createElement('button');
+      const el = document.createElement('div');
       el.className = 'card swap r' + owned.rar;
+      el.setAttribute('role', 'button');
       el.innerHTML =
-        '<div class="card-rar" style="color:' + r.color + '">丢弃 · 按 ' + (i + 1) + '</div>' +
+        '<div class="card-rar" style="color:' + r.color + '">替换 · 按 ' + (i + 1) + '</div>' +
         '<div class="card-icon">' + owned.icon + '</div>' +
         '<div class="card-name">' + owned.name + '</div>' +
         '<div class="card-desc">Lv ' + this.mods[id] + ' / ' + owned.max + '</div>' +
-        '<div class="card-lv">丢弃并装备新卡</div>';
+        '<div class="card-lv">点击卡片 = 丢弃并装备新卡</div>' +
+        '<button class="swap-discard" data-discard="' + id + '">🗑 仅丢弃(腾槽)</button>';
       el.addEventListener('click', () => this.swapPick(id));
       row.appendChild(el);
     });
+    row.querySelectorAll('[data-discard]').forEach(btn =>
+      btn.addEventListener('click', (ev) => { ev.stopPropagation(); this.discardOnly(btn.dataset.discard); }));
     const cancel = document.createElement('button');
     cancel.className = 'menu-btn';
     cancel.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center';
@@ -603,6 +607,22 @@ class Game {
       return;
     }
     this._finishPick(u);
+  }
+
+  /* 仅丢弃:不装备新卡,腾出槽位后回到三选一 */
+  discardOnly(oldId) {
+    if (this.state !== 'levelup' || !this._pendingSwap || !this._swapList.includes(oldId)) return;
+    delete this.mods[oldId];
+    this._pendingSwap = null;
+    this._swapList = null;
+    const { lost } = this._recalcBonds();
+    for (const b of lost) {
+      const cfg = BONDS.find(x => x.id === b);
+      this.banner = { text: '羁绊瓦解 · ' + cfg.name, sub: '条件不再满足', life: 2.2, max: 2.2, red: true };
+      AudioSys.shieldBreak();
+    }
+    this._recalc();
+    this._renderCards();   // 空出一格槽位,回到三选一(可再选新卡或跳过)
   }
 
   /* 满槽替换:丢弃 oldId 后装备待选卡 */

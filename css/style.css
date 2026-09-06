@@ -179,6 +179,14 @@ h2 {
 .card.hidden-card:hover { border-color: #51e08a; box-shadow: 0 10px 30px rgba(81, 224, 138, 0.4); }
 .card.swap { opacity: 0.92; }
 .card.swap:hover { transform: translateY(-8px) scale(1.02); border-color: #ff8fa5; box-shadow: 0 10px 30px rgba(255, 85, 119, 0.4); }
+.swap-discard {
+  margin-top: 4px; padding: 3px 10px; font-size: 10.5px; letter-spacing: 1px;
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: rgba(207, 232, 255, 0.85);
+  background: rgba(80, 12, 28, 0.5);
+  border: 1px solid rgba(255, 85, 119, 0.45); border-radius: 999px; cursor: pointer;
+}
+.swap-discard:hover { color: #ff8fa5; border-color: #ff5577; background: rgba(80, 12, 28, 0.8); }
 .card-rar { font-size: 11px; letter-spacing: 3px; }
 .card-icon { font-size: 34px; line-height: 1.2; filter: drop-shadow(0 0 8px rgba(126, 243, 255, 0.5)); }
 .card-name { font-size: 16px; font-weight: bold; letter-spacing: 2px; color: #eaf7ff; }
