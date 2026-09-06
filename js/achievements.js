@@ -16,7 +16,11 @@ const ACHIEVEMENTS = [
   { id: 'level_10',   name: '极速成长',   desc: '单局达到 10 级' },
   { id: 'combo_30',   name: '连击狂人',   desc: '单局达成 30 连击' },
   { id: 'elite_10',   name: '精英收割者', desc: '累计击坠 10 架精英机' },
-  { id: 'max_weapon', name: '火力全开',   desc: '单局火力达到 5 级' }
+  { id: 'max_weapon', name: '火力全开',   desc: '单局火力达到 5 级' },
+  { id: 'wave_20',    name: '无尽征服者', desc: '单局抵达第 20 波', reward: 150, skin: 'abyss' },
+  { id: 'combo_60',   name: '神射手',     desc: '单局达成 60 连击', reward: 150, skin: 'crimson' },
+  { id: 'evo_3',      name: '进化大师',   desc: '单局完成 3 次进化', reward: 150, skin: 'evoProto' },
+  { id: 'boss_10',    name: '旗舰天敌',   desc: '累计击毁 10 艘旗舰', reward: 150, skin: 'phantomX' }
 ];
 
 const Ach = {
@@ -31,17 +35,18 @@ const Ach = {
     catch (e) { /* 忽略 */ }
   },
 
-  /* 解锁:已解锁则静默;游戏内解锁弹金色横幅播报 */
+  /* 解锁:已解锁则静默;发放星晶奖励与可能的专属皮肤;游戏内金色横幅播报 */
   unlock(id, game) {
     if (this.unlocked[id]) return;
     this.unlocked[id] = Date.now();
     this.save();
+    const a = ACHIEVEMENTS.find(x => x.id === id);
+    if (!a) return;
+    const reward = Shop.grantAchReward(a);
     if (game) {
-      const a = ACHIEVEMENTS.find(x => x.id === id);
-      if (a) {
-        game.banner = { text: '🏆 成就解锁', sub: a.name + ' · ' + a.desc, life: 2.6, max: 2.6, gold: true };
-        AudioSys.bond();
-      }
+      const skinPart = a.skin ? ' · 解锁皮肤「' + (SKINS.find(x => x.id === a.skin) || {}).name + '」' : '';
+      game.banner = { text: '🏆 成就解锁', sub: a.name + ' · +' + reward + '★' + skinPart, life: 3.0, max: 3.0, gold: true };
+      AudioSys.bond();
     }
   },
 

@@ -425,24 +425,29 @@ class Player {
     ctx.save();
     ctx.translate(this.x, this.y);
     if (blink) ctx.globalAlpha = 0.35;
-    // 引擎火焰
+    // 引擎火焰(随皮肤配色)
+    const skin = typeof Shop !== 'undefined' ? Shop.skinSprite() : null;
+    const flame = skin ? skin.flame : ['rgba(120,230,255,0.9)', 'rgba(0,120,255,0)'];
     const fl = 9 + Math.sin(this.engine) * 3;
     const fg = ctx.createLinearGradient(0, 10, 0, 24 + fl);
-    fg.addColorStop(0, 'rgba(120,230,255,0.9)');
-    fg.addColorStop(1, 'rgba(0,120,255,0)');
+    fg.addColorStop(0, flame[0]);
+    fg.addColorStop(1, flame[1]);
     ctx.fillStyle = fg;
     ctx.beginPath();
     ctx.moveTo(-3.5, 11); ctx.lineTo(3.5, 11); ctx.lineTo(0, 13 + fl + 6);
     ctx.closePath(); ctx.fill();
-    // 机体(预渲染精灵)
-    const spr = SPRITES.player;
+    // 机体(预渲染精灵,应用当前皮肤)
+    const spr = skin || SPRITES.player;
     ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
     ctx.globalAlpha = 1;
     // 护盾
     if (this.shield) {
-      ctx.strokeStyle = 'rgba(90,200,255,' + (0.55 + Math.sin(this.engine * 0.6) * 0.25) + ')';
+      const sc = skin ? skin.accent : '#5ac8ff';
+      ctx.strokeStyle = sc;
+      ctx.globalAlpha = 0.55 + Math.sin(this.engine * 0.6) * 0.25;
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(0, 0, 17, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 1;
     }
     // 低速判定点
     if (this.showHitbox) {
@@ -967,7 +972,7 @@ class Wingman {
     ctx.rotate(Math.PI / 2);
     ctx.globalAlpha = 0.85;
     ctx.fillStyle = '#0f4b66';
-    ctx.strokeStyle = '#7ef3ff';
+    ctx.strokeStyle = typeof Shop !== 'undefined' ? Shop.accent() : '#7ef3ff';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(0, -8); ctx.lineTo(5, 5); ctx.lineTo(0, 2); ctx.lineTo(-5, 5);

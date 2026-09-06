@@ -57,6 +57,8 @@ class Game {
       achList: document.getElementById('achList'),
       levelup: document.getElementById('levelupOverlay'),
       lvSub: document.getElementById('lvSub'),
+      overCrystals: document.getElementById('overCrystals'),
+      menuShop: document.getElementById('menuShop'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
     };
@@ -102,6 +104,7 @@ class Game {
     if (this.state === 'gameover') this.toMenu();
     this.menuPanel = name;
     if (name === 'stats') this._refreshStatsPanel();
+    if (name === 'shop') Shop.renderPanel();
     this._showState();
   }
 
@@ -154,6 +157,11 @@ class Game {
     this.state = 'playing';
     AudioSys.init();
     if (AudioSys.musicGain) AudioSys.musicGain.gain.value = 0.3;
+    // 机库永久强化:初始资源
+    const bo = Shop.boosts;
+    if (bo.bomb1) this.player.bombs++;
+    if (bo.hp25) this.player.hp = this.player.maxHp;
+    if (bo.shield) this.player.shield = true;
     this._showState();
     this.startWave(1);
     if (this.daily) this.banner = { text: '每日挑战', sub: this._dailyKey() + ' · 固定关卡,冲击纪录', life: 2.4, max: 2.4, gold: true };
@@ -208,6 +216,8 @@ class Game {
       d.menuMain.classList.toggle('hidden', this.menuPanel !== 'main');
       d.menuHelp.classList.toggle('hidden', this.menuPanel !== 'help');
       d.menuStats.classList.toggle('hidden', this.menuPanel !== 'stats');
+      d.menuShop.classList.toggle('hidden', this.menuPanel !== 'shop');
+      if (this.menuPanel === 'shop') Shop.renderPanel();
     }
   }
 
@@ -230,7 +240,7 @@ class Game {
     p.fireInterval = Math.max(0.045, interval);
     p.speed = 330 * Math.pow(1.15, m.speed || 0);
     p.magnetR = 140 + (m.magnet || 0) * 70;
-    this.xpMult = 1 + 0.25 * (m.xpchip || 0);
+    this.xpMult = 1 + 0.25 * (m.xpchip || 0) + (Shop.boosts.xp10 ? 0.10 : 0);
     this.comboWindow = 2 + 1.5 * (m.combo || 0);
     p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
@@ -238,8 +248,9 @@ class Game {
     this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
     // 卡槽系统:基础 5 槽,隐藏卡扩展
     this.maxSlots = 5 + (m.slotplus || 0);
-    // 生命值系统:上限 = 100 + 卡片成长 + 等级成长(+泰坦血统 50)
-    p.maxHp = 100 + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0);
+    // 生命值系统:上限 = 100 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
+    p.maxHp = 100 + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
+      + (Shop.boosts.hp25 ? 25 : 0);
     p.armorPct = Math.min(0.45, 0.15 * (m.armor || 0));
     p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1);
     p.leechPer = 0.7 * (m.leech || 0);
@@ -430,6 +441,8 @@ class Game {
     if (u.isEvo) {
       // 传说进化:满级卡片质变,不占槽位
       this.evo[u.base] = true;
+      this.runEvoCount = (this.runEvoCount || 0) + 1;
+      if (this.runEvoCount >= 3) Ach.unlock('evo_3', this);
       AudioSys.bond();
       this.banner = { text: '✦ 进化 · ' + u.name, sub: u.desc, life: 3.0, max: 3.0, gold: true };
       this._recalc();
@@ -538,6 +551,7 @@ class Game {
     if (n >= 5) Ach.unlock('wave_5', this);
     if (n >= 10) Ach.unlock('wave_10', this);
     if (n >= 15) Ach.unlock('wave_15', this);
+    if (n >= 20) Ach.unlock('wave_20', this);
     if (n % 5 === 0) {
       this.waveQuota = 1; // 目标:击毁旗舰
       const bname = BOSS_VARIANTS[bossVariant(n)].name;
@@ -928,6 +942,7 @@ class Game {
     Ach.unlock('first_kill', this);
     if (this.runKills >= 60) Ach.unlock('run_kill60', this);
     if (this.combo >= 30) Ach.unlock('combo_30', this);
+    if (this.combo >= 60) Ach.unlock('combo_60', this);
     if (e.elite) {
       this.runEliteKills++;
       if (this._stat('eliteKills', 0) + this.runEliteKills >= 10) Ach.unlock('elite_10', this);
@@ -978,9 +993,11 @@ class Game {
     this.combo++;
     this.comboT = this.comboWindow;
     this.stats.bossKills = this._stat('bossKills', 0) + 1;
+    this.runBossKills = (this.runBossKills || 0) + 1;
     this.waveKills++;
     Ach.unlock('boss_1', this);
     if (this.stats.bossKills >= 5) Ach.unlock('boss_5', this);
+    if (this.stats.bossKills >= 10) Ach.unlock('boss_10', this);
     const pts = Math.round(b.score * this.multiplier());
     this.score += pts;
     this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
@@ -1504,6 +1521,10 @@ class Game {
     d.finalWave.textContent = this.wave;
     d.finalHi.textContent = this.daily ? this._dailyBest() : this.hi;
     this._refreshMenuHi();
+    // 星晶结算:得分/1000 + 旗舰 10 + 精英 2
+    Shop.lastEarn = Math.floor(this.score / 1000) + (this.runBossKills || 0) * 10 + (this.runEliteKills || 0) * 2;
+    Shop.addCrystal(Shop.lastEarn);
+    d.overCrystals.textContent = '★ +' + Shop.lastEarn + '(星晶 ' + Shop.crystal + ')';
     d.overRunStats.textContent = this._runStatsText();
     d.overBuild.innerHTML = this._buildSummaryHTML();
     d.newRecord.classList.toggle('hidden', !this.newRecord);

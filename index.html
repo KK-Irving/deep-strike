@@ -19,6 +19,7 @@
     <div class="menu-btns">
       <button id="btnStart" class="menu-btn primary">▸ 开始出击 <i>Enter</i></button>
       <button id="btnDaily" class="menu-btn">▸ 每日挑战 <i>D</i></button>
+      <button id="btnShop" class="menu-btn">▸ 机库商城 <i>G</i></button>
       <button id="btnHelp" class="menu-btn">▸ 玩法说明 <i>H</i></button>
       <button id="btnStats" class="menu-btn">▸ 战绩档案 <i>T</i></button>
     </div>
@@ -69,6 +70,19 @@
       <div class="hint left">连续击坠累积 COMBO,每 8 个提升一档倍率(最高 ×4),2 秒未击坠则中断<br>每波清版奖励 200 + 100 × 波数 · 最高分自动保存</div>
     </div>
     <button id="btnHelpBack" class="menu-btn">▸ 返回 <i>Esc</i></button>
+  </div>
+
+  <!-- 机库商城 -->
+  <div id="menuShop" class="menu-page hidden">
+    <div class="panel scroll">
+      <div class="sec-title">星晶余额 <span id="shopCrystal" style="color:#ffd166;font-family:Consolas,monospace">0 ★</span></div>
+      <div class="hint left" style="margin:0 0 6px">星晶获取:结算得分/1000 · 旗舰 +10★ · 精英 +2★ · 成就奖励</div>
+      <div class="sec-title">战 机 皮 肤</div>
+      <div id="skinGrid" class="shop-grid"></div>
+      <div class="sec-title">永 久 强 化</div>
+      <div id="boostGrid" class="shop-grid grid-2"></div>
+    </div>
+    <button id="btnShopBack" class="menu-btn">▸ 返回 <i>Esc</i></button>
   </div>
 
   <!-- 战绩档案 -->
@@ -123,6 +137,7 @@
     <div class="stat"><span>最高纪录</span><b id="finalHi">0</b></div>
   </div>
   <div id="overRunStats" class="run-stats"></div>
+  <div id="overCrystals" class="run-stats" style="color:#ffd166"></div>
   <div id="overBuild" class="own-row small"></div>
   <div class="menu-btns">
     <button id="btnRestart" class="menu-btn primary">▸ 再来一局 <i>Enter/R</i></button>
@@ -135,6 +150,7 @@
 <script src="js/entities.js"></script>
 <script src="js/upgrades.js"></script>
 <script src="js/achievements.js"></script>
+<script src="js/shop.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>
 </body>

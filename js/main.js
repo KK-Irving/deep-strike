@@ -61,6 +61,7 @@
     if (game.state === 'menu') {
       if (e.code === 'Enter') game.start();
       if (e.code === 'KeyD') game.start(true);
+      if (e.code === 'KeyG') game.showMenuPanel('shop');
       if (e.code === 'KeyH') game.showMenuPanel('help');
       if (e.code === 'KeyT') game.showMenuPanel('stats');
       if ((e.code === 'Escape' || e.code === 'Backspace') && game.menuPanel !== 'main') game.showMenuPanel('main');
@@ -87,6 +88,8 @@
   $('btnRestart').addEventListener('click', () => { AudioSys.init(); game.start(); });
   $('btnResume').addEventListener('click', () => game.togglePause());
   $('btnRestart2').addEventListener('click', () => { AudioSys.init(); game.start(game.daily); });
+  $('btnShop').addEventListener('click', () => game.showMenuPanel('shop'));
+  $('btnShopBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnHelp').addEventListener('click', () => game.showMenuPanel('help'));
   $('btnStats').addEventListener('click', () => game.showMenuPanel('stats'));
   $('btnHelpBack').addEventListener('click', () => game.showMenuPanel('main'));
