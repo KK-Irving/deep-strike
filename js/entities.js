@@ -94,6 +94,8 @@ function initSprites() {
       path: (g) => { g.moveTo(0, 11); g.lineTo(9, -8); g.lineTo(0, -3); g.lineTo(-9, -8); } },
     shielder: { color: '#5ad0ff', fill: '#0e2c40', half: 26, baseR: 15, dotR: 5, dotY: 0,
       path: (g) => { for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; const px = Math.cos(a) * 15, py = Math.sin(a) * 15; i ? g.lineTo(px, py) : g.moveTo(px, py); } } },
+    mender: { color: '#7dff9e', fill: '#103a1e', half: 24, baseR: 13, dotR: 4, dotY: 0,
+      path: (g) => { for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; const px = Math.cos(a) * 13, py = Math.sin(a) * 13; i ? g.lineTo(px, py) : g.moveTo(px, py); } } },
     sniper: { color: '#c86bff', fill: '#2a1240', half: 24, baseR: 13, dotR: 3, dotY: 1,
       path: (g) => { g.moveTo(0, 13); g.lineTo(10, -10); g.lineTo(0, -3); g.lineTo(-10, -10); } }
   };
@@ -509,6 +511,12 @@ class Enemy {
       this.vy = 34 * spM;
       this.shieldCycle = 2.4; this.shieldOff = 0;
       this.color = '#5ad0ff'; this.fill = '#0e2c40';
+    } else if (type === 'mender') {
+      // 治疗机:周期性治疗周围友军,优先集火目标
+      this.r = 13; this.hp = Math.max(6, Math.round(6 * hpM)); this.score = 350;
+      this.vy = 30 * spM; this.amp = rand(40, 80); this.freq = rand(0.8, 1.4);
+      this.healCd = rand(2, 3);
+      this.color = '#7dff9e'; this.fill = '#103a1e';
     } else { // sniper
       this.r = 13; this.hp = Math.max(2, Math.round(3 * hpM)); this.score = 250;
       this.vy = 170 * spM; this.stopY = rand(90, 210); this.stopped = false;
@@ -549,6 +557,12 @@ class Enemy {
         this.phaseCd -= dt;
         if (this.phaseCd <= 0) { this.elitePhased = true; this.phaseDur = 1.0; this.phaseCd = 2.6; }
       }
+    }
+    // 精英狂暴:生命低于 30% 时激怒(加速+增频)
+    if (this.elite && !this.enraged && this.hp > 0 && this.hp < this.maxHp * 0.3) {
+      this.enraged = true;
+      this.vy *= 1.3;
+      this.fireMul = (this.fireMul || 1) * 0.7;
     }
     const onScreen = this.y > 0;
     const canFire = onScreen && !this.elitePhased;
@@ -599,6 +613,24 @@ class Enemy {
       } else {
         this.shieldCycle -= dt;
         if (this.shieldCycle <= 0) { this.shieldOff = 1.2; this.shieldCycle = 2.4; }
+      }
+    } else if (this.type === 'mender') {
+      this.y += this.vy * dt;
+      this.x = clamp(this.baseX + Math.sin(this.t * this.freq) * this.amp, 20, W - 20);
+      this.healCd -= dt;
+      if (this.healPulse > 0) this.healPulse -= dt;
+      if (canFire && this.healCd <= 0) {
+        this.healCd = 4;
+        let healed = 0;
+        for (const o of game.enemies) {
+          if (o === this || o.dead || o.hp >= o.maxHp || o.elitePhased) continue;
+          const ddx = o.x - this.x, ddy = o.y - this.y;
+          if (ddx * ddx + ddy * ddy < 19600) { o.hp = Math.min(o.maxHp, o.hp + 4); healed++; }
+        }
+        if (healed) {
+          this.healPulse = 0.35;
+          game.rings.push(new Ring(this.x, this.y, '#7dff9e', 140, 0.4));
+        }
       }
     } else { // sniper
       if (!this.stopped) {
@@ -663,6 +695,18 @@ class Enemy {
     ctx.scale(this.r / spr.baseR, this.r / spr.baseR);
     const img = this.flash > 0 ? spr.flash : spr.body;
     ctx.drawImage(img, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
+    // 治疗机:白色十字
+    if (this.type === 'mender') {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillRect(-1.5, -6, 3, 12);
+      ctx.fillRect(-6, -1.5, 12, 3);
+    }
+    // 精英狂暴:红色狂暴光环
+    if (this.enraged) {
+      ctx.strokeStyle = 'rgba(255,80,60,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, this.r + 11 + Math.sin(this.t * 8) * 2, 0, TAU); ctx.stroke();
+    }
     // 护盾兵:正面护盾弧
     if (this.type === 'shielder' && this.shieldOff <= 0) {
       const warn = this.shieldCycle < 0.5 && Math.floor(this.shieldCycle * 10) % 2 === 0;
@@ -688,26 +732,27 @@ class Enemy {
  * BOSS 旗舰:三阶段弹幕;第 10/20/30…波出现「暴风」变体
  * ============================================================ */
 const BOSS_VARIANTS = {
-  flag:  { name: '敌方旗舰', color: '#ff5577', glow: '#ff3355', hull: '#3a1220', turret: '#55182b', core: '#ff2b4e' },
-  storm: { name: '暴风旗舰', color: '#3fe8c8', glow: '#17bfa0', hull: '#12424e', turret: '#1d5f70', core: '#2be8c8' }
+  flag:   { name: '敌方旗舰', color: '#ff5577', glow: '#ff3355', hull: '#3a1220', turret: '#55182b', core: '#ff2b4e' },
+  storm:  { name: '暴风旗舰', color: '#3fe8c8', glow: '#17bfa0', hull: '#12424e', turret: '#1d5f70', core: '#2be8c8' },
+  tyrant: { name: '暴君旗舰', color: '#c86bff', glow: '#8a2be2', hull: '#1e1030', turret: '#3a1a55', core: '#c86bff' }
 };
-const bossVariant = (wave) => (wave >= 10 && Math.floor(wave / 5) % 2 === 0 ? 'storm' : 'flag');
+const bossVariant = (wave) => (wave >= 25 ? 'tyrant' : (wave >= 10 && Math.floor(wave / 5) % 2 === 0 ? 'storm' : 'flag'));
 
 class Boss {
   constructor(wave) {
     this.wave = wave;
     this.isBoss = true;
     this.variant = bossVariant(wave);
-    const storm = this.variant === 'storm';
+    const storm = this.variant === 'storm', tyrant = this.variant === 'tyrant';
     this.x = W / 2; this.y = -90;
     this.r = 44;
-    this.maxHp = this.hp = (150 + wave * 45) * (storm ? 1.3 : 1);
+    this.maxHp = this.hp = (150 + wave * 45) * (tyrant ? 1.6 : storm ? 1.3 : 1);
     this.t = 0; this.flash = 0; this.dead = false;
     this.state = 'enter';
     this.dir = 1;
     this.fireCd = 1.2;
-    this.score = (2500 + wave * 250) * (storm ? 1.25 : 1);
-    this.escortCd = storm ? 4.5 : 6;
+    this.score = (2500 + wave * 250) * (tyrant ? 1.5 : storm ? 1.25 : 1);
+    this.escortCd = tyrant ? 4 : storm ? 4.5 : 6;
     this.phase = 0;
     this.burstCycle = 0;
   }
@@ -720,8 +765,8 @@ class Boss {
       if (this.y >= 115) this.state = 'fight';
       return;
     }
-    const storm = this.variant === 'storm';
-    this.x += this.dir * (36 + this.wave * 1.5) * (storm ? 1.35 : 1) * dt;
+    const storm = this.variant === 'storm', tyrant = this.variant === 'tyrant';
+    this.x += this.dir * (36 + this.wave * 1.5) * (tyrant ? 1.5 : storm ? 1.35 : 1) * dt;
     if (this.x < 70) { this.x = 70; this.dir = 1; }
     if (this.x > W - 70) { this.x = W - 70; this.dir = -1; }
     const frac = this.hp / this.maxHp;
@@ -730,7 +775,7 @@ class Boss {
     if (this.fireCd <= 0) this._attack(game);
     this.escortCd -= dt;
     if (this.phase >= 1 && this.escortCd <= 0) {
-      this.escortCd = storm ? 5 : 6;
+      this.escortCd = tyrant ? 4 : storm ? 5 : 6;
       game.enemies.push(new Enemy('drone', clamp(this.x - 60, 40, W - 40), game.wave, null, game._env));
       game.enemies.push(new Enemy('drone', clamp(this.x + 60, 40, W - 40), game.wave, null, game._env));
     }
@@ -738,6 +783,35 @@ class Boss {
 
   _attack(game) {
     const x = this.x, y = this.y + 26;
+    if (this.variant === 'tyrant') {
+      if (this.phase === 0) {
+        // 瞄准五连
+        const a = game.aimedAngle(x, y);
+        for (let i = -2; i <= 2; i++)
+          game.enemyShot(x, y, a + i * 0.14, 230 + this.wave * 4, 'orange');
+        this.fireCd = 0.85;
+      } else if (this.phase === 1) {
+        // 三臂螺旋
+        const a0 = this.t * 3.2;
+        for (let i = 0; i < 3; i++)
+          game.enemyShot(x, y, a0 + i * Math.PI * 2 / 3, 175);
+        this.fireCd = 0.12;
+      } else {
+        // 双向四臂螺旋 + 瞄准齐射
+        const a = this.t * 4.6;
+        for (let i = 0; i < 4; i++)
+          game.enemyShot(x, y, a + i * Math.PI / 2, 160);
+        this.burstCycle++;
+        if (this.burstCycle % 7 === 0) {
+          const aim = game.aimedAngle(x, y);
+          for (let i = -1; i <= 1; i++)
+            game.enemyShot(x, y, aim + i * 0.2, 240 + this.wave * 3);
+        }
+        this.fireCd = 0.16;
+      }
+      AudioSys.enemyShoot();
+      return;
+    }
     if (this.variant === 'storm') {
       if (this.phase === 0) {
         // 高速窄角狙击三连

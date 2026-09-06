@@ -567,12 +567,13 @@ class Game {
     while (budget > 0) {
       const roll = RNG();
       let type = 'drone';
-      if (n >= 3 && roll < 0.16) type = 'tank';
-      else if (n >= 4 && roll < 0.30) type = 'bomber';
-      else if (n >= 5 && roll < 0.38) type = 'shielder';
-      else if (n >= 2 && roll < 0.66) type = 'waver';
-      else if (n >= 4 && roll < 0.80) type = 'sniper';
-      let cost = type === 'tank' ? 3 : (type === 'shielder' ? 4 : (type === 'drone' ? 1 : 2));
+      if (n >= 3 && roll < 0.15) type = 'tank';
+      else if (n >= 4 && roll < 0.27) type = 'bomber';
+      else if (n >= 5 && roll < 0.34) type = 'shielder';
+      else if (n >= 8 && roll < 0.43) type = 'mender';
+      else if (n >= 2 && roll < 0.67) type = 'waver';
+      else if (n >= 4 && roll < 0.81) type = 'sniper';
+      let cost = type === 'tank' || type === 'mender' ? 3 : (type === 'shielder' ? 4 : (type === 'drone' ? 1 : 2));
       if (cost > budget) { type = 'drone'; cost = 1; }
       if (type === 'drone') {
         const cnt = Math.min(budget, irand(2, 4));
@@ -731,11 +732,12 @@ class Game {
         if (this.trickleT <= 0) {
           this.trickleT = Math.max(0.7, 1.6 - this.wave * 0.06);
           const roll = RNG();
-          const type = this.wave >= 3 && roll < 0.14 ? 'tank'
-            : this.wave >= 4 && roll < 0.26 ? 'bomber'
-            : this.wave >= 5 && roll < 0.34 ? 'shielder'
-            : this.wave >= 2 && roll < 0.62 ? 'waver'
-            : this.wave >= 4 && roll < 0.78 ? 'sniper' : 'drone';
+          const type = this.wave >= 3 && roll < 0.13 ? 'tank'
+            : this.wave >= 4 && roll < 0.24 ? 'bomber'
+            : this.wave >= 5 && roll < 0.32 ? 'shielder'
+            : this.wave >= 8 && roll < 0.41 ? 'mender'
+            : this.wave >= 2 && roll < 0.63 ? 'waver'
+            : this.wave >= 4 && roll < 0.79 ? 'sniper' : 'drone';
           this.enemies.push(new Enemy(type, rand(60, W - 60), this.wave, null, this._env));
         }
       } else if (this.waveClearT < 0) {
@@ -935,6 +937,16 @@ class Game {
     // 击杀汲取
     if (this.player.leechPer > 0 && this.player.alive)
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.leechPer);
+    // 连击奖励:每 25 连击掉落一枚随机道具
+    if (this.combo > 0 && this.combo % 25 === 0) {
+      this._dropPower(this.player.x + rand(-30, 30), this.player.y - 46);
+      this._addFloat(new FloatText(this.player.x, this.player.y - 34, '连击奖励!', '#ffd166', 12));
+    }
+    // 精英击坠:直接获得星晶
+    if (e.elite) {
+      Shop.addCrystal(2);
+      this._addFloat(new FloatText(e.x, e.y - 40, '★+2', '#ffd166', 11));
+    }
     this.stats.kills = this._stat('kills', 0) + 1;
     this.waveKills++;
     this.runKills++;
@@ -967,7 +979,7 @@ class Game {
     AudioSys.explode(e.r >= 18);
     this.shake(Math.min(9, 1.5 + e.r * 0.18), 0.22);
     // 掉落经验晶体(精英 ×4)
-    const xpTable = { drone: 2, waver: 3, sniper: 4, tank: 8, bomber: 3, shielder: 10 };
+    const xpTable = { drone: 2, waver: 3, sniper: 4, tank: 8, bomber: 3, shielder: 10, mender: 6 };
     let xp = (xpTable[e.type] || 2) * (e.elite ? 4 : 1) * (this.waveMod && this.waveMod.id === 'bounty' ? 1.5 : 1);
     while (xp > 0) {
       const v = Math.min(4, xp);
