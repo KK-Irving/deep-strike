@@ -141,9 +141,9 @@ h2 {
   text-shadow: 0 0 18px rgba(255, 209, 102, 0.8) !important;
 }
 .lv-sub { font-size: 13px; color: rgba(159, 232, 255, 0.65); letter-spacing: 2px; margin-bottom: 6px; }
-.card-row { display: flex; gap: 16px; margin: 18px 0 4px; }
+.card-row { display: flex; flex-wrap: wrap; gap: 14px; margin: 18px 0 4px; justify-content: center; max-width: 500px; }
 .card {
-  width: 138px; padding: 14px 12px 12px;
+  width: 136px; padding: 12px 10px 10px;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   font-family: inherit; color: #cfe8ff; text-align: center;
   background: rgba(10, 20, 45, 0.85);
@@ -162,6 +162,10 @@ h2 {
 .card.r1:hover { border-color: #4db8ff; box-shadow: 0 10px 30px rgba(77, 184, 255, 0.4); }
 .card.r2 { border-color: rgba(200, 107, 255, 0.6); box-shadow: 0 0 16px rgba(200, 107, 255, 0.25) inset; }
 .card.r2:hover { border-color: #c86bff; box-shadow: 0 10px 30px rgba(200, 107, 255, 0.45); }
+.card.hidden-card { border-style: dashed; }
+.card.hidden-card:hover { border-color: #51e08a; box-shadow: 0 10px 30px rgba(81, 224, 138, 0.4); }
+.card.swap { opacity: 0.92; }
+.card.swap:hover { transform: translateY(-8px) scale(1.02); border-color: #ff8fa5; box-shadow: 0 10px 30px rgba(255, 85, 119, 0.4); }
 .card-rar { font-size: 11px; letter-spacing: 3px; }
 .card-icon { font-size: 34px; line-height: 1.2; filter: drop-shadow(0 0 8px rgba(126, 243, 255, 0.5)); }
 .card-name { font-size: 16px; font-weight: bold; letter-spacing: 2px; color: #eaf7ff; }

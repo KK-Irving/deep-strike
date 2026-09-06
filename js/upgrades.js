@@ -64,20 +64,26 @@ const UPGRADE_MAP = {};
 for (const u of UPGRADES) UPGRADE_MAP[u.id] = u;
 
 /* 加权抽卡:从未满级的卡片中按稀有度权重抽取 3 张(互不重复)
- * 等级越高,史诗权重略微上调;质变武器互斥——已选路线可继续升级,对手路线移出卡池 */
-function drawUpgradeCards(mods, level, count = 3) {
+ * 等级越高,史诗权重略微上调;质变武器互斥;槽位满载时隐藏卡「基因扩展」进入卡池 */
+function drawUpgradeCards(mods, maxSlots, level, count = 3) {
+  const ownedCount = UPGRADES.filter(u => (mods[u.id] || 0) > 0 && !u.hidden).length;
+  const slotsFull = ownedCount >= maxSlots;
   const pathId = mods.laser ? 'laser' : (mods.spread ? 'spread' : null);
-  const pool = UPGRADES.filter(u => (mods[u.id] || 0) < u.max && !(u.path && pathId && pathId !== u.id));
+  const pool = UPGRADES.filter(u =>
+    (mods[u.id] || 0) < u.max &&
+    !(u.path && pathId && pathId !== u.id) &&
+    !(u.hidden && !slotsFull)
+  );
   const weights = RARITY.map((r, i) => r.weight + (i === 2 ? level : 0));
+  const cardWeight = (u) => weights[u.rar] + (u.hidden ? 45 : 0);
   const picks = [];
-  const w = weights.slice();
   for (let n = 0; n < count && pool.length; n++) {
     let total = 0;
-    for (const u of pool) total += w[u.rar];
+    for (const u of pool) total += cardWeight(u);
     let roll = RNG() * total;
     let chosen = pool[0];
     for (const u of pool) {
-      roll -= w[u.rar];
+      roll -= cardWeight(u);
       if (roll <= 0) { chosen = u; break; }
     }
     picks.push(chosen);

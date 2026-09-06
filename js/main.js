@@ -44,8 +44,14 @@
     if (e.code === 'KeyP' || e.code === 'Escape') game.togglePause();
     // R 快速重开(暂停或结算时)
     if (e.code === 'KeyR' && (game.state === 'paused' || game.state === 'gameover')) game.start(game.daily);
-    // 升级选卡快捷键
+    // 升级选卡快捷键(满槽替换模式下数字键选择要丢弃的模块)
     if (game.state === 'levelup') {
+      if (game._pendingSwap) {
+        const keys = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'];
+        const idx = keys.indexOf(e.code);
+        if (idx >= 0 && game._swapList && game._swapList[idx]) game.swapPick(game._swapList[idx]);
+        return;
+      }
       if (e.code === 'Digit1' || e.code === 'Numpad1') game.chooseCard(0);
       if (e.code === 'Digit2' || e.code === 'Numpad2') game.chooseCard(1);
       if (e.code === 'Digit3' || e.code === 'Numpad3') game.chooseCard(2);

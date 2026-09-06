@@ -47,6 +47,7 @@ class Game {
       stBoss: document.getElementById('stBoss'),
       achList: document.getElementById('achList'),
       levelup: document.getElementById('levelupOverlay'),
+      lvSub: document.getElementById('lvSub'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
     };
@@ -130,6 +131,7 @@ class Game {
     this.asteroids = []; this.supplies = [];
     this.runKills = 0; this.runEliteKills = 0;
     this._cardChoices = [];
+    this._pendingSwap = null; this._swapList = null;
     this._recalc();
   }
 
@@ -218,6 +220,8 @@ class Game {
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
     const timePerStack = this.bonds.includes('chrono') ? 0.30 : 0.18;
     this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
+    // 卡槽系统:基础 5 槽,隐藏卡扩展
+    this.maxSlots = 5 + (m.slotplus || 0);
     // 生命值系统:上限 = 100 + 卡片成长 + 等级成长
     p.maxHp = 100 + 25 * (m.vitality || 0) + 5 * (this.level - 1);
     p.armorPct = Math.min(0.45, 0.15 * (m.armor || 0));
@@ -298,9 +302,22 @@ class Game {
     if (this.pendingLevels > 0 && this.state === 'playing' && this.player.alive) this.openLevelup();
   }
 
+  _ownedIds() {
+    return UPGRADES.filter(u => (this.mods[u.id] || 0) > 0 && !u.hidden).map(u => u.id);
+  }
+
+  /* 羁绊重构:根据当前模组重算激活羁绊,返回增减 */
+  _recalcBonds() {
+    const active = BONDS.filter(b => b.req.every(id => (this.mods[id] || 0) > 0)).map(b => b.id);
+    const gained = active.filter(id => !this.bonds.includes(id));
+    const lost = this.bonds.filter(id => !active.includes(id));
+    this.bonds = active;
+    return { gained, lost };
+  }
+
   openLevelup() {
     if (this.state !== 'playing' || this.pendingLevels <= 0) return;
-    this._cardChoices = drawUpgradeCards(this.mods, this.level);
+    this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level);
     // 卡池耗尽兜底(全部满级):转化为奖励分,避免软锁
     if (this._cardChoices.length === 0) {
       const bonus = 500 * this.pendingLevels;
@@ -318,17 +335,24 @@ class Game {
   _renderCards() {
     const row = this._dom.cardRow;
     row.innerHTML = '';
+    const owned = this._ownedIds().length;
+    const slotsFull = owned >= this.maxSlots;
+    this._dom.lvSub.innerHTML = '槽位 <b style="color:#ffd166">' + owned + ' / ' + this.maxSlots + '</b>' +
+      (slotsFull ? ' · 已满,选择新卡需替换' : ' · 按 1 / 2 / 3 或点击卡片');
     this._cardChoices.forEach((u, i) => {
       const r = RARITY[u.rar];
       const cur = this.mods[u.id] || 0;
+      const needSwap = slotsFull && !cur && !u.hidden;
       const el = document.createElement('button');
-      el.className = 'card r' + u.rar;
+      el.className = 'card r' + u.rar + (u.hidden ? ' hidden-card' : '');
       el.innerHTML =
-        '<div class="card-rar" style="color:' + r.color + '">' + r.name + (u.rar === 2 ? ' ★' : '') + '</div>' +
+        '<div class="card-rar" style="color:' + r.color + '">' + (u.hidden ? '隐藏卡' : r.name) + (u.rar === 2 ? ' ★' : '') + '</div>' +
         '<div class="card-icon">' + u.icon + '</div>' +
         '<div class="card-name">' + u.name + '</div>' +
         '<div class="card-desc">' + u.desc + '</div>' +
-        '<div class="card-lv">' + (cur > 0 ? 'Lv ' + cur + ' → ' + (cur + 1) : '新能力!') + ' · 按 ' + (i + 1) + '</div>';
+        '<div class="card-lv">' + (u.hidden ? '槽位 +1'
+          : cur > 0 ? 'Lv ' + cur + ' → ' + (cur + 1)
+          : needSwap ? '需替换一项' : '新能力!') + ' · 按 ' + (i + 1) + '</div>';
       el.addEventListener('click', () => this.chooseCard(i));
       row.appendChild(el);
     });
@@ -344,25 +368,87 @@ class Game {
     this._dom.ownRow.innerHTML = html || '<span class="chip">首次升级 · 选择你的成长路线</span>';
   }
 
+  /* 满槽替换界面:展示已持有模块,点击丢弃 */
+  _renderSwap() {
+    const row = this._dom.cardRow;
+    row.innerHTML = '';
+    const u = this._pendingSwap;
+    this._dom.lvSub.innerHTML = '<b style="color:#ff8fa5">槽位已满</b> · 选择要丢弃的模块以装备「' + u.icon + ' ' + u.name + '」';
+    this._swapList.forEach((id, i) => {
+      const owned = UPGRADE_MAP[id];
+      const r = RARITY[owned.rar];
+      const el = document.createElement('button');
+      el.className = 'card swap r' + owned.rar;
+      el.innerHTML =
+        '<div class="card-rar" style="color:' + r.color + '">丢弃 · 按 ' + (i + 1) + '</div>' +
+        '<div class="card-icon">' + owned.icon + '</div>' +
+        '<div class="card-name">' + owned.name + '</div>' +
+        '<div class="card-desc">Lv ' + this.mods[id] + ' / ' + owned.max + '</div>' +
+        '<div class="card-lv">丢弃并装备新卡</div>';
+      el.addEventListener('click', () => this.swapPick(id));
+      row.appendChild(el);
+    });
+  }
+
   chooseCard(i) {
-    if (this.state !== 'levelup') return;
+    if (this.state !== 'levelup' || this._pendingSwap) return;
     const u = this._cardChoices[i];
     if (!u) return;
-    this.mods[u.id] = (this.mods[u.id] || 0) + 1;
+    if (u.id === 'slotplus') {
+      // 隐藏卡:直接扩充槽位,不占用槽位
+      this.mods[u.id] = (this.mods[u.id] || 0) + 1;
+    } else if (this.mods[u.id]) {
+      // 已持有:叠加层数,不占用新槽位
+      this.mods[u.id]++;
+    } else if (this._ownedIds().length < this.maxSlots) {
+      // 新卡且有空闲槽位
+      this.mods[u.id] = 1;
+    } else {
+      // 槽位已满:进入替换模式,先选择要丢弃的模块
+      this._pendingSwap = u;
+      this._swapList = this._ownedIds();
+      this._renderSwap();
+      AudioSys.cardPick();
+      return;
+    }
+    this._finishPick(u);
+  }
+
+  /* 满槽替换:丢弃 oldId 后装备待选卡 */
+  swapPick(oldId) {
+    if (this.state !== 'levelup' || !this._pendingSwap) return;
+    if (!this._swapList.includes(oldId)) return;
+    delete this.mods[oldId];
+    const u = this._pendingSwap;
+    this._pendingSwap = null;
+    this._swapList = null;
+    this.mods[u.id] = 1;
+    this._finishPick(u);
+  }
+
+  _finishPick(u) {
     AudioSys.cardPick();
-    // 羁绊觉醒
-    for (const b of checkNewBonds(this.mods, this.bonds)) {
-      this.bonds.push(b.id);
-      this.banner = { text: '羁绊觉醒 · ' + b.name, sub: b.desc, life: 2.6, max: 2.6, gold: true };
+    const { gained, lost } = this._recalcBonds();
+    for (const b of gained) {
+      const cfg = BONDS.find(x => x.id === b);
+      this.banner = { text: '羁绊觉醒 · ' + cfg.name, sub: cfg.desc, life: 2.6, max: 2.6, gold: true };
       AudioSys.bond();
       if (this.bonds.length >= 3) Ach.unlock('bond_3', this);
     }
+    for (const b of lost) {
+      const cfg = BONDS.find(x => x.id === b);
+      this.banner = { text: '羁绊瓦解 · ' + cfg.name, sub: '条件不再满足', life: 2.2, max: 2.2, red: true };
+      AudioSys.shieldBreak();
+    }
     this._recalc();
+    if (u.id === 'vitality') this.player.hp = Math.min(this.player.maxHp, this.player.hp + 25);
     this.pendingLevels--;
     if (this.pendingLevels > 0) {
-      this._cardChoices = drawUpgradeCards(this.mods, this.level);
+      this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level);
       this._renderCards();
     } else {
+      this._pendingSwap = null;
+      this._swapList = null;
       this.state = 'playing';
       this._showState();
     }
@@ -1242,6 +1328,12 @@ class Game {
       ctx.fillStyle = '#ffd166';
       ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
       ctx.fillText('羁绊 ' + this.bonds.map(id => BONDS.find(b => b.id === id).name).join(' · '), 14, H - 44);
+    }
+    if (owned.length) {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(159,232,255,0.6)';
+      ctx.font = 'bold 10px Consolas, monospace';
+      ctx.fillText(this._ownedIds().length + '/' + this.maxSlots + ' 槽', W / 2, H - 48);
     }
   }
 
