@@ -141,7 +141,7 @@ class Game {
     this.bombMeter = 0;
     this.wingmen = []; this.rifts = []; this.riftCd = 0;
     this.asteroids = []; this.supplies = [];
-    this.runKills = 0; this.runEliteKills = 0;
+    this.runKills = 0; this.runEliteKills = 0; this.runBossKills = 0; this.runEvoCount = 0;
     this._cardChoices = [];
     this._pendingSwap = null; this._swapList = null;
     this.evo = {}; this.bulletFreezeT = 0;
@@ -995,6 +995,9 @@ class Game {
     this.stats.bossKills = this._stat('bossKills', 0) + 1;
     this.runBossKills = (this.runBossKills || 0) + 1;
     this.waveKills++;
+    // 旗舰奖励:击毁后获得一次额外升级机会
+    this.pendingLevels++;
+    if (this.state === 'playing' && this.player.alive) this.openLevelup();
     Ach.unlock('boss_1', this);
     if (this.stats.bossKills >= 5) Ach.unlock('boss_5', this);
     if (this.stats.bossKills >= 10) Ach.unlock('boss_10', this);
@@ -1392,7 +1395,7 @@ class Game {
       ctx.fillStyle = '#ffd166';
       ctx.font = 'bold 15px Consolas, monospace';
       ctx.fillText(this.combo + ' COMBO  ×' + this.multiplier(), W / 2, 60);
-      const fw = 90 * clamp(this.comboT / 2, 0, 1);
+      const fw = 90 * clamp(this.comboT / this.comboWindow, 0, 1);
       ctx.fillStyle = 'rgba(255,209,102,0.5)';
       ctx.fillRect(W / 2 - fw / 2, 80, fw, 3);
     }
@@ -1406,6 +1409,14 @@ class Game {
       ctx.strokeStyle = 'rgba(255,85,119,0.7)';
       ctx.lineWidth = 1;
       ctx.strokeRect(bx - 2.5, by - 2.5, bw + 5, 13);
+      // 三阶段分段标记(当前阶段高亮)
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillRect(bx + bw / 3 - 1, by, 2, 8);
+      ctx.fillRect(bx + bw * 2 / 3 - 1, by, 2, 8);
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 9px Consolas, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('P' + (this.boss.phase + 1), bx + bw + 10, by + 1);
     }
     // 经验条与等级
     if (this.level > 1 || this.xp > 0 || this.mods && Object.keys(this.mods).length) {

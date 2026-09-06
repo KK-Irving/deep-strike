@@ -108,11 +108,13 @@ function drawUpgradeCards(mods, maxSlots, level, evo, count = 3) {
     picks.push(chosen);
     pool.splice(pool.indexOf(chosen), 1);
   }
-  // 进化注入:已满级且未进化的卡片,其传说进化卡替换一张候选(必定露面)
+  // 进化注入:已满级且未进化的卡片,其传说进化卡替换一张候选(必定露面);
+  // 若常规卡池已耗尽但进化可拿,仍单独提供进化选项
   const evoReady = EVOLUTIONS.filter(e => (mods[e.base] || 0) >= UPGRADE_MAP[e.base].max && !(evo && evo[e.base]));
-  if (evoReady.length && picks.length) {
+  if (evoReady.length) {
     const evo = evoReady[Math.floor(RNG() * evoReady.length)];
-    picks[Math.floor(RNG() * picks.length)] = Object.assign({ isEvo: true, rar: 3 }, evo);
+    if (picks.length) picks[Math.floor(RNG() * picks.length)] = Object.assign({ isEvo: true, rar: 3 }, evo);
+    else picks.push(Object.assign({ isEvo: true, rar: 3 }, evo));
   }
   return picks;
 }
