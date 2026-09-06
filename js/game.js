@@ -475,7 +475,7 @@ class Game {
     if (crit) dmg = Math.round(dmg * (this.bonds.includes('execute') ? 4.5 : 3));
     AudioSys.hit();
     this._sparks(b.x, b.y, crit ? '#ffd166' : e.color, crit ? 7 : 4);
-    if (crit) this.floats.push(new FloatText(b.x, b.y - 8, '暴击', '#ff5470', 11));
+    if (crit) this._addFloat(new FloatText(b.x, b.y - 8, '暴击', '#ff5470', 11));
     // 裂变弹:命中后分裂出 2 枚小弹(羁绊「弹幕风暴」赋予贯穿)
     if (b.split > 0) {
       for (let i = 0; i < 2; i++) {
@@ -507,14 +507,14 @@ class Game {
         this.bombMeter = 0;
         if (this.player.bombs < 5) {
           this.player.bombs++;
-          this.floats.push(new FloatText(this.player.x, this.player.y - 30, '歼灭装填 炸弹+1', '#51e08a', 12));
+          this._addFloat(new FloatText(this.player.x, this.player.y - 30, '歼灭装填 炸弹+1', '#51e08a', 12));
         }
       }
     }
     const mult = this.multiplier();
     const pts = Math.round(e.score * mult);
     this.score += pts;
-    this.floats.push(new FloatText(e.x, e.y - 8, '+' + pts, mult > 1 ? '#ffd166' : '#e8f6ff', e.r > 18 ? 16 : 13));
+    this._addFloat(new FloatText(e.x, e.y - 8, '+' + pts, mult > 1 ? '#ffd166' : '#e8f6ff', e.r > 18 ? 16 : 13));
     this._explode(e.x, e.y, e.r, e.color, 1);
     AudioSys.explode(e.r >= 18);
     this.shake(Math.min(9, 1.5 + e.r * 0.18), 0.22);
@@ -536,7 +536,7 @@ class Game {
       this._dropPower(e.x, e.y);
       const bonus = 150 + this.wave * 25;
       this.score += bonus;
-      this.floats.push(new FloatText(e.x, e.y - 26, '精英击坠 +' + bonus, e.eliteColor, 13));
+      this._addFloat(new FloatText(e.x, e.y - 26, '精英击坠 +' + bonus, e.eliteColor, 13));
     }
     else if (Math.random() < 0.13) this._dropPower(e.x, e.y);
   }
@@ -548,7 +548,7 @@ class Game {
     this.waveKills++;
     const pts = Math.round(b.score * this.multiplier());
     this.score += pts;
-    this.floats.push(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
+    this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
     for (let i = 0; i < 10; i++)
       this._explode(b.x + rand(-b.r, b.r), b.y + rand(-b.r * 0.6, b.r * 0.6), 14, '#ff8c42', 1.1);
     this._explode(b.x, b.y, 30, '#ffd166', 1.6);
@@ -581,29 +581,29 @@ class Game {
     if (type === 'power') {
       if (p.weapon < 5) {
         p.weapon++;
-        this.floats.push(new FloatText(p.x, p.y - 24, '火力提升!', '#ff5470'));
+        this._addFloat(new FloatText(p.x, p.y - 24, '火力提升!', '#ff5470'));
       } else {
         this.score += 300;
-        this.floats.push(new FloatText(p.x, p.y - 24, '+300', '#ffd166'));
+        this._addFloat(new FloatText(p.x, p.y - 24, '+300', '#ffd166'));
       }
     } else if (type === 'shield') {
       p.shield = true;
-      this.floats.push(new FloatText(p.x, p.y - 24, '护盾展开!', '#4db8ff'));
+      this._addFloat(new FloatText(p.x, p.y - 24, '护盾展开!', '#4db8ff'));
     } else if (type === 'bomb') {
       if (p.bombs < 5) {
         p.bombs++;
-        this.floats.push(new FloatText(p.x, p.y - 24, '炸弹 +1', '#51e08a'));
+        this._addFloat(new FloatText(p.x, p.y - 24, '炸弹 +1', '#51e08a'));
       } else {
         this.score += 300;
-        this.floats.push(new FloatText(p.x, p.y - 24, '+300', '#ffd166'));
+        this._addFloat(new FloatText(p.x, p.y - 24, '+300', '#ffd166'));
       }
     } else if (type === 'life') {
       if (p.lives < 5) {
         p.lives++;
-        this.floats.push(new FloatText(p.x, p.y - 24, '生命 +1', '#ff77a9'));
+        this._addFloat(new FloatText(p.x, p.y - 24, '生命 +1', '#ff77a9'));
       } else {
         this.score += 500;
-        this.floats.push(new FloatText(p.x, p.y - 24, '+500', '#ffd166'));
+        this._addFloat(new FloatText(p.x, p.y - 24, '+500', '#ffd166'));
       }
     }
   }
@@ -700,10 +700,14 @@ class Game {
     this.shakeMag = mag; this.shakeDur = dur; this.shakeT = dur;
   }
 
+  // 容量保护:极端场面下粒子/飘字不无限膨胀
+  _addParticle(p) { if (this.particles.length < 500) this.particles.push(p); }
+  _addFloat(f) { if (this.floats.length < 60) this.floats.push(f); }
+
   _sparks(x, y, color, n = 6) {
     for (let i = 0; i < n; i++) {
       const a = rand(0, TAU), sp = rand(60, 220);
-      this.particles.push(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.15, 0.35), rand(1.5, 3), color));
+      this._addParticle(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.15, 0.35), rand(1.5, 3), color));
     }
   }
 
@@ -712,7 +716,7 @@ class Game {
     for (let i = 0; i < n; i++) {
       const a = rand(0, TAU), sp = rand(30, 260) * scale;
       const c = Math.random() < 0.5 ? color : (Math.random() < 0.5 ? '#ffd166' : '#ff8c42');
-      this.particles.push(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.3, 0.8) * scale, rand(1.5, 4) * scale, c));
+      this._addParticle(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.3, 0.8) * scale, rand(1.5, 4) * scale, c));
     }
     this.rings.push(new Ring(x, y, color, (r + 20) * scale, 0.4));
   }

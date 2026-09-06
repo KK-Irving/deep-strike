@@ -44,6 +44,104 @@ function createBackground() {
   return c;
 }
 
+/* ============================================================
+ * 精灵预渲染:带 shadowBlur 的静态机体只绘制一次到离屏画布,
+ * 运行时 drawImage 贴图,避免逐帧 shadowBlur 的巨大开销
+ * ============================================================ */
+function makeSprite(half, paint) {
+  const c = document.createElement('canvas');
+  c.width = c.height = half * 4;   // 2x 超采样
+  const g = c.getContext('2d');
+  g.scale(2, 2);
+  g.translate(half, half);
+  paint(g);
+  return c;
+}
+
+const SPRITES = { enemy: {}, power: {} };
+
+function initSprites() {
+  const enemyPaint = (color, fill, path, dotR, dotY) => (g) => {
+    g.shadowColor = color; g.shadowBlur = 9;
+    g.beginPath(); path(g); g.closePath();
+    g.fillStyle = fill; g.fill();
+    g.lineWidth = 2; g.strokeStyle = color; g.stroke();
+    g.shadowBlur = 0;
+    g.fillStyle = color;
+    g.beginPath(); g.arc(0, dotY, dotR, 0, TAU); g.fill();
+  };
+  const enemyDefs = {
+    drone:  { color: '#ff4d6d', fill: '#42101d', half: 22, baseR: 11, dotR: 3, dotY: 0,
+      path: (g) => { g.moveTo(0, 12); g.lineTo(10, -9); g.lineTo(0, -4); g.lineTo(-10, -9); } },
+    waver:  { color: '#ff7ab8', fill: '#40152c', half: 24, baseR: 13, dotR: 3, dotY: 1,
+      path: (g) => { g.moveTo(0, 14); g.lineTo(11, 0); g.lineTo(0, -11); g.lineTo(-11, 0); } },
+    tank:   { color: '#ff9a3c', fill: '#40230c', half: 32, baseR: 21, dotR: 6, dotY: 1,
+      path: (g) => { for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + Math.PI / 6; const px = Math.cos(a) * 21, py = Math.sin(a) * 21; i ? g.lineTo(px, py) : g.moveTo(px, py); } } },
+    sniper: { color: '#c86bff', fill: '#2a1240', half: 24, baseR: 13, dotR: 3, dotY: 1,
+      path: (g) => { g.moveTo(0, 13); g.lineTo(10, -10); g.lineTo(0, -3); g.lineTo(-10, -10); } }
+  };
+  for (const [type, d] of Object.entries(enemyDefs)) {
+    SPRITES.enemy[type] = {
+      baseR: d.baseR, half: d.half,
+      body: makeSprite(d.half, enemyPaint(d.color, d.fill, d.path, d.dotR, d.dotY)),
+      flash: makeSprite(d.half, enemyPaint('#ffffff', '#ffffff', d.path, d.dotR, d.dotY))
+    };
+  }
+  // 玩家机体(引擎火焰/护盾/判定点动态绘制)
+  SPRITES.player = {
+    half: 30,
+    body: makeSprite(30, (g) => {
+      g.shadowColor = '#37e2ff'; g.shadowBlur = 14;
+      g.beginPath();
+      g.moveTo(0, -17); g.lineTo(9, 4); g.lineTo(14, 11); g.lineTo(5, 8);
+      g.lineTo(0, 12); g.lineTo(-5, 8); g.lineTo(-14, 11); g.lineTo(-9, 4);
+      g.closePath();
+      g.fillStyle = '#0f4b66'; g.fill();
+      g.lineWidth = 2; g.strokeStyle = '#7ef3ff'; g.stroke();
+      g.shadowBlur = 0;
+      g.fillStyle = '#d9fbff';
+      g.beginPath(); g.arc(0, -4, 2.6, 0, TAU); g.fill();
+    })
+  };
+  // BOSS 舰体(旋转外环与核心动态绘制)
+  SPRITES.boss = {
+    half: 84,
+    body: makeSprite(84, (g) => {
+      g.shadowColor = '#ff3355'; g.shadowBlur = 22;
+      g.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = i / 6 * TAU + Math.PI / 6;
+        const px = Math.cos(a) * 44, py = Math.sin(a) * 44;
+        i ? g.lineTo(px, py) : g.moveTo(px, py);
+      }
+      g.closePath();
+      g.fillStyle = '#3a1220'; g.fill();
+      g.lineWidth = 3; g.strokeStyle = '#ff5577'; g.stroke();
+      g.shadowBlur = 0;
+      g.fillStyle = '#55182b';
+      g.fillRect(-54, -8, 14, 26);
+      g.fillRect(40, -8, 14, 26);
+    })
+  };
+  // 道具盒
+  for (const [type, cfg] of Object.entries(PowerUp.CFG)) {
+    SPRITES.power[type] = {
+      half: 28,
+      c: makeSprite(28, (g) => {
+        g.shadowColor = cfg.color; g.shadowBlur = 14;
+        roundRectPath(g, -11, -11, 22, 22, 5);
+        g.fillStyle = '#0b1220'; g.fill();
+        g.lineWidth = 2; g.strokeStyle = cfg.color; g.stroke();
+        g.shadowBlur = 0;
+        g.fillStyle = cfg.color;
+        g.font = 'bold 13px "Segoe UI", sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(cfg.label, 0, 1);
+      })
+    };
+  }
+}
+
 class Particle {
   constructor(x, y, vx, vy, life, size, color) {
     this.x = x; this.y = y; this.vx = vx; this.vy = vy;
@@ -220,7 +318,7 @@ class Player {
       }
     }
     if (Math.random() < 0.6)
-      game.particles.push(new Particle(
+      game._addParticle(new Particle(
         this.x + rand(-2.5, 2.5), this.y + 13,
         rand(-14, 14), rand(90, 160),
         rand(0.12, 0.28), rand(1.2, 2.4),
@@ -288,23 +386,9 @@ class Player {
     ctx.beginPath();
     ctx.moveTo(-3.5, 11); ctx.lineTo(3.5, 11); ctx.lineTo(0, 13 + fl + 6);
     ctx.closePath(); ctx.fill();
-    // 机体
-    ctx.shadowColor = '#37e2ff';
-    ctx.shadowBlur = 14;
-    ctx.beginPath();
-    ctx.moveTo(0, -17);
-    ctx.lineTo(9, 4); ctx.lineTo(14, 11); ctx.lineTo(5, 8);
-    ctx.lineTo(0, 12); ctx.lineTo(-5, 8); ctx.lineTo(-14, 11); ctx.lineTo(-9, 4);
-    ctx.closePath();
-    ctx.fillStyle = '#0f4b66';
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#7ef3ff';
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    // 座舱
-    ctx.fillStyle = '#d9fbff';
-    ctx.beginPath(); ctx.arc(0, -4, 2.6, 0, TAU); ctx.fill();
+    // 机体(预渲染精灵)
+    const spr = SPRITES.player;
+    ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
     ctx.globalAlpha = 1;
     // 护盾
     if (this.shield) {
@@ -454,41 +538,20 @@ class Enemy {
       ctx.textAlign = 'center';
       ctx.fillText(this.eliteName, 0, -this.r - 16);
     }
-    ctx.shadowColor = this.color;
-    ctx.shadowBlur = 9;
-    ctx.beginPath();
-    if (this.type === 'drone') {
-      ctx.moveTo(0, 12); ctx.lineTo(10, -9); ctx.lineTo(0, -4); ctx.lineTo(-10, -9);
-    } else if (this.type === 'waver') {
-      ctx.moveTo(0, 14); ctx.lineTo(11, 0); ctx.lineTo(0, -11); ctx.lineTo(-11, 0);
-    } else if (this.type === 'tank') {
-      for (let i = 0; i < 6; i++) {
-        const a = i / 6 * TAU + Math.PI / 6;
-        const px = Math.cos(a) * this.r, py = Math.sin(a) * this.r;
-        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-      }
-    } else {
-      ctx.moveTo(0, 13); ctx.lineTo(10, -10); ctx.lineTo(0, -3); ctx.lineTo(-10, -10);
-    }
-    ctx.closePath();
-    ctx.fillStyle = this.flash > 0 ? '#ffffff' : this.fill;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = this.color;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = this.flash > 0 ? '#ffffff' : this.color;
-    ctx.beginPath();
-    ctx.arc(0, this.type === 'drone' ? 0 : 1, this.type === 'tank' ? 6 : 3, 0, TAU);
-    ctx.fill();
+    // 机体(预渲染精灵,精英按半径比例放大)
+    const spr = SPRITES.enemy[this.type];
+    ctx.scale(this.r / spr.baseR, this.r / spr.baseR);
+    const img = this.flash > 0 ? spr.flash : spr.body;
+    ctx.drawImage(img, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
+    ctx.restore();
+    // 血条(屏幕坐标)
     if (this.elite || (this.hp < this.maxHp && this.maxHp >= 3)) {
       const w = this.r * 2;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(-w / 2, -this.r - 9, w, 4);
+      ctx.fillRect(this.x - w / 2, this.y - this.r - 9, w, 4);
       ctx.fillStyle = '#ff5577';
-      ctx.fillRect(-w / 2, -this.r - 9, w * (this.hp / this.maxHp), 4);
+      ctx.fillRect(this.x - w / 2, this.y - this.r - 9, w * (this.hp / this.maxHp), 4);
     }
-    ctx.restore();
   }
 }
 
@@ -583,25 +646,9 @@ class Boss {
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
-    // 舰体
-    ctx.shadowColor = '#ff3355';
-    ctx.shadowBlur = 22;
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const a = i / 6 * TAU + Math.PI / 6;
-      i ? ctx.lineTo(Math.cos(a) * this.r, Math.sin(a) * this.r) : ctx.moveTo(Math.cos(a) * this.r, Math.sin(a) * this.r);
-    }
-    ctx.closePath();
-    ctx.fillStyle = this.flash > 0 ? '#ffffff' : '#3a1220';
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#ff5577';
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    // 侧炮塔
-    ctx.fillStyle = this.flash > 0 ? '#ffffff' : '#55182b';
-    ctx.fillRect(-this.r - 10, -8, 14, 26);
-    ctx.fillRect(this.r - 4, -8, 14, 26);
+    // 舰体(预渲染精灵)
+    const spr = SPRITES.boss;
+    ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
     // 核心
     const pr = 11 + Math.sin(this.t * 5) * 3;
     ctx.fillStyle = this.flash > 0 ? '#ffffff' : '#ff2b4e';
@@ -646,24 +693,12 @@ class PowerUp {
     if (this.y > H + 24) this.dead = true;
   }
   draw(ctx) {
-    const cfg = PowerUp.CFG[this.type];
-    const s = 11 + Math.sin(this.t * 6) * 1.6;
+    const spr = SPRITES.power[this.type];
+    const s = 1 + Math.sin(this.t * 6) * 0.05;
     ctx.save();
     ctx.translate(this.x, this.y);
-    ctx.shadowColor = cfg.color;
-    ctx.shadowBlur = 14;
-    roundRectPath(ctx, -s, -s, s * 2, s * 2, 5);
-    ctx.fillStyle = '#0b1220';
-    ctx.fill();
-    ctx.strokeStyle = cfg.color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = cfg.color;
-    ctx.font = 'bold 13px "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(cfg.label, 0, 1);
+    ctx.scale(s, s);
+    ctx.drawImage(spr.c, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
     ctx.restore();
   }
 }
@@ -709,3 +744,5 @@ class XPOrb {
     ctx.restore();
   }
 }
+
+initSprites();
