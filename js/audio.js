@@ -137,6 +137,9 @@ const AudioSys = {
     this.tone({ freq: 70, end: 180, dur: 0.8, type: 'sine', vol: 0.3 });
     this.noise({ dur: 0.8, vol: 0.12, from: 500, to: 2200 });
   },
+  beam() {
+    this.tone({ freq: 150, end: 95, dur: 0.14, type: 'sawtooth', vol: 0.035 });
+  },
   gameover() {
     [392, 330, 262, 196].forEach((f, i) =>
       this.tone({ freq: f, dur: 0.3, type: 'triangle', vol: 0.25, delay: i * 0.25 }));

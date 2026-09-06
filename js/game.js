@@ -211,6 +211,38 @@ class Game {
     if (m.shieldgen && !p.shield && p.shieldCd <= 0) p.shieldCd = p.shieldInterval;
   }
 
+  /* 激光主炮:光束持续伤害结算(每帧调用) */
+  beamTick(dt) {
+    const p = this.player, m = this.mods;
+    const lvl = m.laser;
+    const dps = (7 + 4 * (lvl - 1) + 2.5 * p.dmgBonus)
+      * (this.bonds.includes('focus') ? 1.6 : 1)
+      * (1 + 0.15 * (p.weapon - 1));
+    const halfW = 2.5 + 0.8 * (lvl - 1) + 0.4 * (p.weapon - 1);
+    const xs = [p.x];
+    for (let i = 1; i <= (m.multi || 0); i++) { xs.push(p.x - 7 - i * 8, p.x + 7 + i * 8); }
+    this.beams = xs.map(x => ({ x, halfW }));
+    let hitAny = false;
+    for (const bx of xs) {
+      for (const e of this.enemies) {
+        if (e.dead || e.elitePhased) continue;
+        if (e.y < p.y - 6 && Math.abs(e.x - bx) < e.r + halfW) {
+          e.damage(dps * dt, this, true);
+          hitAny = true;
+        }
+      }
+      if (this.boss && this.boss.state === 'fight' && Math.abs(this.boss.x - bx) < this.boss.r + halfW) {
+        this.boss.damage(dps * dt, this, true);
+        hitAny = true;
+      }
+    }
+    this._beamSndT = (this._beamSndT || 0) - dt;
+    if (hitAny && this._beamSndT <= 0) {
+      this._beamSndT = 0.15;
+      AudioSys.beam();
+    }
+  }
+
   gainXP(n) {
     this.xp += n * this.xpMult;
     AudioSys.xp();
@@ -374,9 +406,15 @@ class Game {
     }
 
     if (this.player.alive) this.player.update(dt, this);
+    if (!this.player.beamOn) this.beams = null;
 
     for (let i = this.playerBullets.length - 1; i >= 0; i--) {
       const b = this.playerBullets[i];
+      // 散射弹丸射程衰减
+      if (b.life !== undefined) {
+        b.life -= dt;
+        if (b.life <= 0) { this.playerBullets.splice(i, 1); continue; }
+      }
       if (b.homing) {
         b.life -= dt;
         if (b.life <= 0) { this.playerBullets.splice(i, 1); continue; }
@@ -856,6 +894,18 @@ class Game {
       ctx.fillRect(b.x - 3.5, b.y - 13, 7, 18);
       ctx.fillStyle = b.color;
       ctx.fillRect(b.x - 1.8, b.y - 10, 3.6, 14);
+    }
+    // 激光光束
+    if (this.player.beamOn && this.beams) {
+      const tk = performance.now() / 1000;
+      for (const bm of this.beams) {
+        const flick = 0.72 + 0.28 * Math.sin(tk * 42 + bm.x);
+        const bottom = this.player.y - 14;
+        ctx.fillStyle = 'rgba(255,110,170,' + (0.16 * flick).toFixed(3) + ')';
+        ctx.fillRect(bm.x - bm.halfW * 2.2, 0, bm.halfW * 4.4, bottom);
+        ctx.fillStyle = 'rgba(255,228,246,' + (0.72 * flick).toFixed(3) + ')';
+        ctx.fillRect(bm.x - bm.halfW * 0.7, 0, bm.halfW * 1.4, bottom);
+      }
     }
     ctx.restore();
 

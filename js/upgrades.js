@@ -30,7 +30,9 @@ const UPGRADES = [
   { id: 'shieldgen',icon: '◇',  name: '护盾发生器', max: 1, rar: 2, desc: '每 12 秒自动展开一层护盾' },
   { id: 'time',     icon: '⏳', name: '时滞力场',   max: 2, rar: 2, desc: '全部敌方弹幕减速 18%' },
   { id: 'wingman',  icon: '🛰', name: '幻影僚机',   max: 2, rar: 2, desc: '召唤僚机环绕,自动索敌射击' },
-  { id: 'rift',     icon: '🌀', name: '空间裂隙',   max: 2, rar: 2, desc: '周期生成黑洞,撕碎弹幕并灼烧敌机' }
+  { id: 'rift',     icon: '🌀', name: '空间裂隙',   max: 2, rar: 2, desc: '周期生成黑洞,撕碎弹幕并灼烧敌机' },
+  { id: 'laser',    icon: '🔦', name: '激光主炮',   max: 2, rar: 2, desc: '质变:主炮替换为贯穿激光束,持续灼烧一列', path: true },
+  { id: 'spread',   icon: '🎇', name: '散射炮',     max: 2, rar: 2, desc: '质变:主炮替换为宽扇散射,近程爆发(弹丸会衰减)', path: true }
 ];
 
 /* 羁绊:同时拥有指定技能后觉醒,提供额外特效 */
@@ -43,16 +45,19 @@ const BONDS = [
   { id: 'execute',  name: '歼灭协议', req: ['crit', 'dmg'],         desc: '暴击倍率提升至 4.5 倍' },
   { id: 'ghostNet', name: '维度撕裂', req: ['time', 'rift'],        desc: '裂隙范围 +60%,撕碎弹幕更快' },
   { id: 'squad',    name: '僚机协议', req: ['wingman', 'homing'],   desc: '僚机改射追踪导弹' },
-  { id: 'chrono',   name: '时间领主', req: ['time', 'rate'],        desc: '时滞效果提升至每层 30%' }
+  { id: 'chrono',   name: '时间领主', req: ['time', 'rate'],        desc: '时滞效果提升至每层 30%' },
+  { id: 'focus',    name: '聚能协议', req: ['laser', 'dmg'],        desc: '激光伤害 +60%' },
+  { id: 'suppress', name: '压制弹幕', req: ['spread', 'side'],      desc: '散射与侧翼弹丸数 +2' }
 ];
 
 const UPGRADE_MAP = {};
 for (const u of UPGRADES) UPGRADE_MAP[u.id] = u;
 
 /* 加权抽卡:从未满级的卡片中按稀有度权重抽取 3 张(互不重复)
- * 等级越高,史诗权重略微上调(后期更容易抽到质变卡) */
+ * 等级越高,史诗权重略微上调;质变武器互斥——已选路线可继续升级,对手路线移出卡池 */
 function drawUpgradeCards(mods, level, count = 3) {
-  const pool = UPGRADES.filter(u => (mods[u.id] || 0) < u.max);
+  const pathId = mods.laser ? 'laser' : (mods.spread ? 'spread' : null);
+  const pool = UPGRADES.filter(u => (mods[u.id] || 0) < u.max && !(u.path && pathId && pathId !== u.id));
   const weights = RARITY.map((r, i) => r.weight + (i === 2 ? level : 0));
   const picks = [];
   const w = weights.slice();

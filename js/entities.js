@@ -296,6 +296,12 @@ class Player {
     this.showHitbox = !!k.slow;
     this.engine += dt * 26;
     this.invuln = Math.max(0, this.invuln - dt);
+    // 激光主炮:按住开火时持续光束
+    this.beamOn = false;
+    if (game.mods.laser && (k.fire || game.autoFire)) {
+      this.beamOn = true;
+      game.beamTick(dt);
+    }
     this.fireCd -= dt;
     if ((k.fire || game.autoFire) && this.fireCd <= 0) {
       this._fire(game);
@@ -342,28 +348,39 @@ class Player {
         Math.random() < 0.7 ? '#39d7ff' : '#bff7ff'));
   }
   _fire(game) {
-    AudioSys.shoot();
     const P = game.playerBullets;
     const m = game.mods;
     const dmg = 1 + this.dmgBonus;
     const pierce = m.pierce || 0;
     const split = m.split || 0;
-    const mk = (ox, oy, vx, vy) =>
-      P.push({ x: this.x + ox, y: this.y + oy, vx, vy, r: 3, dmg, color: '#dffaff', dead: false, pierce, split });
-    switch (this.weapon) {
-      case 1: mk(0, -14, 0, -540); break;
-      case 2: mk(-6, -10, 0, -540); mk(6, -10, 0, -540); break;
-      case 3: mk(0, -16, 0, -560); mk(-9, -6, -75, -510); mk(9, -6, 75, -510); break;
-      case 4: mk(-5, -12, 0, -560); mk(5, -12, 0, -560); mk(-11, -5, -130, -490); mk(11, -5, 130, -490); break;
-      default: mk(0, -16, 0, -580); mk(-7, -11, -45, -545); mk(7, -11, 45, -545); mk(-13, -4, -160, -480); mk(13, -4, 160, -480); break;
+    const mk = (ox, oy, vx, vy, extra) =>
+      P.push(Object.assign({ x: this.x + ox, y: this.y + oy, vx, vy, r: 3, dmg, color: '#dffaff', dead: false, pierce, split }, extra || {}));
+    if (m.spread) {
+      // 散射炮:宽扇弹丸(质变路线),弹丸射程衰减
+      const n = 5 + 2 * (m.spread - 1) + 2 * (m.multi || 0) + (this.weapon - 1)
+        + (game.bonds.includes('suppress') ? 2 : 0);
+      for (let i = 0; i < n; i++) {
+        const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * 0.6);
+        mk(0, -12, Math.cos(a) * 520, Math.sin(a) * 520, { life: 0.42, color: '#ffe9a8', r: 2.6 });
+      }
+    } else if (!m.laser) {
+      switch (this.weapon) {
+        case 1: mk(0, -14, 0, -540); break;
+        case 2: mk(-6, -10, 0, -540); mk(6, -10, 0, -540); break;
+        case 3: mk(0, -16, 0, -560); mk(-9, -6, -75, -510); mk(9, -6, 75, -510); break;
+        case 4: mk(-5, -12, 0, -560); mk(5, -12, 0, -560); mk(-11, -5, -130, -490); mk(11, -5, 130, -490); break;
+        default: mk(0, -16, 0, -580); mk(-7, -11, -45, -545); mk(7, -11, 45, -545); mk(-13, -4, -160, -480); mk(13, -4, 160, -480); break;
+      }
+      // 并列弹道:主炮两侧追加直射弹
+      for (let i = 1; i <= (m.multi || 0); i++) {
+        mk(-7 - i * 8, -8, 0, -540);
+        mk(7 + i * 8, -8, 0, -540);
+      }
     }
-    // 并列弹道:主炮两侧追加直射弹
-    for (let i = 1; i <= (m.multi || 0); i++) {
-      mk(-7 - i * 8, -8, 0, -540);
-      mk(7 + i * 8, -8, 0, -540);
-    }
-    // 侧翼弹:更开斜角的追加弹对
-    for (let i = 1; i <= (m.side || 0); i++) {
+    // 侧翼弹:更开斜角的追加弹对(不受质变影响)
+    let sideN = m.side || 0;
+    if (game.bonds.includes('suppress')) sideN += 2;
+    for (let i = 1; i <= sideN; i++) {
       const vx = 95 + i * 55;
       mk(-10, -4, -vx, -500);
       mk(10, -4, vx, -500);
@@ -373,6 +390,7 @@ class Player {
       mk(-5, 10, -70, 380);
       mk(5, 10, 70, 380);
     }
+    AudioSys.shoot();
   }
   _fireHoming(game) {
     const lvl = game.mods.homing;
@@ -696,10 +714,10 @@ class Boss {
     AudioSys.enemyShoot();
   }
 
-  damage(n, game) {
+  damage(n, game, silent) {
     if (this.dead || this.state !== 'fight') return;
     this.hp -= n;
-    this.flash = 0.06;
+    if (!silent) this.flash = 0.06;
     if (this.hp <= 0) {
       this.hp = 0;
       this.dead = true;
