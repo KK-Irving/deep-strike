@@ -5,9 +5,22 @@
  * ============================================================ */
 const W = 480, H = 720;
 const TAU = Math.PI * 2;
-const rand = (a, b) => a + Math.random() * (b - a);
-const irand = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+/* 可注入随机源:普通模式为 Math.random,每日挑战替换为按日期播种的确定性随机 */
+let RNG = Math.random;
+const rand = (a, b) => a + RNG() * (b - a);
+const irand = (a, b) => Math.floor(a + RNG() * (b - a + 1));
 const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+
+/* mulberry32 播种随机数生成器 */
+function mulberry32(seed) {
+  let s = seed >>> 0;
+  return function () {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 function roundRectPath(ctx, x, y, w, h, r) {
   ctx.beginPath();

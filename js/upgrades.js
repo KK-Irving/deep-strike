@@ -59,7 +59,7 @@ function drawUpgradeCards(mods, level, count = 3) {
   for (let n = 0; n < count && pool.length; n++) {
     let total = 0;
     for (const u of pool) total += w[u.rar];
-    let roll = Math.random() * total;
+    let roll = RNG() * total;
     let chosen = pool[0];
     for (const u of pool) {
       roll -= w[u.rar];

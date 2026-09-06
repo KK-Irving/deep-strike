@@ -12,6 +12,7 @@ class Game {
     this.keys = { left: false, right: false, up: false, down: false, fire: false, slow: false };
     this.touch = { active: false, x: 0, y: 0 };
     this.autoFire = true; // F 键可切换
+    this.daily = false;   // 每日挑战模式
     this.bg = createBackground();
     this.stars = new Starfield();
     this.player = new Player();
@@ -45,7 +46,7 @@ class Game {
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
     };
-    this._dom.menuHi.textContent = '最高纪录 ' + this.hi;
+    this._refreshMenuHi();
     this._showState();
   }
 
@@ -95,7 +96,7 @@ class Game {
     this.state = 'menu';
     this.menuPanel = 'main';
     this.saveStats();
-    this._dom.menuHi.textContent = '最高纪录 ' + this.hi;
+    this._refreshMenuHi();
     this._showState();
   }
 
@@ -126,13 +127,40 @@ class Game {
     this._recalc();
   }
 
-  start() {
+  start(dailyMode) {
+    this.daily = !!dailyMode;
+    // 每日挑战:按日期播种,全天同一波次序列与抽卡序列
+    RNG = this.daily ? mulberry32(this._dailySeed()) : Math.random;
     this._reset();
     this.state = 'playing';
     AudioSys.init();
     if (AudioSys.musicGain) AudioSys.musicGain.gain.value = 0.3;
     this._showState();
     this.startWave(1);
+    if (this.daily) this.banner = { text: '每日挑战', sub: this._dailyKey() + ' · 固定关卡,冲击纪录', life: 2.4, max: 2.4, gold: true };
+  }
+
+  /* ---- 每日挑战 ---- */
+  _dailyKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  _dailySeed() {
+    const k = this._dailyKey();
+    let h = 2166136261;
+    for (let i = 0; i < k.length; i++) { h ^= k.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  _dailyBest() {
+    try { return +localStorage.getItem('deepstrike.dailyHi.' + this._dailyKey()) || 0; }
+    catch (e) { return 0; }
+  }
+  _saveDailyBest(score) {
+    try { localStorage.setItem('deepstrike.dailyHi.' + this._dailyKey(), String(score)); }
+    catch (e) { /* 忽略 */ }
+  }
+  _refreshMenuHi() {
+    this._dom.menuHi.textContent = '最高纪录 ' + this.hi + ' · 每日挑战 ' + this._dailyBest();
   }
 
   togglePause() {
@@ -286,7 +314,7 @@ class Game {
     let budget = 8 + n * 3;
     let t = 1.0;
     while (budget > 0) {
-      const roll = Math.random();
+      const roll = RNG();
       let type = 'drone';
       if (n >= 3 && roll < 0.18) type = 'tank';
       else if (n >= 2 && roll < 0.48) type = 'waver';
@@ -309,14 +337,14 @@ class Game {
     this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65);
     this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机';
     // 精英机:第 3 波起概率随队,第 7 波起可能双精英,第 10 波起概率出现双词缀精英
-    if (n >= 3 && Math.random() < 0.65) {
+    if (n >= 3 && RNG() < 0.65) {
       const affixes = Object.keys(ELITE_CFG);
-      const count = n >= 7 && Math.random() < 0.35 ? 2 : 1;
+      const count = n >= 7 && RNG() < 0.35 ? 2 : 1;
       for (let i = 0; i < count; i++) {
         const idx = irand(0, this.spawnQueue.length - 1);
         const a1 = affixes[irand(0, affixes.length - 1)];
         const list = [a1];
-        if (n >= 10 && Math.random() < 0.35) {
+        if (n >= 10 && RNG() < 0.35) {
           const a2 = affixes[irand(0, affixes.length - 1)];
           if (a2 !== a1) list.push(a2);
         }
@@ -422,7 +450,7 @@ class Game {
         this.trickleT -= dt;
         if (this.trickleT <= 0) {
           this.trickleT = Math.max(0.7, 1.6 - this.wave * 0.06);
-          const roll = Math.random();
+          const roll = RNG();
           const type = this.wave >= 3 && roll < 0.16 ? 'tank'
             : this.wave >= 2 && roll < 0.5 ? 'waver'
             : this.wave >= 4 && roll < 0.65 ? 'sniper' : 'drone';
@@ -525,7 +553,7 @@ class Game {
     let dmg = b.dmg;
     const cc = 0.2 * (this.mods.crit || 0);
     const guaranteed = b.homing && this.bonds.includes('hunt');
-    const crit = guaranteed || (cc > 0 && Math.random() < cc);
+    const crit = guaranteed || (cc > 0 && RNG() < cc);
     if (crit) dmg = Math.round(dmg * (this.bonds.includes('execute') ? 4.5 : 3));
     AudioSys.hit();
     this._sparks(b.x, b.y, crit ? '#ffd166' : e.color, crit ? 7 : 4);
@@ -601,7 +629,7 @@ class Game {
       this.score += bonus;
       this._addFloat(new FloatText(e.x, e.y - 26, '精英击坠 +' + bonus, e.eliteColor, 13));
     }
-    else if (Math.random() < 0.13) this._dropPower(e.x, e.y);
+    else if (RNG() < 0.13) this._dropPower(e.x, e.y);
   }
 
   killBoss(b) {
@@ -623,7 +651,7 @@ class Game {
     this.enemyBullets.length = 0;
     this._dropPower(b.x - 40, b.y, 'power');
     this._dropPower(b.x + 40, b.y, 'bomb');
-    this._dropPower(b.x, b.y - 20, Math.random() < 0.5 ? 'life' : 'shield');
+    this._dropPower(b.x, b.y - 20, RNG() < 0.5 ? 'life' : 'shield');
     // 旗舰核心大量经验:环形散落晶体
     for (let i = 0; i < 15; i++) {
       const a = i / 15 * TAU;
@@ -634,7 +662,7 @@ class Game {
   _dropPower(x, y, force) {
     let type = force;
     if (!type) {
-      const r = Math.random();
+      const r = RNG();
       type = r < 0.42 ? 'power' : r < 0.68 ? 'shield' : r < 0.92 ? 'bomb' : 'life';
     }
     this.powerups.push(new PowerUp(x, y, type));
@@ -781,7 +809,7 @@ class Game {
     const n = Math.round((10 + r) * scale);
     for (let i = 0; i < n; i++) {
       const a = rand(0, TAU), sp = rand(30, 260) * scale;
-      const c = Math.random() < 0.5 ? color : (Math.random() < 0.5 ? '#ffd166' : '#ff8c42');
+      const c = RNG() < 0.5 ? color : (RNG() < 0.5 ? '#ffd166' : '#ff8c42');
       this._addParticle(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.3, 0.8) * scale, rand(1.5, 4) * scale, c));
     }
     this.rings.push(new Ring(x, y, color, (r + 20) * scale, 0.4));
@@ -899,6 +927,12 @@ class Game {
       ctx.font = '12px sans-serif';
       ctx.fillText('♪ OFF', W - 14, 38);
     }
+    // 每日挑战标识
+    if (this.daily) {
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 11px Consolas, monospace';
+      ctx.fillText('每日挑战 · 纪录 ' + this._dailyBest(), W - 14, 54);
+    }
     // 生命(小战机)
     for (let i = 0; i < p.lives; i++) {
       ctx.save();
@@ -1010,7 +1044,15 @@ class Game {
   _gameover() {
     this.state = 'gameover';
     AudioSys.gameover();
-    if (this.score > this.hi) {
+    if (this.daily) {
+      // 每日挑战:独立当日纪录
+      const best = this._dailyBest();
+      if (this.score > best) {
+        this.newRecord = true;
+        this._saveDailyBest(this.score);
+        AudioSys.record();
+      }
+    } else if (this.score > this.hi) {
       this.hi = this.score;
       this.newRecord = true;
       this._saveHi();
@@ -1028,8 +1070,8 @@ class Game {
     const d = this._dom;
     d.finalScore.textContent = this.score;
     d.finalWave.textContent = this.wave;
-    d.finalHi.textContent = this.hi;
-    d.menuHi.textContent = '最高纪录 ' + this.hi;
+    d.finalHi.textContent = this.daily ? this._dailyBest() : this.hi;
+    this._refreshMenuHi();
     d.newRecord.classList.toggle('hidden', !this.newRecord);
     this._showState();
   }

@@ -51,6 +51,7 @@
     }
     if (game.state === 'menu') {
       if (e.code === 'Enter') game.start();
+      if (e.code === 'KeyD') game.start(true);
       if (e.code === 'KeyH') game.showMenuPanel('help');
       if (e.code === 'KeyT') game.showMenuPanel('stats');
       if ((e.code === 'Escape' || e.code === 'Backspace') && game.menuPanel !== 'main') game.showMenuPanel('main');
@@ -73,6 +74,7 @@
   // 按钮
   const $ = (id) => document.getElementById(id);
   $('btnStart').addEventListener('click', () => { AudioSys.init(); game.start(); });
+  $('btnDaily').addEventListener('click', () => { AudioSys.init(); game.start(true); });
   $('btnRestart').addEventListener('click', () => { AudioSys.init(); game.start(); });
   $('btnResume').addEventListener('click', () => game.togglePause());
   $('btnHelp').addEventListener('click', () => game.showMenuPanel('help'));
