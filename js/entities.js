@@ -712,28 +712,37 @@ class XPOrb {
     const a = rand(0, TAU), sp = rand(30, 110);
     this.vx = Math.cos(a) * sp; this.vy = Math.sin(a) * sp - 40;
     this.v = v; this.t = rand(0, TAU); this.dead = false;
+    this.age = 0;
+    this.life = rand(14, 18); // 存活时间,临期闪烁后消失
   }
   update(dt, game) {
     this.t += dt;
+    this.age += dt;
+    this.life -= dt;
+    if (this.life <= 0) { this.dead = true; return; }
     const p = game.player;
     const dx = p.x - this.x, dy = p.y - this.y;
     const d = Math.hypot(dx, dy) || 1;
-    if (p.alive && d < p.magnetR) {
-      const sp = 240 + (p.magnetR - d) * 2.4;
+    // 磁吸范围内立即吸取;掉落 5 秒后自动飞向玩家兜底,保证经验不浪费
+    if (p.alive && (d < p.magnetR || this.age > 5)) {
+      const sp = clamp(240 + (p.magnetR - d) * 2.4, 220, 560);
       const f = Math.min(1, 9 * dt);
       this.vx += (dx / d * sp - this.vx) * f;
       this.vy += (dy / d * sp - this.vy) * f;
     } else {
       this.vx *= Math.exp(-2.5 * dt);
-      this.vy += (46 - this.vy) * Math.min(1, 2.5 * dt);
+      this.vy += (14 - this.vy) * Math.min(1, 1.6 * dt); // 缓慢漂落,不会坠出屏幕
     }
     this.x += this.vx * dt; this.y += this.vy * dt;
-    if (p.alive && d < 22) { this.dead = true; game.gainXP(this.v); }
-    if (this.y > H + 30) this.dead = true;
+    this.x = clamp(this.x, 8, W - 8);
+    this.y = clamp(this.y, -20, H - 12);
+    if (p.alive && d < 24) { this.dead = true; game.gainXP(this.v); }
   }
   draw(ctx) {
     const s = 3.2 + Math.sin(this.t * 7) * 0.8;
+    const blink = this.life < 3 && Math.floor(this.life * 6) % 2 === 0;
     ctx.save();
+    if (blink) ctx.globalAlpha = 0.3;
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = 'rgba(80,220,255,0.22)';
     ctx.beginPath(); ctx.arc(this.x, this.y, s * 2.4, 0, TAU); ctx.fill();

@@ -157,7 +157,7 @@ class Game {
     if (this.bonds.includes('overdrive')) interval *= 0.85;
     p.fireInterval = Math.max(0.045, interval);
     p.speed = 330 * Math.pow(1.15, m.speed || 0);
-    p.magnetR = 90 + (m.magnet || 0) * 70;
+    p.magnetR = 140 + (m.magnet || 0) * 70;
     this.xpMult = 1 + 0.25 * (m.xpchip || 0);
     this.comboWindow = 2 + 1.5 * (m.combo || 0);
     p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
