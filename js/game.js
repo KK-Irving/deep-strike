@@ -124,7 +124,8 @@ class Game {
   }
 
   _reset() {
-    this.player.reset();
+    this.shipDef = Shop.currentShip();
+    this.player.reset(this.shipDef);
     this.playerBullets = [];
     this.enemyBullets = [];
     this.enemies = [];
@@ -240,13 +241,14 @@ class Game {
   _recalc() {
     const m = this.mods, p = this.player;
     const E = this.evo || {};   // 进化状态
-    p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0);
-    let interval = 0.12 * Math.pow(0.85, m.rate || 0);
+    const sh = this.shipDef || {};
+    p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0) + (sh.dmgBonus || 0);
+    let interval = (p.fireBase || 0.12) * Math.pow(0.85, m.rate || 0);
     if (E.rate) interval *= 0.75;
     if (this.bonds.includes('overdrive')) interval *= 0.85;
     p.fireInterval = Math.max(0.045, interval);
-    p.speed = 330 * Math.pow(1.15, m.speed || 0);
-    p.magnetR = 140 + (m.magnet || 0) * 70;
+    p.speed = (sh.speed || 330) * Math.pow(1.15, m.speed || 0);
+    p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 70;
     this.xpMult = 1 + 0.25 * (m.xpchip || 0) + (Shop.boosts.xp10 ? 0.10 : 0);
     this.comboWindow = 2 + 1.5 * (m.combo || 0);
     p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
@@ -255,10 +257,10 @@ class Game {
     this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
     // 卡槽系统:基础 5 槽,隐藏卡扩展
     this.maxSlots = 5 + (m.slotplus || 0);
-    // 生命值系统:上限 = 100 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
-    p.maxHp = 100 + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
+    // 生命值系统:上限 = 机体基础 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
+    p.maxHp = (sh.hp || 100) + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
       + (Shop.boosts.hp25 ? 25 : 0);
-    p.armorPct = Math.min(0.45, 0.15 * (m.armor || 0));
+    p.armorPct = Math.min(0.5, 0.15 * (m.armor || 0) + (sh.perkArmor || 0));
     p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1);
     p.leechPer = 0.7 * (m.leech || 0);
     p.hp = Math.min(p.hp, p.maxHp);

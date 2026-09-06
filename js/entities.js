@@ -268,11 +268,13 @@ class Starfield {
  * ============================================================ */
 class Player {
   constructor() { this.reset(); }
-  reset() {
+  reset(shipDef) {
+    shipDef = shipDef || {};
     this.x = W / 2; this.y = H - 90;
-    this.r = 6; this.speed = 330;
-    // 生命值系统:数值化生命,上限由等级与卡片成长
-    this.maxHp = 100; this.hp = 100;
+    this.r = 6; this.speed = shipDef.speed || 330;
+    // 生命值系统:数值化生命,上限由机体/等级与卡片成长
+    this.maxHp = shipDef.hp || 100; this.hp = this.maxHp;
+    this.fireBase = shipDef.fire || 0.12;
     this.armorPct = 0; this.regenRate = 0; this.leechPer = 0;
     this.undyingUsed = false;
     this.weapon = 1; this.bombs = 2;
@@ -395,6 +397,7 @@ class Player {
     // 侧翼弹:更开斜角的追加弹对(不受质变影响)
     let sideN = m.side || 0;
     if (game.bonds.includes('suppress')) sideN += 2;
+    if (game.shipDef && game.shipDef.perkSide) sideN += game.shipDef.perkSide;
     for (let i = 1; i <= sideN; i++) {
       const vx = 95 + i * 55;
       mk(-10, -4, -vx, -500);
@@ -438,8 +441,8 @@ class Player {
     ctx.beginPath();
     ctx.moveTo(-3.5, 11); ctx.lineTo(3.5, 11); ctx.lineTo(0, 13 + fl + 6);
     ctx.closePath(); ctx.fill();
-    // 机体(预渲染精灵,应用当前皮肤)
-    const spr = skin || SPRITES.player;
+    // 机体(预渲染精灵,应用当前机体造型与皮肤)
+    const spr = (typeof Shop !== 'undefined') ? Shop.shipSprite() : (skin || SPRITES.player);
     ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
     ctx.globalAlpha = 1;
     // 护盾

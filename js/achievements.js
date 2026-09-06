@@ -18,7 +18,7 @@ const ACHIEVEMENTS = [
   { id: 'wave_10',    cat: '波次', name: '深入敌后',   desc: '单局抵达第 10 波', reward: 100 },
   { id: 'wave_15',    cat: '波次', name: '王牌飞行员', desc: '单局抵达第 15 波', reward: 150 },
   { id: 'wave_20',    cat: '波次', name: '无尽征服者', desc: '单局抵达第 20 波', reward: 150, skin: 'abyss' },
-  { id: 'wave_25',    cat: '波次', name: '深空行者',   desc: '单局抵达第 25 波', reward: 200 },
+  { id: 'wave_25',    cat: '波次', name: '深空行者',   desc: '单局抵达第 25 波', reward: 200, ship: 'tempest' },
   { id: 'wave_30',    cat: '波次', name: '破晓者',     desc: '单局抵达第 30 波', reward: 300 },
   // ---- BOSS ----
   { id: 'boss_1',     cat: 'BOSS', name: '旗舰猎手',   desc: '累计击毁 1 艘旗舰', reward: 50 },

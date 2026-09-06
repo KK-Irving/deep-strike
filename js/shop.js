@@ -17,6 +17,22 @@ const SKINS = [
   { id: 'phantomX', name: '幽灵X',        ach: 'boss_10',  hull: '#1a1a2e', stroke: '#8fa8ff', cockpit: '#dfe8ff', flame: ['rgba(143,168,255,0.8)', 'rgba(40,60,180,0)'] }
 ];
 
+/* 出击机体:造型/数值/专属特性;ach 指定成就解锁 */
+const SHIPS = [
+  { id: 'vanguard',  name: '突击机',     price: 0,   desc: '均衡型:全属性标准',            hp: 100, speed: 330, fire: 0.12,  dmgBonus: 0 },
+  { id: 'juggernaut',name: '重装堡垒',   price: 500, desc: '重装型:血厚甲硬,机动迟缓',      hp: 140, speed: 295, fire: 0.135, dmgBonus: 0, perkArmor: 0.10 },
+  { id: 'phantom',   name: '幽灵',       price: 350, desc: '掠袭型:极速机动,机体脆弱',      hp: 75,  speed: 375, fire: 0.10,  dmgBonus: 0, perkMagnet: 60 },
+  { id: 'tempest',   name: '风暴棱镜',   ach: 'wave_25', desc: '特化型:开局自带侧翼弹',     hp: 90,  speed: 350, fire: 0.11,  dmgBonus: 0, perkSide: 1 }
+];
+
+/* 机体 hull 造型路径(与皮肤配色组合渲染) */
+const SHIP_SHAPES = {
+  vanguard:  (g) => { g.moveTo(0, -17); g.lineTo(9, 4); g.lineTo(14, 11); g.lineTo(5, 8); g.lineTo(0, 12); g.lineTo(-5, 8); g.lineTo(-14, 11); g.lineTo(-9, 4); g.closePath(); },
+  juggernaut:(g) => { g.moveTo(0, -15); g.lineTo(11, -6); g.lineTo(15, 8); g.lineTo(6, 12); g.lineTo(-6, 12); g.lineTo(-15, 8); g.lineTo(-11, -6); g.closePath(); },
+  phantom:   (g) => { g.moveTo(0, -18); g.lineTo(6, 2); g.lineTo(10, 12); g.lineTo(0, 7); g.lineTo(-10, 12); g.lineTo(-6, 2); g.closePath(); },
+  tempest:   (g) => { g.moveTo(0, -16); g.lineTo(5, -4); g.lineTo(13, 10); g.lineTo(4, 6); g.lineTo(0, 12); g.lineTo(-4, 6); g.lineTo(-13, 10); g.lineTo(-5, -4); g.closePath(); }
+};
+
 /* 永久强化:一次性买断,作用于每次出击 */
 const BOOSTS = [
   { id: 'bomb1',  icon: '💣', name: '初始炸弹 +1', desc: '每次出击携带的炸弹 +1', price: 120 },
@@ -29,9 +45,12 @@ const Shop = {
   crystal: 0,
   owned: {},          // 皮肤/强化拥有表
   equipped: 'proto',  // 当前皮肤
+  equippedShip: 'vanguard', // 当前机体
+  ownedShip: {},      // 机体拥有表
   granted: [],        // 已发放奖励的成就
   boosts: {},         // 已购强化
   sprites: {},        // 皮肤预渲染精灵
+  shipSprites: {},    // 机体x皮肤组合缓存
   lastEarn: 0,        // 上局获得星晶(结算展示)
 
   load() {
@@ -41,7 +60,11 @@ const Shop = {
       this.boosts = JSON.parse(localStorage.getItem('deepstrike.boosts')) || {};
       this.granted = JSON.parse(localStorage.getItem('deepstrike.granted')) || [];
       this.equipped = localStorage.getItem('deepstrike.skin') || 'proto';
+      this.equippedShip = localStorage.getItem('deepstrike.ship') || 'vanguard';
+      this.ownedShip = JSON.parse(localStorage.getItem('deepstrike.shipsOwned')) || {};
     } catch (e) { /* 忽略 */ }
+    if (!this.ownedShip.vanguard) this.ownedShip.vanguard = true;
+    if (!this.ownedShip[this.equippedShip]) this.equippedShip = 'vanguard';
     // 成就解锁款皮肤:成就达成即拥有(含历史成就补发)
     for (const sk of SKINS) {
       if (sk.ach && this.achUnlocked(sk.ach)) this.owned[sk.id] = true;
@@ -79,6 +102,8 @@ const Shop = {
       localStorage.setItem('deepstrike.boosts', JSON.stringify(this.boosts));
       localStorage.setItem('deepstrike.granted', JSON.stringify(this.granted));
       localStorage.setItem('deepstrike.skin', this.equipped);
+      localStorage.setItem('deepstrike.ship', this.equippedShip);
+      localStorage.setItem('deepstrike.shipsOwned', JSON.stringify(this.ownedShip));
     } catch (e) { /* 忽略 */ }
   },
 
@@ -98,6 +123,7 @@ const Shop = {
       this.granted.push(a.id);
     }
     if (a.skin) this.owned[a.skin] = true;
+    if (a.ship) this.ownedShip[a.ship] = true;
     this.save();
     this._checkSkinCollect();
     return reward;
@@ -118,6 +144,71 @@ const Shop = {
     this.save();
     this._checkSkinCollect();
     return { ok: true, msg: '已购入「' + sk.name + '」' };
+  },
+
+  currentShip() {
+    return SHIPS.find(x => x.id === this.equippedShip) || SHIPS[0];
+  },
+
+  buyShip(id) {
+    const sh = SHIPS.find(x => x.id === id);
+    if (!sh || sh.ach || this.ownedShip[id]) return { ok: false, msg: '无法购买' };
+    if (this.crystal < sh.price) return { ok: false, msg: '星晶不足' };
+    this.crystal -= sh.price;
+    this.ownedShip[id] = true;
+    this.save();
+    return { ok: true, msg: '已购入「' + sh.name + '」' };
+  },
+
+  equipShip(id) {
+    if (!this.ownedShip[id]) return false;
+    this.equippedShip = id;
+    this.save();
+    return true;
+  },
+
+  shipSpriteFor(shipId, skinId) {
+    const key = shipId + '|' + skinId;
+    if (!this.shipSprites[key]) {
+      const sh = SHIPS.find(x => x.id === shipId) || SHIPS[0];
+      const sk = SKINS.find(x => x.id === skinId) || SKINS[0];
+      this.shipSprites[key] = {
+        body: makeSprite(30, (g) => {
+          g.shadowColor = sk.stroke; g.shadowBlur = 14;
+          SHIP_SHAPES[sh.id](g);
+          g.fillStyle = sk.hull; g.fill();
+          g.lineWidth = 2; g.strokeStyle = sk.stroke; g.stroke();
+          g.shadowBlur = 0;
+          g.fillStyle = sk.cockpit;
+          g.beginPath(); g.arc(0, -4, 2.6, 0, TAU); g.fill();
+        }),
+        flame: sk.flame, accent: sk.stroke, half: 30
+      };
+    }
+    return this.shipSprites[key];
+  },
+
+  shipSprite() {
+    const key = this.equippedShip + '|' + this.equipped;
+    if (!this.shipSprites[key]) {
+      const sh = this.currentShip();
+      const sk = SKINS.find(x => x.id === this.equipped) || SKINS[0];
+      this.shipSprites[key] = {
+        body: makeSprite(30, (g) => {
+          g.shadowColor = sk.stroke; g.shadowBlur = 14;
+          SHIP_SHAPES[sh.id](g);
+          g.fillStyle = sk.hull; g.fill();
+          g.lineWidth = 2; g.strokeStyle = sk.stroke; g.stroke();
+          g.shadowBlur = 0;
+          g.fillStyle = sk.cockpit;
+          g.beginPath(); g.arc(0, -4, 2.6, 0, TAU); g.fill();
+        }),
+        flame: sk.flame,
+        accent: sk.stroke,
+        half: 30
+      };
+    }
+    return this.shipSprites[key];
   },
 
   buyBoost(id) {
@@ -199,6 +290,38 @@ const Shop = {
       g.scale(1.5, 1.5);
       g.drawImage(this.sprites[sk.id].body, -30, -30, 60, 60);
     }
+    // 机体区块
+    const shipGrid = $('shipGrid');
+    shipGrid.innerHTML = '';
+    for (const sh of SHIPS) {
+      const owned = !!this.ownedShip[sh.id];
+      const equipped = this.equippedShip === sh.id;
+      const card = document.createElement('div');
+      card.className = 'shop-card' + (equipped ? ' using' : '');
+      let action;
+      if (equipped) action = '<button class="shop-btn" disabled>使用中</button>';
+      else if (owned) action = '<button class="shop-btn primary" data-equips="' + sh.id + '">装 备</button>';
+      else if (sh.ach) {
+        const a = typeof ACHIEVEMENTS !== 'undefined' ? ACHIEVEMENTS.find(x => x.id === sh.ach) : null;
+        action = '<button class="shop-btn" disabled>🔒 ' + (a ? a.name : '成就解锁') + '</button>';
+      } else action = '<button class="shop-btn primary" data-buyship="' + sh.id + '">★ ' + sh.price + '</button>';
+      const statLine = 'HP ' + sh.hp + ' · 速 ' + sh.speed + ' · 射 ' + Math.round(sh.fire * 1000) / 10;
+      card.innerHTML =
+        '<canvas class="skin-preview" width="64" height="64" data-shipview="' + sh.id + '"></canvas>' +
+        '<div class="shop-name">' + sh.name + '</div>' +
+        '<div class="shop-desc">' + sh.desc + '<br>' + statLine + '</div>' +
+        action;
+      shipGrid.appendChild(card);
+      const cv = card.querySelector('canvas');
+      const g = cv.getContext('2d');
+      g.translate(32, 34); g.scale(1.5, 1.5);
+      g.drawImage(this.shipSpriteFor(sh.id, this.equipped).body, -30, -30, 60, 60);
+    }
+    shipGrid.querySelectorAll('[data-equips]').forEach(el =>
+      el.addEventListener('click', () => { this.equipShip(el.dataset.equips); this.renderPanel(); }));
+    shipGrid.querySelectorAll('[data-buyship]').forEach(el =>
+      el.addEventListener('click', () => { const r = this.buyShip(el.dataset.buyship); this.renderPanel(); r.ok && AudioSys.powerup(); }));
+
     const boostGrid = $('boostGrid');
     boostGrid.innerHTML = '';
     for (const b of BOOSTS) {
