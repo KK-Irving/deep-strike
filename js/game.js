@@ -122,6 +122,7 @@ class Game {
     this.xpMult = 1; this.comboWindow = 2;
     this.bombMeter = 0;
     this.wingmen = []; this.rifts = []; this.riftCd = 0;
+    this.asteroids = []; this.supplies = [];
     this.runKills = 0; this.runEliteKills = 0;
     this._cardChoices = [];
     this._recalc();
@@ -211,6 +212,17 @@ class Game {
     if (m.shieldgen && !p.shield && p.shieldCd <= 0) p.shieldCd = p.shieldInterval;
   }
 
+  /* 补给空投开箱 */
+  openSupply(kind, x, y) {
+    AudioSys.powerup();
+    if (kind === 'star') {
+      this.score += 500;
+      this._addFloat(new FloatText(x, y - 16, '+500', '#ffd166', 15));
+    } else {
+      this._applyPower(kind);
+    }
+  }
+
   /* 激光主炮:光束持续伤害结算(每帧调用) */
   beamTick(dt) {
     const p = this.player, m = this.mods;
@@ -230,6 +242,13 @@ class Game {
           // 护盾开启的护盾兵:激光仅 30% 烧蚀通过
           const mul = (e.type === 'shielder' && e.shieldOff <= 0) ? 0.3 : 1;
           e.damage(dps * dt * mul, this, true);
+          hitAny = true;
+        }
+      }
+      // 激光烧蚀陨石
+      for (const a of this.asteroids) {
+        if (!a.dead && a.y < p.y - 6 && Math.abs(a.x - bx) < a.r + halfW) {
+          a.damage(dps * dt, this);
           hitAny = true;
         }
       }
@@ -388,6 +407,18 @@ class Game {
       }
       this.banner.sub += ' · ⚠ 精英机随队';
     }
+    // 事件波:陨石带(第3/8/13…波,掩体兼威胁)与补给空投(第4/9/14…波)
+    if (n % 5 === 3) {
+      this.banner.sub += ' · ☄ 陨石带';
+      const rocks = 4 + Math.floor(n / 3);
+      for (let i = 0; i < rocks; i++)
+        this.spawnQueue.push({ asteroid: true, t: rand(0.5, 6), x: rand(40, W - 40), r: rand(14, 26) });
+    }
+    if (n % 5 === 4) {
+      this.banner.sub += ' · ▽ 补给空投';
+      for (let i = 0; i < 3; i++)
+        this.spawnQueue.push({ supply: true, t: rand(1, 5), x: rand(50, W - 50) });
+    }
   }
 
   /* ---------------- 主更新 ---------------- */
@@ -401,6 +432,8 @@ class Game {
       const s = this.spawnQueue[i];
       if (s.t <= this.waveTime) {
         if (s.boss) this.boss = new Boss(this.wave);
+        else if (s.asteroid) this.asteroids.push(new Asteroid(s.x, -30, s.r));
+        else if (s.supply) this.supplies.push(new SupplyDrop(s.x, SUPPLY_LOOT[irand(0, SUPPLY_LOOT.length - 1)]));
         else {
           this.enemies.push(new Enemy(s.type, s.x, this.wave, s.elite));
           if (s.elite) AudioSys.elite();
@@ -453,6 +486,8 @@ class Game {
       if (b.dead || b.y > H + 20 || b.y < -30 || b.x < -20 || b.x > W + 20) this.enemyBullets.splice(i, 1);
     }
     this._updateArr(this.enemies, dt);
+    this._updateArr(this.asteroids, dt);
+    this._updateArr(this.supplies, dt);
     this._updateArr(this.powerups, dt);
     this._updateArr(this.orbs, dt);
     this._updateArr(this.rifts, dt);
@@ -558,6 +593,20 @@ class Game {
         const rr = bo.r + b.r;
         if (dx * dx + dy * dy < rr * rr) this._hitTarget(b, bo);
       }
+      // 陨石吸收玩家弹幕
+      if (!b.dead) {
+        for (const a of this.asteroids) {
+          if (a.dead) continue;
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const rr = a.r + b.r;
+          if (dx * dx + dy * dy < rr * rr) {
+            b.dead = true;
+            a.damage(b.dmg, this);
+            this._sparks(b.x, b.y, '#8a7f68', 2);
+            break;
+          }
+        }
+      }
     }
     if (!p.alive) return;
     // 敌弹 → 玩家
@@ -584,6 +633,19 @@ class Game {
             break;
           }
         }
+        // 陨石撞击
+        if (p.alive && p.invuln <= 0) {
+          for (const a of this.asteroids) {
+            if (a.dead) continue;
+            const dx = a.x - p.x, dy = a.y - p.y;
+            const rr = a.r + p.r;
+            if (dx * dx + dy * dy < rr * rr) {
+              a.damage(3, this);
+              this._playerHit();
+              break;
+            }
+          }
+        }
         if (p.alive && p.invuln <= 0 && this.boss && !this.boss.dead && this.boss.state === 'fight') {
           const bo = this.boss;
           const dx = bo.x - p.x, dy = bo.y - p.y;
@@ -598,6 +660,19 @@ class Game {
       if (dx * dx + dy * dy < 900) {
         pu.dead = true;
         this._applyPower(pu.type);
+      }
+    }
+    // 敌方弹幕被陨石吸收(掩体机制)
+    for (const b of this.enemyBullets) {
+      if (b.dead) continue;
+      for (const a of this.asteroids) {
+        if (a.dead) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        if (dx * dx + dy * dy < a.r * a.r) {
+          b.dead = true;
+          this._sparks(b.x, b.y, '#8a7f68', 2);
+          break;
+        }
       }
     }
   }
@@ -822,6 +897,7 @@ class Game {
     for (const b of this.enemyBullets) this._sparks(b.x, b.y, '#9fe8ff', 3);
     this.enemyBullets.length = 0;
     for (const e of this.enemies) e.damage(8, this);
+    for (const a of this.asteroids) a.damage(6, this);
     if (this.boss) this.boss.damage(20, this);
     this.rings.push(new Ring(p.x, p.y, '#aef3ff', 300, 0.7));
   }
@@ -896,7 +972,9 @@ class Game {
     if (off) ctx.translate(off[0], off[1]);
 
     for (const pu of this.powerups) pu.draw(ctx);
+    for (const su of this.supplies) su.draw(ctx);
     for (const o of this.orbs) o.draw(ctx);
+    for (const a of this.asteroids) a.draw(ctx);
     for (const rf of this.rifts) rf.draw(ctx);
     for (const e of this.enemies) e.draw(ctx);
     if (this.boss) this.boss.draw(ctx);

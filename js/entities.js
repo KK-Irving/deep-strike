@@ -1035,4 +1035,122 @@ class Rift {
   }
 }
 
+/* ============================================================
+ * 陨石:缓慢漂落,吸收双方弹幕(掩体),击碎掉落经验
+ * ============================================================ */
+class Asteroid {
+  constructor(x, y, r) {
+    this.x = x; this.y = y; this.r = r;
+    this.rot = rand(0, TAU); this.rotSpd = rand(-1.2, 1.2);
+    this.vy = rand(26, 44);
+    this.hp = Math.max(3, Math.round(r * 0.4)); this.maxHp = this.hp;
+    this.t = rand(0, TAU); this.dead = false;
+    this.verts = [];
+    const n = irand(7, 9);
+    for (let i = 0; i < n; i++) {
+      const a = i / n * TAU;
+      const rr = r * rand(0.75, 1.15);
+      this.verts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    }
+  }
+  update(dt, game) {
+    this.t += dt;
+    this.rot += this.rotSpd * dt;
+    this.y += this.vy * dt;
+    if (this.y > H + this.r + 20) this.dead = true;
+  }
+  damage(n, game) {
+    if (this.dead) return;
+    this.hp -= n;
+    if (this.hp <= 0) {
+      this.dead = true;
+      game._explode(this.x, this.y, this.r, '#9a8f7a', 0.9);
+      AudioSys.explode(this.r > 20);
+      let xp = Math.round(this.r * 0.5);
+      while (xp > 0) {
+        const v = Math.min(4, xp);
+        xp -= v;
+        game.orbs.push(new XPOrb(this.x + rand(-8, 8), this.y + rand(-8, 8), v));
+      }
+    }
+  }
+  draw(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rot);
+    ctx.beginPath();
+    this.verts.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1]));
+    ctx.closePath();
+    ctx.fillStyle = '#322c22';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#8a7f68';
+    ctx.stroke();
+    // 坑洞
+    ctx.fillStyle = 'rgba(20,17,12,0.7)';
+    ctx.beginPath(); ctx.arc(-this.r * 0.3, -this.r * 0.2, this.r * 0.22, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(this.r * 0.28, this.r * 0.25, this.r * 0.16, 0, TAU); ctx.fill();
+    ctx.restore();
+    if (this.hp < this.maxHp) {
+      const w = this.r * 1.6;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(this.x - w / 2, this.y - this.r - 8, w, 3);
+      ctx.fillStyle = '#b8a888';
+      ctx.fillRect(this.x - w / 2, this.y - this.r - 8, w * (this.hp / this.maxHp), 3);
+    }
+  }
+}
+
+/* ============================================================
+ * 补给空投:缓慢降落的标准补给箱,接住即获得对应物资
+ * ============================================================ */
+const SUPPLY_LOOT = ['power', 'shield', 'bomb', 'life', 'star'];
+class SupplyDrop {
+  constructor(x, kind) {
+    this.x = x; this.y = -20; this.kind = kind;
+    this.t = rand(0, TAU); this.dead = false;
+  }
+  update(dt, game) {
+    this.t += dt;
+    this.y += 30 * dt;
+    this.x += Math.sin(this.t * 1.4) * 14 * dt;
+    const p = game.player;
+    const dx = p.x - this.x, dy = p.y - this.y;
+    if (p.alive && dx * dx + dy * dy < 460) {
+      this.dead = true;
+      game.openSupply(this.kind, this.x, this.y);
+    }
+    if (this.y > H + 20) this.dead = true;
+  }
+  draw(ctx) {
+    const cfg = { power: '#ff5470', shield: '#4db8ff', bomb: '#51e08a', life: '#ff77a9', star: '#ffd166' }[this.kind];
+    const label = { power: 'P', shield: 'S', bomb: 'B', life: '♥', star: '★' }[this.kind];
+    ctx.save();
+    ctx.translate(this.x, this.y + Math.sin(this.t * 4) * 2);
+    // 降落伞绳
+    ctx.strokeStyle = 'rgba(207,232,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-10, -6); ctx.lineTo(0, -22); ctx.lineTo(10, -6);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(207,232,255,0.25)';
+    ctx.beginPath(); ctx.arc(0, -24, 13, Math.PI, 0); ctx.fill();
+    // 箱体
+    ctx.shadowColor = cfg;
+    ctx.shadowBlur = 12;
+    roundRectPath(ctx, -11, -9, 22, 20, 4);
+    ctx.fillStyle = '#0b1220';
+    ctx.fill();
+    ctx.strokeStyle = cfg;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = cfg;
+    ctx.font = 'bold 12px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, 0, 1);
+    ctx.restore();
+  }
+}
+
 initSprites();
