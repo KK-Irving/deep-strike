@@ -162,6 +162,11 @@ h2 {
 .card.r1:hover { border-color: #4db8ff; box-shadow: 0 10px 30px rgba(77, 184, 255, 0.4); }
 .card.r2 { border-color: rgba(200, 107, 255, 0.6); box-shadow: 0 0 16px rgba(200, 107, 255, 0.25) inset; }
 .card.r2:hover { border-color: #c86bff; box-shadow: 0 10px 30px rgba(200, 107, 255, 0.45); }
+.card.r3 { border-color: rgba(255, 209, 102, 0.65); box-shadow: 0 0 18px rgba(255, 209, 102, 0.28) inset; }
+.card.r3:hover { border-color: #ffd166; box-shadow: 0 10px 30px rgba(255, 209, 102, 0.5); }
+.card.evo-card { background: rgba(60, 44, 10, 0.6); animation: evoPulse 1.6s ease-in-out infinite; }
+@keyframes evoPulse { 50% { box-shadow: 0 0 26px rgba(255, 209, 102, 0.55); } }
+.chip.evo { color: #ffd166; border-color: rgba(255, 209, 102, 0.55); }
 .card.hidden-card { border-style: dashed; }
 .card.hidden-card:hover { border-color: #51e08a; box-shadow: 0 10px 30px rgba(81, 224, 138, 0.4); }
 .card.swap { opacity: 0.92; }

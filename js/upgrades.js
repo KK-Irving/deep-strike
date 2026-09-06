@@ -7,7 +7,8 @@
 const RARITY = [
   { name: '普通', color: '#9fb8d0', weight: 60 },
   { name: '稀有', color: '#4db8ff', weight: 32 },
-  { name: '史诗', color: '#c86bff', weight: 8 }
+  { name: '史诗', color: '#c86bff', weight: 8 },
+  { name: '传说', color: '#ffd166', weight: 0 }
 ];
 
 /* 升级卡片:id / 图标 / 名称 / 最大层数 / 稀有度(0普 1稀 2史) / 说明
@@ -63,9 +64,27 @@ const BONDS = [
 const UPGRADE_MAP = {};
 for (const u of UPGRADES) UPGRADE_MAP[u.id] = u;
 
+/* ============================================================
+ * 进化卡(传说):对应卡片满级后出现在升级三选一中,
+ * 选中后该卡片"质变"——不占用槽位,提供质变级战力
+ * ============================================================ */
+const EVOLUTIONS = [
+  { id: 'e_fusion',    base: 'dmg',      icon: '☄', name: '聚变弹头', desc: '伤害额外 +2,命中溅射周围敌人(50% 伤害)' },
+  { id: 'e_overclock', base: 'rate',     icon: '⚙', name: '超频引擎', desc: '射击间隔额外 -25%' },
+  { id: 'e_titan',     base: 'vitality', icon: '🧱', name: '泰坦血统', desc: '生命上限 +50,每波清版额外回复 15 点' },
+  { id: 'e_quantum',   base: 'pierce',   icon: '⚛', name: '量子穿甲', desc: '贯穿 +2,子弹伤害 +1' },
+  { id: 'e_executioner', base: 'crit',   icon: '☠', name: '处决者',   desc: '暴击率 +30%,暴击对精英与旗舰 +50% 伤害' },
+  { id: 'e_rapture',   base: 'homing',   icon: '🌠', name: '天罚矩阵', desc: '追踪导弹数量 +3,伤害 +2' },
+  { id: 'e_chain',     base: 'split',    icon: '❋', name: '链式裂变', desc: '裂变小弹再次分裂一次' },
+  { id: 'e_aegis',     base: 'shieldgen',icon: '⚜', name: '圣盾爆发', desc: '护盾破碎时清除全屏弹幕并重创周围敌机' },
+  { id: 'e_annihil',   base: 'laser',    icon: '🔆', name: '湮灭主炮', desc: '激光宽度 +60%,伤害 +40%' },
+  { id: 'e_maelstrom', base: 'spread',   icon: '💫', name: '万弹齐发', desc: '散射弹丸 +6,且射程不再衰减' },
+  { id: 'e_freeze',    base: 'time',     icon: '⏱', name: '时间冻结', desc: '每波开始时,敌方弹幕静止 2.5 秒' }
+];
+
 /* 加权抽卡:从未满级的卡片中按稀有度权重抽取 3 张(互不重复)
  * 等级越高,史诗权重略微上调;质变武器互斥;槽位满载时隐藏卡「基因扩展」进入卡池 */
-function drawUpgradeCards(mods, maxSlots, level, count = 3) {
+function drawUpgradeCards(mods, maxSlots, level, evo, count = 3) {
   const ownedCount = UPGRADES.filter(u => (mods[u.id] || 0) > 0 && !u.hidden).length;
   const slotsFull = ownedCount >= maxSlots;
   const pathId = mods.laser ? 'laser' : (mods.spread ? 'spread' : null);
@@ -88,6 +107,12 @@ function drawUpgradeCards(mods, maxSlots, level, count = 3) {
     }
     picks.push(chosen);
     pool.splice(pool.indexOf(chosen), 1);
+  }
+  // 进化注入:已满级且未进化的卡片,其传说进化卡替换一张候选(必定露面)
+  const evoReady = EVOLUTIONS.filter(e => (mods[e.base] || 0) >= UPGRADE_MAP[e.base].max && !(evo && evo[e.base]));
+  if (evoReady.length && picks.length) {
+    const evo = evoReady[Math.floor(RNG() * evoReady.length)];
+    picks[Math.floor(RNG() * picks.length)] = Object.assign({ isEvo: true, rar: 3 }, evo);
   }
   return picks;
 }

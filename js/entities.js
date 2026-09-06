@@ -363,17 +363,18 @@ class Player {
     const P = game.playerBullets;
     const m = game.mods;
     const dmg = 1 + this.dmgBonus;
-    const pierce = m.pierce || 0;
+    const pierce = (m.pierce || 0) + (game.evo.pierce ? 2 : 0);
     const split = m.split || 0;
     const mk = (ox, oy, vx, vy, extra) =>
       P.push(Object.assign({ x: this.x + ox, y: this.y + oy, vx, vy, r: 3, dmg, color: '#dffaff', dead: false, pierce, split }, extra || {}));
     if (m.spread) {
       // 散射炮:宽扇弹丸(质变路线),弹丸射程衰减
       const n = 5 + 2 * (m.spread - 1) + 2 * (m.multi || 0) + (this.weapon - 1)
-        + (game.bonds.includes('suppress') ? 2 : 0);
+        + (game.bonds.includes('suppress') ? 2 : 0) + (game.evo.spread ? 6 : 0);
+      const fade = game.evo.spread ? {} : { life: 0.42 };
       for (let i = 0; i < n; i++) {
         const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * 0.6);
-        mk(0, -12, Math.cos(a) * 520, Math.sin(a) * 520, { life: 0.42, color: '#ffe9a8', r: 2.6 });
+        mk(0, -12, Math.cos(a) * 520, Math.sin(a) * 520, Object.assign({ color: '#ffe9a8', r: 2.6 }, fade));
       }
     } else if (!m.laser) {
       switch (this.weapon) {
@@ -406,13 +407,13 @@ class Player {
   }
   _fireHoming(game) {
     const lvl = game.mods.homing;
-    const n = 1 + lvl;
+    const n = 1 + lvl + (game.evo.homing ? 3 : 0);
     for (let i = 0; i < n; i++) {
       const a = -Math.PI / 2 + (i - (n - 1) / 2) * 0.55;
       game.playerBullets.push({
         x: this.x, y: this.y - 8,
         vx: Math.cos(a) * 300, vy: Math.sin(a) * 300,
-        r: 4, dmg: 2 + this.dmgBonus, color: '#ffd166', dead: false,
+        r: 4, dmg: 2 + this.dmgBonus + (game.evo.homing ? 2 : 0), color: '#ffd166', dead: false,
         homing: true, life: 2.6, pierce: 0, split: 0
       });
     }
@@ -684,6 +685,7 @@ const bossVariant = (wave) => (wave >= 10 && Math.floor(wave / 5) % 2 === 0 ? 's
 class Boss {
   constructor(wave) {
     this.wave = wave;
+    this.isBoss = true;
     this.variant = bossVariant(wave);
     const storm = this.variant === 'storm';
     this.x = W / 2; this.y = -90;

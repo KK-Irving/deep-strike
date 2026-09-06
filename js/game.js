@@ -132,6 +132,7 @@ class Game {
     this.runKills = 0; this.runEliteKills = 0;
     this._cardChoices = [];
     this._pendingSwap = null; this._swapList = null;
+    this.evo = {}; this.bulletFreezeT = 0;
     this._recalc();
   }
 
@@ -208,8 +209,10 @@ class Game {
   /* ---------------- 肉鸽升级系统 ---------------- */
   _recalc() {
     const m = this.mods, p = this.player;
-    p.dmgBonus = m.dmg || 0;
+    const E = this.evo || {};   // 进化状态
+    p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0);
     let interval = 0.12 * Math.pow(0.85, m.rate || 0);
+    if (E.rate) interval *= 0.75;
     if (this.bonds.includes('overdrive')) interval *= 0.85;
     p.fireInterval = Math.max(0.045, interval);
     p.speed = 330 * Math.pow(1.15, m.speed || 0);
@@ -222,10 +225,10 @@ class Game {
     this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
     // 卡槽系统:基础 5 槽,隐藏卡扩展
     this.maxSlots = 5 + (m.slotplus || 0);
-    // 生命值系统:上限 = 100 + 卡片成长 + 等级成长
-    p.maxHp = 100 + 25 * (m.vitality || 0) + 5 * (this.level - 1);
+    // 生命值系统:上限 = 100 + 卡片成长 + 等级成长(+泰坦血统 50)
+    p.maxHp = 100 + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0);
     p.armorPct = Math.min(0.45, 0.15 * (m.armor || 0));
-    p.regenRate = 0.6 * (m.regen || 0);
+    p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1);
     p.leechPer = 0.7 * (m.leech || 0);
     p.hp = Math.min(p.hp, p.maxHp);
     // 幻影僚机:数量同步
@@ -252,7 +255,9 @@ class Game {
     const dps = (7 + 4 * (lvl - 1) + 2.5 * p.dmgBonus)
       * (this.bonds.includes('focus') ? 1.6 : 1)
       * (1 + 0.15 * (p.weapon - 1));
-    const halfW = 2.5 + 0.8 * (lvl - 1) + 0.4 * (p.weapon - 1);
+    let halfW = 2.5 + 0.8 * (lvl - 1) + 0.4 * (p.weapon - 1);
+    if (this.evo.laser) halfW *= 1.6;
+    const beamDps = dps * (this.evo.laser ? 1.4 : 1);
     const xs = [p.x];
     for (let i = 1; i <= (m.multi || 0); i++) { xs.push(p.x - 7 - i * 8, p.x + 7 + i * 8); }
     this.beams = xs.map(x => ({ x, halfW }));
@@ -263,19 +268,19 @@ class Game {
         if (e.y < p.y - 6 && Math.abs(e.x - bx) < e.r + halfW) {
           // 护盾开启的护盾兵:激光仅 30% 烧蚀通过
           const mul = (e.type === 'shielder' && e.shieldOff <= 0) ? 0.3 : 1;
-          e.damage(dps * dt * mul, this, true);
+          e.damage(beamDps * dt * mul, this, true);
           hitAny = true;
         }
       }
       // 激光烧蚀陨石
       for (const a of this.asteroids) {
         if (!a.dead && a.y < p.y - 6 && Math.abs(a.x - bx) < a.r + halfW) {
-          a.damage(dps * dt, this);
+          a.damage(beamDps * dt, this);
           hitAny = true;
         }
       }
       if (this.boss && this.boss.state === 'fight' && Math.abs(this.boss.x - bx) < this.boss.r + halfW) {
-        this.boss.damage(dps * dt, this, true);
+        this.boss.damage(beamDps * dt, this, true);
         hitAny = true;
       }
     }
@@ -317,7 +322,7 @@ class Game {
 
   openLevelup() {
     if (this.state !== 'playing' || this.pendingLevels <= 0) return;
-    this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level);
+    this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
     // 卡池耗尽兜底(全部满级):转化为奖励分,避免软锁
     if (this._cardChoices.length === 0) {
       const bonus = 500 * this.pendingLevels;
@@ -342,15 +347,16 @@ class Game {
     this._cardChoices.forEach((u, i) => {
       const r = RARITY[u.rar];
       const cur = this.mods[u.id] || 0;
-      const needSwap = slotsFull && !cur && !u.hidden;
+      const needSwap = slotsFull && !cur && !u.hidden && !u.isEvo;
       const el = document.createElement('button');
-      el.className = 'card r' + u.rar + (u.hidden ? ' hidden-card' : '');
+      el.className = 'card r' + u.rar + (u.hidden ? ' hidden-card' : '') + (u.isEvo ? ' evo-card' : '');
       el.innerHTML =
-        '<div class="card-rar" style="color:' + r.color + '">' + (u.hidden ? '隐藏卡' : r.name) + (u.rar === 2 ? ' ★' : '') + '</div>' +
+        '<div class="card-rar" style="color:' + r.color + '">' + (u.hidden ? '隐藏卡' : r.name) + (u.isEvo ? ' ✦' : u.rar === 2 ? ' ★' : '') + '</div>' +
         '<div class="card-icon">' + u.icon + '</div>' +
         '<div class="card-name">' + u.name + '</div>' +
         '<div class="card-desc">' + u.desc + '</div>' +
-        '<div class="card-lv">' + (u.hidden ? '槽位 +1'
+        '<div class="card-lv">' + (u.isEvo ? '传说进化! · ' + UPGRADE_MAP[u.base].name + ' 满级'
+          : u.hidden ? '槽位 +1'
           : cur > 0 ? 'Lv ' + cur + ' → ' + (cur + 1)
           : needSwap ? '需替换一项' : '新能力!') + ' · 按 ' + (i + 1) + '</div>';
       el.addEventListener('click', () => this.chooseCard(i));
@@ -360,7 +366,7 @@ class Game {
     let html = '';
     for (const u of UPGRADES) {
       const c = this.mods[u.id] || 0;
-      if (c > 0) html += '<span class="chip"><i>' + u.icon + '</i>' + u.name + (u.max > 1 ? ' ×' + c : '') + '</span>';
+      if (c > 0) html += '<span class="chip' + (this.evo[u.id] ? ' evo' : '') + '"><i>' + u.icon + '</i>' + u.name + (u.max > 1 ? ' ×' + c : '') + (this.evo[u.id] ? ' ✦' : '') + '</span>';
     }
     for (const b of BONDS) {
       if (this.bonds.includes(b.id)) html += '<span class="chip bond" title="' + b.desc + '">羁绊·' + b.name + '</span>';
@@ -408,6 +414,22 @@ class Game {
     if (this.state !== 'levelup' || this._pendingSwap) return;
     const u = this._cardChoices[i];
     if (!u) return;
+    if (u.isEvo) {
+      // 传说进化:满级卡片质变,不占槽位
+      this.evo[u.base] = true;
+      AudioSys.bond();
+      this.banner = { text: '✦ 进化 · ' + u.name, sub: u.desc, life: 3.0, max: 3.0, gold: true };
+      this._recalc();
+      this.pendingLevels--;
+      if (this.pendingLevels > 0) {
+        this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
+        this._renderCards();
+      } else {
+        this.state = 'playing';
+        this._showState();
+      }
+      return;
+    }
     if (u.id === 'slotplus') {
       // 隐藏卡:直接扩充槽位,不占用槽位
       this.mods[u.id] = (this.mods[u.id] || 0) + 1;
@@ -458,7 +480,7 @@ class Game {
     if (u.id === 'vitality') this.player.hp = Math.min(this.player.maxHp, this.player.hp + 25);
     this.pendingLevels--;
     if (this.pendingLevels > 0) {
-      this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level);
+      this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
       // 升级链中途卡池耗尽兜底:剩余等级转化为奖励分
       if (this._cardChoices.length === 0) {
         const bonus = 500 * this.pendingLevels;
@@ -480,6 +502,8 @@ class Game {
   startWave(n) {
     this.wave = n; this.waveTime = 0; this.spawnQueue = []; this.waveClearT = -1;
     this.waveKills = 0; this.trickleT = 0;
+    // 时间冻结:每波开始静止敌方弹幕
+    if (this.evo.time) this.bulletFreezeT = 2.5;
     if (n >= 5) Ach.unlock('wave_5', this);
     if (n >= 10) Ach.unlock('wave_10', this);
     if (n >= 15) Ach.unlock('wave_15', this);
@@ -609,6 +633,8 @@ class Game {
     }
     for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
       const b = this.enemyBullets[i];
+      // 时间冻结:波首静止弹幕
+      if (this.bulletFreezeT > 0) continue;
       // 时滞力场
       const sdt = dt * this.bulletSlow;
       b.x += b.vx * sdt; b.y += b.vy * sdt;
@@ -668,7 +694,7 @@ class Game {
         this.waveClearT = 1.6;
         const bonus = 200 + this.wave * 100;
         this.score += bonus;
-        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5);
+        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5 + (this.evo.vitality ? 15 : 0));
         this.banner = { text: 'WAVE CLEAR', sub: '奖励 +' + bonus, life: 1.6, max: 1.6, red: false };
         AudioSys.waveStart();
       } else {
@@ -810,10 +836,12 @@ class Game {
   /* 单发子弹命中结算:暴击 / 贯穿 / 裂变 */
   _hitTarget(b, e) {
     let dmg = b.dmg;
-    const cc = 0.2 * (this.mods.crit || 0);
+    const cc = 0.2 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0);
     const guaranteed = b.homing && this.bonds.includes('hunt');
     const crit = guaranteed || (cc > 0 && RNG() < cc);
     if (crit) dmg = Math.round(dmg * (this.bonds.includes('execute') ? 4.5 : 3));
+    // 处决者:暴击对精英与旗舰额外 +50%
+    if (crit && this.evo.crit && (e.elite || e.isBoss)) dmg = Math.round(dmg * 1.5);
     AudioSys.hit();
     this._sparks(b.x, b.y, crit ? '#ffd166' : e.color, crit ? 7 : 4);
     if (crit) {
@@ -828,13 +856,26 @@ class Game {
         this.playerBullets.push({
           x: b.x, y: b.y, vx: Math.cos(a) * 330, vy: Math.sin(a) * 330,
           r: 2.2, dmg: Math.max(1, Math.round(b.dmg * 0.4)), color: '#a5ffd6', dead: false,
-          pierce: this.bonds.includes('storm') ? 1 : 0, split: 0, child: true
+          pierce: this.bonds.includes('storm') ? 1 : 0, split: (this.evo.split && !b.child) ? 1 : 0, child: true
         });
       }
     }
     // 贯穿:未耗尽穿透数时继续飞行
     if (b.pierce > 0) { b.pierce--; b.lastHit = e; }
     else b.dead = true;
+    // 聚变弹头:命中溅射
+    if (this.evo.dmg && dmg > 1) {
+      const splash = Math.max(1, Math.round(dmg * 0.5));
+      for (const o of this.enemies) {
+        if (o === e || o.dead) continue;
+        const ddx = o.x - e.x, ddy = o.y - e.y;
+        if (ddx * ddx + ddy * ddy < 3600) o.damage(splash, this, true);
+      }
+      if (this.boss && !this.boss.dead && this.boss !== e) {
+        const ddx = this.boss.x - e.x, ddy = this.boss.y - e.y;
+        if (ddx * ddx + ddy * ddy < 4900) this.boss.damage(splash, this, true);
+      }
+    }
     e.damage(dmg, this);
   }
 
@@ -977,6 +1018,14 @@ class Game {
       p.shield = false;
       p.invuln = 1.2;
       if (this.mods.shieldgen) p.shieldCd = p.shieldInterval; // 重启护盾充能
+      // 圣盾爆发:护盾破碎时清屏+重创
+      if (this.evo.shieldgen) {
+        this.enemyBullets.length = 0;
+        for (const e of this.enemies) e.damage(12, this);
+        this.rings.push(new Ring(p.x, p.y, '#ffd166', 240, 0.6));
+        this.shake(10, 0.4);
+        AudioSys.bomb();
+      }
       if (this.bonds.includes('symbiosis') && this.mods.regen) {
         p.hp = Math.min(p.maxHp, p.hp + 15);
         this._addFloat(new FloatText(p.x, p.y - 26, '生机涌动 +15', '#51e08a', 12));
@@ -1109,6 +1158,7 @@ class Game {
       this.bombT -= dt;
       if (this.bombT <= 0) this.bombActive = false;
     }
+    if (this.bulletFreezeT > 0) this.bulletFreezeT -= dt;
     if (this.banner) this.banner.life -= dt;
   }
 
@@ -1336,8 +1386,8 @@ class Game {
       let ox = W / 2 - total / 2 + 7;
       for (const u of owned) {
         const cnt = this.mods[u.id];
-        ctx.fillStyle = RARITY[u.rar].color;
-        ctx.fillText(u.icon, ox, H - 38);
+        ctx.fillStyle = this.evo[u.id] ? '#ffd166' : RARITY[u.rar].color;
+        ctx.fillText(u.icon + (this.evo[u.id] ? '✦' : ''), ox, H - 38);
         if (u.max > 1) {
           ctx.fillStyle = 'rgba(230,245,255,0.75)';
           ctx.fillText(String(cnt), ox + 5, H - 30);
@@ -1364,7 +1414,7 @@ class Game {
     let html = '';
     for (const u of UPGRADES) {
       const c = this.mods[u.id] || 0;
-      if (c > 0) html += '<span class="chip"><i>' + u.icon + '</i>' + u.name + (u.max > 1 ? ' ×' + c : '') + '</span>';
+      if (c > 0) html += '<span class="chip' + (this.evo[u.id] ? ' evo' : '') + '"><i>' + u.icon + '</i>' + u.name + (u.max > 1 ? ' ×' + c : '') + (this.evo[u.id] ? ' ✦' : '') + '</span>';
     }
     for (const b of BONDS) {
       if (this.bonds.includes(b.id)) html += '<span class="chip bond">羁绊·' + b.name + '</span>';
