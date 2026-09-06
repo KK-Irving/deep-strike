@@ -218,6 +218,12 @@ class Game {
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
     const timePerStack = this.bonds.includes('chrono') ? 0.30 : 0.18;
     this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
+    // 生命值系统:上限 = 100 + 卡片成长 + 等级成长
+    p.maxHp = 100 + 25 * (m.vitality || 0) + 5 * (this.level - 1);
+    p.armorPct = Math.min(0.45, 0.15 * (m.armor || 0));
+    p.regenRate = 0.6 * (m.regen || 0);
+    p.leechPer = 0.7 * (m.leech || 0);
+    p.hp = Math.min(p.hp, p.maxHp);
     // 幻影僚机:数量同步
     while (this.wingmen.length < (m.wingman || 0)) this.wingmen.push(new Wingman(this.wingmen.length));
     while (this.wingmen.length > (m.wingman || 0)) this.wingmen.pop();
@@ -284,6 +290,9 @@ class Game {
       this.level++;
       this.xpNext = Math.round(this.xpNext * 1.22 + 4);
       this.pendingLevels++;
+      // 等级成长:生命上限 +5 并回复同量
+      this._recalc();
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5);
       if (this.level >= 10) Ach.unlock('level_10', this);
     }
     if (this.pendingLevels > 0 && this.state === 'playing' && this.player.alive) this.openLevelup();
@@ -551,6 +560,7 @@ class Game {
         this.waveClearT = 1.6;
         const bonus = 200 + this.wave * 100;
         this.score += bonus;
+        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5);
         this.banner = { text: 'WAVE CLEAR', sub: '奖励 +' + bonus, life: 1.6, max: 1.6, red: false };
         AudioSys.waveStart();
       } else {
@@ -629,7 +639,7 @@ class Game {
         const rr = p.r + b.r;
         if (dx * dx + dy * dy < rr * rr) {
           b.dead = true;
-          this._playerHit();
+          this._playerHit(25);
           break;
         }
       }
@@ -641,7 +651,7 @@ class Game {
           const rr = e.r + p.r;
           if (dx * dx + dy * dy < rr * rr) {
             e.damage(3, this);
-            this._playerHit();
+            this._playerHit(35);
             break;
           }
         }
@@ -653,7 +663,7 @@ class Game {
             const rr = a.r + p.r;
             if (dx * dx + dy * dy < rr * rr) {
               a.damage(3, this);
-              this._playerHit();
+              this._playerHit(35);
               break;
             }
           }
@@ -662,7 +672,7 @@ class Game {
           const bo = this.boss;
           const dx = bo.x - p.x, dy = bo.y - p.y;
           const rr = bo.r + p.r;
-          if (dx * dx + dy * dy < rr * rr) this._playerHit();
+          if (dx * dx + dy * dy < rr * rr) this._playerHit(35);
         }
       }
     }
@@ -698,7 +708,11 @@ class Game {
     if (crit) dmg = Math.round(dmg * (this.bonds.includes('execute') ? 4.5 : 3));
     AudioSys.hit();
     this._sparks(b.x, b.y, crit ? '#ffd166' : e.color, crit ? 7 : 4);
-    if (crit) this._addFloat(new FloatText(b.x, b.y - 8, '暴击', '#ff5470', 11));
+    if (crit) {
+      this._addFloat(new FloatText(b.x, b.y - 8, '暴击', '#ff5470', 11));
+      if (this.bonds.includes('bloodrush') && this.player.alive)
+        this.player.hp = Math.min(this.player.maxHp, this.player.hp + 2);
+    }
     // 裂变弹:命中后分裂出 2 枚小弹(羁绊「弹幕风暴」赋予贯穿)
     if (b.split > 0) {
       for (let i = 0; i < 2; i++) {
@@ -721,6 +735,9 @@ class Game {
     this.combo++;
     this.comboT = this.comboWindow;
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+    // 击杀汲取
+    if (this.player.leechPer > 0 && this.player.alive)
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.leechPer);
     this.stats.kills = this._stat('kills', 0) + 1;
     this.waveKills++;
     this.runKills++;
@@ -834,45 +851,64 @@ class Game {
         this._addFloat(new FloatText(p.x, p.y - 24, '+300', '#ffd166'));
       }
     } else if (type === 'life') {
-      if (p.lives < 5) {
-        p.lives++;
-        this._addFloat(new FloatText(p.x, p.y - 24, '生命 +1', '#ff77a9'));
-      } else {
-        this.score += 500;
-        this._addFloat(new FloatText(p.x, p.y - 24, '+500', '#ffd166'));
+      const heal = Math.min(40, p.maxHp - p.hp);
+      p.hp += heal;
+      if (heal > 0) this._addFloat(new FloatText(p.x, p.y - 24, '生命 +' + Math.round(heal), '#ff77a9'));
+      else {
+        this.score += 300;
+        this._addFloat(new FloatText(p.x, p.y - 24, '+300', '#ffd166'));
       }
     }
   }
 
-  _playerHit() {
+  /* 受击结算:数值伤害(dmg 由伤害来源指定),装甲减免,不屈兜底 */
+  _playerHit(dmg = 25) {
     const p = this.player;
     if (p.invuln > 0 || !p.alive) return;
     if (p.shield) {
       p.shield = false;
       p.invuln = 1.2;
       if (this.mods.shieldgen) p.shieldCd = p.shieldInterval; // 重启护盾充能
+      if (this.bonds.includes('symbiosis') && this.mods.regen) {
+        p.hp = Math.min(p.maxHp, p.hp + 15);
+        this._addFloat(new FloatText(p.x, p.y - 26, '生机涌动 +15', '#51e08a', 12));
+      }
       AudioSys.shieldBreak();
       this.shake(7, 0.3);
       this.rings.push(new Ring(p.x, p.y, '#4db8ff', 60, 0.4));
       this._thornBlast();
       return;
     }
-    p.lives--;
+    const real = Math.max(1, Math.round(dmg * (1 - p.armorPct)));
+    p.hp -= real;
+    this.combo = 0;
     AudioSys.playerHit();
     this.shake(14, 0.5);
     this.flashT = 0.35; this.flashColor = 'rgba(255,70,90,';
     this._explode(p.x, p.y, 16, '#7ef3ff', 1.4);
-    this.combo = 0;
     this._thornBlast();
-    if (p.lives <= 0) {
+    if (this.bonds.includes('ironwill') && this.mods.armor && p.alive) {
+      p.hp = Math.min(p.maxHp, p.hp + 5);
+      this._addFloat(new FloatText(p.x, p.y - 26, '荆棘装甲 +5', '#a5ffd6', 11));
+    }
+    if (p.hp <= 0) {
+      // 不屈意志:每局一次,保留 1 点生命并清除全屏弹幕
+      if (this.mods.undying && !p.undyingUsed) {
+        p.undyingUsed = true;
+        p.hp = 1;
+        p.invuln = 2.5;
+        this.enemyBullets.length = 0;
+        this._addFloat(new FloatText(p.x, p.y - 30, '🕊 不屈意志!', '#ffd166', 16));
+        AudioSys.record();
+        this.rings.push(new Ring(p.x, p.y, '#ffd166', 240, 0.6));
+        return;
+      }
+      p.hp = 0;
       p.alive = false;
       this._explode(p.x, p.y, 26, '#7ef3ff', 2);
       this.shake(20, 0.8);
     } else {
-      p.weapon = Math.max(1, p.weapon - 1);
-      p.invuln = 3.0;
-      p.x = W / 2;
-      p.y = H - 90;
+      p.invuln = 1.5;
     }
   }
 
@@ -1046,7 +1082,7 @@ class Game {
       ctx.fillRect(0, 0, W, H);
     }
     // 濒死警示:最后一丝生命时屏幕边缘红色脉动
-    if (this.state === 'playing' && this.player.alive && this.player.lives === 1) {
+    if (this.state === 'playing' && this.player.alive && this.player.hp / this.player.maxHp <= 0.3) {
       const a = 0.10 + 0.07 * Math.sin(performance.now() / 250);
       const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.34, W / 2, H / 2, H * 0.72);
       g.addColorStop(0, 'rgba(255,40,70,0)');
@@ -1099,19 +1135,21 @@ class Game {
       ctx.font = 'bold 11px Consolas, monospace';
       ctx.fillText('每日挑战 · 纪录 ' + this._dailyBest(), W - 14, 54);
     }
-    // 生命(小战机)
-    for (let i = 0; i < p.lives; i++) {
-      ctx.save();
-      ctx.translate(22 + i * 24, H - 22);
-      ctx.scale(0.62, 0.62);
-      ctx.fillStyle = '#0f4b66';
-      ctx.strokeStyle = '#7ef3ff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, -14); ctx.lineTo(10, 8); ctx.lineTo(0, 4); ctx.lineTo(-10, 8);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      ctx.restore();
+    // 生命条(数值化生命)
+    {
+      const bw = 104, bx = 14, by = H - 27;
+      const pct = clamp(p.hp / p.maxHp, 0, 1);
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(bx - 1, by - 1, bw + 2, 10);
+      ctx.fillStyle = pct > 0.5 ? '#51e08a' : (pct > 0.25 ? '#ffd166' : '#ff5577');
+      ctx.fillRect(bx, by, bw * pct, 8);
+      ctx.strokeStyle = 'rgba(126,243,255,0.35)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx - 1.5, by - 1.5, bw + 3, 11);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#cfe8ff';
+      ctx.font = 'bold 10px Consolas, monospace';
+      ctx.fillText('HP ' + Math.ceil(p.hp) + '/' + p.maxHp, bx + bw + 8, by);
     }
     // 炸弹
     for (let i = 0; i < p.bombs; i++) {

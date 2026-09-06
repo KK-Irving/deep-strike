@@ -269,7 +269,11 @@ class Player {
   reset() {
     this.x = W / 2; this.y = H - 90;
     this.r = 6; this.speed = 330;
-    this.lives = 3; this.weapon = 1; this.bombs = 2;
+    // 生命值系统:数值化生命,上限由等级与卡片成长
+    this.maxHp = 100; this.hp = 100;
+    this.armorPct = 0; this.regenRate = 0; this.leechPer = 0;
+    this.undyingUsed = false;
+    this.weapon = 1; this.bombs = 2;
     this.shield = false; this.invuln = 2.2;
     this.fireCd = 0; this.alive = true;
     this.engine = 0; this.showHitbox = false;
@@ -300,6 +304,9 @@ class Player {
     this.showHitbox = !!k.slow;
     this.engine += dt * 26;
     this.invuln = Math.max(0, this.invuln - dt);
+    // 纳米修复:持续回复
+    if (this.regenRate > 0 && this.hp < this.maxHp)
+      this.hp = Math.min(this.maxHp, this.hp + this.regenRate * dt);
     // 激光主炮:按住开火时持续光束
     this.beamOn = false;
     if (game.mods.laser && (k.fire || game.autoFire)) {
