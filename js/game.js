@@ -168,6 +168,7 @@ class Game {
     this._pendingSwap = null; this._swapList = null;
     this.evo = {}; this.bulletFreezeT = 0;
     this.relics = {}; this.pendingRelic = false; this._relicMode = false; this._relicChoices = [];
+    this.levelupCooldown = 0;
     this.waveMod = null; this._env = { hpMul: 1, spdMul: 1, fireMul: 1 };
     this._recalc();
   }
@@ -374,7 +375,7 @@ class Game {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5);
       if (this.level >= 10) Ach.unlock('level_10', this);
     }
-    if (this.pendingLevels > 0 && this.state === 'playing' && this.player.alive) this.openLevelup();
+    if (this.pendingLevels > 0 && this.state === 'playing' && this.player.alive && !(this.levelupCooldown > 0)) this.openLevelup();
   }
 
   _ownedIds() {
@@ -442,6 +443,13 @@ class Game {
       if (this.bonds.includes(b.id)) html += '<span class="chip bond" title="' + b.desc + '">羁绊·' + b.name + '</span>';
     }
     this._dom.ownRow.innerHTML = html || '<span class="chip">首次升级 · 选择你的成长路线</span>';
+    // 跳过按钮:暂存本次升级,稍后自动弹出
+    const skip = document.createElement('button');
+    skip.className = 'menu-btn';
+    skip.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center;margin-top:10px';
+    skip.innerHTML = '▸ 跳过本次升级(暂存,稍后自动弹出)';
+    skip.addEventListener('click', () => this.skipUpgrade());
+    row.appendChild(skip);
   }
 
   /* 遗物三选一:复用升级界面 */
@@ -508,6 +516,18 @@ class Game {
     this._renderCards();
   }
 
+  /* 跳过本次升级:暂存待选等级,获得经验后自动重新弹出(遗物奖励不可跳过) */
+  skipUpgrade() {
+    if (this.state !== 'levelup' || this._relicMode) return;
+    this._pendingSwap = null;
+    this._swapList = null;
+    this._cardChoices = [];
+    this.levelupCooldown = 3;
+    this.state = 'playing';
+    this._showState();
+    this._addFloat(new FloatText(this.player.x, this.player.y - 30, '升级已暂存,稍后自动弹出', '#9fe8ff', 12));
+  }
+
   /* 满槽替换界面:展示已持有模块,点击丢弃 */
   _renderSwap() {
     const row = this._dom.cardRow;
@@ -531,9 +551,15 @@ class Game {
     const cancel = document.createElement('button');
     cancel.className = 'menu-btn';
     cancel.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center';
-    cancel.innerHTML = '▸ 放弃本次选择(不消耗升级)';
+    cancel.innerHTML = '▸ 返回选项(重新挑选)';
     cancel.addEventListener('click', () => this.cancelSwap());
     row.appendChild(cancel);
+    const skip2 = document.createElement('button');
+    skip2.className = 'menu-btn';
+    skip2.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center';
+    skip2.innerHTML = '▸ 跳过本次升级(暂存,稍后自动弹出)';
+    skip2.addEventListener('click', () => this.skipUpgrade());
+    row.appendChild(skip2);
   }
 
   chooseCard(i) {
@@ -1388,6 +1414,7 @@ class Game {
       if (this.bombT <= 0) this.bombActive = false;
     }
     if (this.bulletFreezeT > 0) this.bulletFreezeT -= dt;
+    if (this.levelupCooldown > 0) this.levelupCooldown -= dt;
     if (this.banner) this.banner.life -= dt;
   }
 
