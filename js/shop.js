@@ -82,9 +82,11 @@ const Shop = {
     } catch (e) { /* 忽略 */ }
   },
 
-  /* 结算获得星晶 */
-  addCrystal(n) {
+  /* 结算获得星晶(富豪成就联动) */
+  addCrystal(n, game) {
     this.crystal += n;
+    if (this.crystal >= 500) Ach.unlock('rich_500', game);
+    if (this.crystal >= 1000) Ach.unlock('rich_1000', game);
     this.save();
   },
 
@@ -97,7 +99,14 @@ const Shop = {
     }
     if (a.skin) this.owned[a.skin] = true;
     this.save();
+    this._checkSkinCollect();
     return reward;
+  },
+
+  _checkSkinCollect() {
+    const ownedSkins = SKINS.filter(x => this.owned[x.id]).length;
+    if (ownedSkins >= 3) Ach.unlock('skin_3');
+    if (ownedSkins >= SKINS.length) Ach.unlock('skin_all');
   },
 
   buySkin(id) {
@@ -107,6 +116,7 @@ const Shop = {
     this.crystal -= sk.price;
     this.owned[id] = true;
     this.save();
+    this._checkSkinCollect();
     return { ok: true, msg: '已购入「' + sk.name + '」' };
   },
 

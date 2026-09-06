@@ -86,16 +86,22 @@ class Game {
     d.stKills.textContent = this._stat('kills', 0);
     d.stScore.textContent = this._stat('totalScore', 0);
     d.stBoss.textContent = this._stat('bossKills', 0);
-    // 成就列表
+    // 成就列表(按分类分组)
     const on = Ach.count();
-    d.achList.innerHTML =
-      '<div class="ach-head">' + on + ' / ' + ACHIEVEMENTS.length + '</div>' +
-      ACHIEVEMENTS.map(a => {
+    const cats = [...new Set(ACHIEVEMENTS.map(a => a.cat))];
+    let html = '<div class="ach-head">' + on + ' / ' + ACHIEVEMENTS.length + '</div>';
+    for (const cat of cats) {
+      const list = ACHIEVEMENTS.filter(a => a.cat === cat);
+      const gotCat = list.filter(a => Ach.unlocked[a.id]).length;
+      html += '<div class="ach-cat">' + cat + ' ' + gotCat + '/' + list.length + '</div>';
+      for (const a of list) {
         const got = !!Ach.unlocked[a.id];
-        return '<div class="ach-item ' + (got ? 'on' : 'off') + '">' +
+        html += '<div class="ach-item ' + (got ? 'on' : 'off') + '">' +
           '<i>' + (got ? '🏆' : '🔒') + '</i>' +
           '<div><b>' + a.name + '</b><span>' + a.desc + '</span></div></div>';
-      }).join('');
+      }
+    }
+    d.achList.innerHTML = html;
   }
 
   /* ---- 菜单子页面切换 ---- */
@@ -142,6 +148,7 @@ class Game {
     this.wingmen = []; this.rifts = []; this.riftCd = 0;
     this.asteroids = []; this.supplies = [];
     this.runKills = 0; this.runEliteKills = 0; this.runBossKills = 0; this.runEvoCount = 0;
+    this.waveDamageTaken = 0; this.perfectStreak = 0; this.runLowHpKills = 0;
     this._cardChoices = [];
     this._pendingSwap = null; this._swapList = null;
     this.evo = {}; this.bulletFreezeT = 0;
@@ -443,6 +450,7 @@ class Game {
       this.evo[u.base] = true;
       this.runEvoCount = (this.runEvoCount || 0) + 1;
       if (this.runEvoCount >= 3) Ach.unlock('evo_3', this);
+      if (this.runEvoCount >= 5) Ach.unlock('evo_5', this);
       AudioSys.bond();
       this.banner = { text: '✦ 进化 · ' + u.name, sub: u.desc, life: 3.0, max: 3.0, gold: true };
       this._recalc();
@@ -496,6 +504,7 @@ class Game {
       this.banner = { text: '羁绊觉醒 · ' + cfg.name, sub: cfg.desc, life: 2.6, max: 2.6, gold: true };
       AudioSys.bond();
       if (this.bonds.length >= 3) Ach.unlock('bond_3', this);
+      if (this.bonds.length >= 5) Ach.unlock('bond_5', this);
     }
     for (const b of lost) {
       const cfg = BONDS.find(x => x.id === b);
@@ -504,6 +513,9 @@ class Game {
     }
     this._recalc();
     if (u.id === 'vitality') this.player.hp = Math.min(this.player.maxHp, this.player.hp + 25);
+    // 满级大师:3 张卡升至满级
+    const maxedCount = UPGRADES.filter(x => (this.mods[x.id] || 0) >= x.max && !x.hidden).length;
+    if (maxedCount >= 3) Ach.unlock('maxed_3', this);
     this.pendingLevels--;
     if (this.pendingLevels > 0) {
       this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
@@ -552,6 +564,9 @@ class Game {
     if (n >= 10) Ach.unlock('wave_10', this);
     if (n >= 15) Ach.unlock('wave_15', this);
     if (n >= 20) Ach.unlock('wave_20', this);
+    if (n >= 25) Ach.unlock('wave_25', this);
+    if (n >= 30) Ach.unlock('wave_30', this);
+    this.waveDamageTaken = 0;
     if (n % 5 === 0) {
       this.waveQuota = 1; // 目标:击毁旗舰
       const bname = BOSS_VARIANTS[bossVariant(n)].name;
@@ -745,6 +760,12 @@ class Game {
         const bonus = 200 + this.wave * 100;
         this.score += bonus;
         if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5 + (this.evo.vitality ? 15 : 0));
+        // 完美波次:本波未受任何实际伤害
+        if (this.waveDamageTaken === 0 && this.wave > 1) {
+          this.perfectStreak++;
+          Ach.unlock('perfect_wave', this);
+          if (this.perfectStreak >= 3) Ach.unlock('perfect_3', this);
+        } else this.perfectStreak = 0;
         this.banner = { text: 'WAVE CLEAR', sub: '奖励 +' + bonus, life: 1.6, max: 1.6, red: false };
         AudioSys.waveStart();
       } else {
@@ -955,6 +976,21 @@ class Game {
     if (this.runKills >= 60) Ach.unlock('run_kill60', this);
     if (this.combo >= 30) Ach.unlock('combo_30', this);
     if (this.combo >= 60) Ach.unlock('combo_60', this);
+    if (this.combo >= 15) Ach.unlock('combo_15', this);
+    if (this.combo >= 100) Ach.unlock('combo_100', this);
+    // 累计击杀与单局击杀成就
+    const tk = this.stats.kills;
+    if (tk >= 100) Ach.unlock('total_100', this);
+    if (tk >= 500) Ach.unlock('total_500', this);
+    if (tk >= 2000) Ach.unlock('total_2000', this);
+    if (this.runKills >= 120) Ach.unlock('run_kill120', this);
+    // 双子星杀手:双词缀精英
+    if (e.elite && e.elite.length >= 2) Ach.unlock('dual_elite', this);
+    // 向死而生:濒死状态击坠
+    if (this.player.alive && this.player.hp / this.player.maxHp <= 0.1) {
+      this.runLowHpKills++;
+      if (this.runLowHpKills >= 10) Ach.unlock('lowhp_10', this);
+    }
     if (e.elite) {
       this.runEliteKills++;
       if (this._stat('eliteKills', 0) + this.runEliteKills >= 10) Ach.unlock('elite_10', this);
@@ -1013,6 +1049,9 @@ class Game {
     Ach.unlock('boss_1', this);
     if (this.stats.bossKills >= 5) Ach.unlock('boss_5', this);
     if (this.stats.bossKills >= 10) Ach.unlock('boss_10', this);
+    if (this.stats.bossKills >= 25) Ach.unlock('boss_25', this);
+    if (b.variant === 'storm') Ach.unlock('storm_kill', this);
+    if (b.variant === 'tyrant') Ach.unlock('tyrant_kill', this);
     const pts = Math.round(b.score * this.multiplier());
     this.score += pts;
     this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
@@ -1104,6 +1143,7 @@ class Game {
     }
     const real = Math.max(1, Math.round(dmg * (1 - p.armorPct)));
     p.hp -= real;
+    this.waveDamageTaken++;
     this.combo = 0;
     AudioSys.playerHit();
     this.shake(14, 0.5);
@@ -1160,6 +1200,8 @@ class Game {
     const p = this.player;
     if (p.bombs <= 0 || this.bombActive) return;
     p.bombs--;
+    this.stats.bombsUsed = this._stat('bombsUsed', 0) + 1;
+    if (this.stats.bombsUsed >= 50) Ach.unlock('bomb_50', this);
     this.bombActive = true;
     this.bombT = 0.9;
     AudioSys.bomb();
@@ -1516,6 +1558,7 @@ class Game {
   _gameover() {
     this.state = 'gameover';
     AudioSys.gameover();
+    if (this.daily && this.score >= 5000) Ach.unlock('daily_5000', this);
     if (this.daily) {
       // 每日挑战:独立当日纪录
       const best = this._dailyBest();
