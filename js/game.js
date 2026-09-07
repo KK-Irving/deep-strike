@@ -184,7 +184,7 @@ class Game {
     if (AudioSys.musicGain) AudioSys.musicGain.gain.value = 0.3;
     // 机库永久强化:初始资源(多级)
     const bombLv = boostLevel('bomb1');
-    if (bombLv) this.player.bombs += bombLv;
+    if (bombLv) this.player.bombs += Math.ceil(bombLv / 2); // 砍半:每 2 级 +1 炸弹(满级 +5)
     if (boostLevel('hp25')) this.player.hp = this.player.maxHp;
     if (boostLevel('shield')) this.player.shield = true;
     this._showState();
@@ -306,7 +306,7 @@ class Game {
     p.fireInterval = Math.max(0.045, interval);
     p.speed = (sh.speed || 330) * Math.pow(1.15, m.speed || 0);
     p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 70;
-    this.xpMult = 1 + 0.25 * (m.xpchip || 0) + 0.06 * boostLevel('xp10');
+    this.xpMult = 1 + 0.25 * (m.xpchip || 0) + 0.04 * boostLevel('xp10'); // 砍:每级 +4%(满级 +40%)
     this.comboWindow = 2 + 1.5 * (m.combo || 0);
     p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
@@ -317,8 +317,8 @@ class Game {
     this.maxSlots = 5 + (m.slotplus || 0);
     // 生命值系统:上限 = 机体基础 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
     p.maxHp = (sh.hp || 100) + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
-      + 15 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0);
-    p.armorPct = Math.min(0.5, 0.15 * (m.armor || 0) + (sh.perkArmor || 0) + (boostLevel('shield') >= 2 ? 0.08 : 0));
+      + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0);
+    p.armorPct = Math.min(0.5, 0.15 * (m.armor || 0) + (sh.perkArmor || 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 护盾:每级 +1.2% 减伤(满级 +12%)
     p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1);
     p.leechPer = 0.7 * (m.leech || 0);
     p.hp = Math.min(p.hp, p.maxHp);

@@ -37,8 +37,10 @@ const SHIPS = [
   { id: 'lancer',    name: '锐锋狙击',   price: 1900, desc: '狙击型:高伤慢射,精准强袭',      hp: 90,  speed: 320, fire: 0.16,  dmgBonus: 2 },
   { id: 'scatter',   name: '散华',       price: 2200, desc: '散射型:高频弱弹,弹幕覆盖',      hp: 95,  speed: 340, fire: 0.09,  dmgBonus: 0, perkSide: 1, perkMagnet: 30 },
   { id: 'tempest',   name: '风暴棱镜',   ach: 'wave_25', desc: '特化型:开局自带侧翼弹',     hp: 90,  speed: 350, fire: 0.11,  dmgBonus: 0, perkSide: 1 },
-  { id: 'titanX',    name: '泰坦·X',     rare: true, desc: '★绚丽机体:全能强袭,仅密匣/兑换获得', hp: 130, speed: 355, fire: 0.10, dmgBonus: 2, perkArmor: 0.08, perkSide: 1 },
-  { id: 'seraph',    name: '炽天使',     rare: true, desc: '★绚丽机体:环绕圣光,高机动高伤,仅密匣/兑换获得', hp: 120, speed: 365, fire: 0.095, dmgBonus: 2, perkArmor: 0.06, perkMagnet: 50, perkSide: 1, fx: { glow: 2.3, dual: '#fff6cf', sheen: '#ffffff', trail: 2.0, anim: 'halo', shipTier: 3 } }
+  { id: 'titanX',    name: '泰坦·X',     rare: true, desc: '★绚丽机体:全能强袭 · 电磁风暴环绕,仅密匣/兑换获得', hp: 130, speed: 355, fire: 0.10, dmgBonus: 2, perkArmor: 0.08, perkSide: 1, fx: { glow: 2.4, dual: '#8fe4ff', sheen: '#ffffff', trail: 2.1, anim: 'storm', shipTier: 3 } },
+  { id: 'seraph',    name: '炽天使',     rare: true, desc: '★绚丽机体:环绕圣光,高机动高伤 · 超新星脉冲,仅密匣/兑换获得', hp: 120, speed: 365, fire: 0.095, dmgBonus: 2, perkArmor: 0.06, perkMagnet: 50, perkSide: 1, fx: { glow: 2.3, dual: '#fff6cf', sheen: '#ffffff', trail: 2.0, anim: 'nova', shipTier: 3 } },
+  { id: 'voidreaver', name: '虚空掠夺者', rare: true, desc: '★绚丽机体:暗物质卫星环绕,极限机动,仅密匣/兑换获得', hp: 105, speed: 385, fire: 0.09, dmgBonus: 2, perkMagnet: 70, perkSide: 1, fx: { glow: 2.5, dual: '#b070ff', sheen: '#e6d0ff', trail: 2.3, anim: 'void', shipTier: 3 } },
+  { id: 'bloomlord',  name: '花神领主',   rare: true, desc: '★绚丽机体:绽放光之花冠,厚甲高伤,仅密匣/兑换获得', hp: 135, speed: 345, fire: 0.10, dmgBonus: 3, perkArmor: 0.10, perkMagnet: 40, perkSide: 1, fx: { glow: 2.5, dual: '#7dffb0', sheen: '#e0ffe8', trail: 2.2, anim: 'bloom', shipTier: 3 } }
 ];
 
 /* 机体 hull 造型路径(与皮肤配色组合渲染) */
@@ -50,18 +52,26 @@ const SHIP_SHAPES = {
   lancer:    (g) => { g.moveTo(0, -20); g.lineTo(4, 0); g.lineTo(8, 12); g.lineTo(3, 9); g.lineTo(0, 13); g.lineTo(-3, 9); g.lineTo(-8, 12); g.lineTo(-4, 0); g.closePath(); },
   scatter:   (g) => { g.moveTo(0, -14); g.lineTo(8, -6); g.lineTo(16, 6); g.lineTo(7, 9); g.lineTo(0, 13); g.lineTo(-7, 9); g.lineTo(-16, 6); g.lineTo(-8, -6); g.closePath(); },
   titanX:    (g) => { g.moveTo(0, -18); g.lineTo(10, -5); g.lineTo(14, 9); g.lineTo(5, 7); g.lineTo(0, 13); g.lineTo(-5, 7); g.lineTo(-14, 9); g.lineTo(-10, -5); g.closePath(); },
-  seraph:    (g) => { g.moveTo(0, -19); g.lineTo(7, -6); g.lineTo(16, 2); g.lineTo(9, 8); g.lineTo(4, 7); g.lineTo(0, 13); g.lineTo(-4, 7); g.lineTo(-9, 8); g.lineTo(-16, 2); g.lineTo(-7, -6); g.closePath(); }
+  seraph:    (g) => { g.moveTo(0, -19); g.lineTo(7, -6); g.lineTo(16, 2); g.lineTo(9, 8); g.lineTo(4, 7); g.lineTo(0, 13); g.lineTo(-4, 7); g.lineTo(-9, 8); g.lineTo(-16, 2); g.lineTo(-7, -6); g.closePath(); },
+  voidreaver:(g) => { g.moveTo(0, -20); g.lineTo(5, -8); g.lineTo(13, -2); g.lineTo(8, 6); g.lineTo(11, 13); g.lineTo(0, 9); g.lineTo(-11, 13); g.lineTo(-8, 6); g.lineTo(-13, -2); g.lineTo(-5, -8); g.closePath(); },
+  bloomlord: (g) => { g.moveTo(0, -16); g.lineTo(8, -8); g.lineTo(15, 4); g.lineTo(8, 6); g.lineTo(6, 13); g.lineTo(0, 9); g.lineTo(-6, 13); g.lineTo(-8, 6); g.lineTo(-15, 4); g.lineTo(-8, -8); g.closePath(); }
 };
 
 /* 永久强化:多级可升级,作用于每次出击。
  * prices[i] 为购买第 (i+1) 级所需星晶;max = prices.length。
  * 数值经平衡下调,靠逐级递增价格拉高总投入。
  * 兼容旧存档:boosts[id] === true 视为 1 级。 */
+/* 永久强化:统一最高 10 级。数值经下调(砍),靠逐级陡增的价格拉高总投入。
+ * prices[i] = 购买第 (i+1) 级所需星晶;max = prices.length = 10。 */
 const BOOSTS = [
-  { id: 'bomb1',  icon: '💣', name: '初始炸弹',   desc: '每次出击携带炸弹 +1/级', prices: [250, 650],             per: '+1 炸弹' },
-  { id: 'hp25',   icon: '❤️', name: '装甲扩容',   desc: '初始生命上限 +15/级',    prices: [320, 560, 880, 1300], per: '+15 HP' },
-  { id: 'xp10',   icon: '🔷', name: '经验调校',   desc: '经验获取 +6%/级',        prices: [400, 720, 1120],      per: '+6% 经验' },
-  { id: 'shield', icon: '◇',  name: '出发护盾',   desc: 'Lv1 出击1层盾 · Lv2 盾额外减伤', prices: [560, 1120],    per: '护盾强化' }
+  { id: 'bomb1',  icon: '💣', name: '初始炸弹',   desc: '每 2 级 +1 初始炸弹(满级 +5)',
+    prices: [300, 500, 800, 1150, 1550, 2000, 2500, 3100, 3800, 4600], per: '每2级 +1 炸弹' },
+  { id: 'hp25',   icon: '❤️', name: '装甲扩容',   desc: '初始生命上限 +10/级(满级 +100)',
+    prices: [280, 460, 700, 1000, 1360, 1780, 2260, 2800, 3400, 4100], per: '+10 HP' },
+  { id: 'xp10',   icon: '🔷', name: '经验调校',   desc: '经验获取 +4%/级(满级 +40%)',
+    prices: [350, 560, 840, 1180, 1580, 2040, 2560, 3140, 3780, 4480], per: '+4% 经验' },
+  { id: 'shield', icon: '◇',  name: '出发护盾',   desc: 'Lv1 出击1层盾 · 每级额外减伤,满级更硬',
+    prices: [500, 780, 1120, 1520, 1980, 2500, 3080, 3720, 4420, 5180], per: '护盾+减伤' }
 ];
 /* 读取某强化的当前等级(兼容旧布尔存档) */
 function boostLevel(id) {
@@ -327,8 +337,31 @@ const Shop = {
   EXCHANGE: [
     { id: 'ex_basic', name: '标准密匣', chips: 12, boost: 0,   desc: '绚丽概率 2.5%~4%' },
     { id: 'ex_fine',  name: '精制密匣', chips: 30, boost: 1,   desc: '绚丽概率 5%~7.5%' },
-    { id: 'ex_lux',   name: '奢华密匣', chips: 60, boost: 2,   desc: '绚丽概率 10%~15%' }
+    { id: 'ex_lux',   name: '奢华密匣', chips: 60, boost: 2,   desc: '绚丽概率 10%~15%' },
+    { id: 'ex_glory', name: '荣耀秘匣', chips: 520, glory: true, desc: '★ 必得绚丽皮肤或机体(100%)' }
   ],
+  /* 必得绚丽:在所有绚丽皮肤(epic)与绚丽机体(mythic)中随机,已拥有则高额星晶补偿 */
+  _grantGlory() {
+    const rnd = () => (RNG ? RNG() : Math.random());
+    // 汇集所有绚丽实物;各占一半权重(皮肤池/机体池均分)
+    const skins = SKINS.filter(s => s.rare).map(s => ({ t: 'skin', item: s, tier: 'epic' }));
+    const ships = SHIPS.filter(s => s.rare).map(s => ({ t: 'ship', item: s, tier: 'mythic' }));
+    // 优先未拥有项,避免 520 芯片换到重复补偿
+    const pool = skins.concat(ships);
+    const unowned = pool.filter(c => c.t === 'skin' ? !this.owned[c.item.id] : !this.ownedShip[c.item.id]);
+    const useList = unowned.length ? unowned : pool;
+    const pick = useList[Math.floor(rnd() * useList.length)];
+    const ownedAlready = pick.t === 'skin' ? !!this.owned[pick.item.id] : !!this.ownedShip[pick.item.id];
+    if (ownedAlready) {
+      const comp = pick.tier === 'mythic' ? 1200 : 900;
+      this.crystal += comp;
+      return { tier: pick.tier, kind: 'crystal', amount: comp, dup: true, name: '重复·星晶 +' + comp + '(' + pick.item.name + ')' };
+    }
+    if (pick.t === 'skin') this.owned[pick.item.id] = true;
+    else this.ownedShip[pick.item.id] = true;
+    if (typeof Ach !== 'undefined') Ach.unlock('rare_pull');
+    return { tier: pick.tier, kind: pick.t, id: pick.item.id, name: pick.item.name };
+  },
   /* boost 档位改写掉落概率 */
   _boxDropBoosted(boost) {
     const rnd = () => (RNG ? RNG() : Math.random());
@@ -358,7 +391,7 @@ const Shop = {
     if (this.chips < cost) return { ok: false, msg: '芯片不足(需 ' + cost + ')' };
     this.chips -= cost;
     const results = [];
-    for (let i = 0; i < count; i++) results.push(this._boxDropBoosted(ex.boost));
+    for (let i = 0; i < count; i++) results.push(ex.glory ? this._grantGlory() : this._boxDropBoosted(ex.boost));
     this.boxOpens += count;
     if (this.boxOpens >= 50 && typeof Ach !== 'undefined') Ach.unlock('box_50');
     this._checkSkinCollect();

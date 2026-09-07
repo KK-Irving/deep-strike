@@ -78,11 +78,25 @@ function startServer() {
       out.fx[sk] = fxAfterEquip(sk, null);
       out.ops[sk] = countDrawOps(sk, null, 1.0);
     }
-    out.fx.seraph = fxAfterEquip('proto', 'seraph');
-    out.ops.seraph = countDrawOps('proto', 'seraph', 1.0);
+    // 绚丽机体(配普通皮肤 proto,动效来自机体):titanX/seraph/voidreaver/bloomlord
+    out.ships = {};
+    for (const sh of ['titanX', 'seraph', 'voidreaver', 'bloomlord']) {
+      out.fx[sh] = fxAfterEquip('proto', sh);
+      out.ops[sh] = countDrawOps('proto', sh, 1.0);
+      out.ships[sh] = out.fx[sh] ? out.fx[sh].anim : null;
+    }
+
+    // 收集全部 8 个绚丽项的 anim,验证互不相同
+    out.anims = {
+      prism: out.fx.prism && out.fx.prism.anim,
+      celestial: out.fx.celestial && out.fx.celestial.anim,
+      singularity: out.fx.singularity && out.fx.singularity.anim,
+      phoenix: out.fx.phoenix && out.fx.phoenix.anim,
+      titanX: out.ships.titanX, seraph: out.ships.seraph,
+      voidreaver: out.ships.voidreaver, bloomlord: out.ships.bloomlord
+    };
 
     // 掉落池:epic(绚丽皮肤)/mythic(绚丽机体)候选包含新条目
-    // 复用 _grantPool 的候选构造逻辑:直接读 SKINS/SHIPS
     const epicSkins = SKINS.filter(s => s.rare).map(s => s.id);
     const mythicShips = SHIPS.filter(s => s.rare).map(s => s.id);
     out.epicSkins = epicSkins;
@@ -123,6 +137,8 @@ function startServer() {
     + ' seraph=' + result.ops.seraph);
   console.log('绚丽皮肤池 epicSkins = ' + j(result.epicSkins));
   console.log('绚丽机体池 mythicShips = ' + j(result.mythicShips));
+  console.log('八项绚丽动效 anims = ' + j(result.anims));
+  console.log('新机体 drawOps titanX=' + result.ops.titanX + ' voidreaver=' + result.ops.voidreaver + ' bloomlord=' + result.ops.bloomlord);
   console.log('prism 动画帧差: t1=' + result.prismT1 + ' t2=' + result.prismT2);
 
   let bad = 0;
@@ -136,8 +152,20 @@ function startServer() {
   check(dazzleMin > result.ops.proto + 5, '绚丽机体逐帧绘制指令明显多于普通皮肤(有额外动画)');
   check(result.ops.nebula <= result.ops.proto + 4, 'tier2 皮肤不产生额外逐帧动画');
   check(result.epicSkins.includes('singularity') && result.epicSkins.includes('phoenix'), '新绚丽皮肤进入 epic 掉落池');
-  check(result.mythicShips.includes('seraph'), '新绚丽机体 seraph 进入 mythic 掉落池');
+  check(result.mythicShips.includes('seraph'), '绚丽机体 seraph 进入 mythic 掉落池');
   check(result.prismT1 !== result.prismT2, 'prism 动画随时间变化(逐帧动效)');
+  // 新增两个绚丽机体
+  check(result.mythicShips.includes('voidreaver') && result.mythicShips.includes('bloomlord'), '新增绚丽机体 voidreaver/bloomlord 进入 mythic 掉落池');
+  // titanX 现在也有专属动效(此前无 anim)
+  check(result.ships.titanX && result.ops.titanX > result.ops.proto + 5, 'titanX 具备专属动效并逐帧绘制');
+  // 四个绚丽机体都动画
+  for (const sh of ['titanX', 'seraph', 'voidreaver', 'bloomlord']) {
+    check(result.ships[sh] && result.ops[sh] > result.ops.proto + 5, sh + ' 绚丽机体有逐帧动效');
+  }
+  // 关键:八项绚丽动效互不相同(体现"每个都不一样")
+  const animVals = Object.values(result.anims);
+  const allSet = new Set(animVals);
+  check(animVals.every(Boolean) && allSet.size === animVals.length, '八项绚丽动效各不相同(风格不重复)');
   console.log(bad ? ('\nFAILED: ' + bad) : '\n绚丽动效验证完成');
   process.exitCode = bad ? 1 : 0;
 })().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
