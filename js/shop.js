@@ -79,11 +79,15 @@ const Shop = {
   shipSprites: {},    // 机体x皮肤组合缓存
   lastEarn: 0,        // 上局获得星晶(结算展示)
   lastChips: 0,       // 上局获得芯片(结算展示)
+  boxOpens: 0,        // 累计开箱次数(成就)
+  chipsEarned: 0,     // 累计获得芯片(成就)
 
   load() {
     try {
       this.crystal = +localStorage.getItem('deepstrike.crystal') || 0;
-      this.chips = +localStorage.getItem('deepstrike.chips') || 0;
+            this.chips = +localStorage.getItem('deepstrike.chips') || 0;
+      this.boxOpens = +localStorage.getItem('deepstrike.boxOpens') || 0;
+      this.chipsEarned = +localStorage.getItem('deepstrike.chipsEarned') || 0;
       this.owned = JSON.parse(localStorage.getItem('deepstrike.shopOwned')) || {};
       this.boosts = JSON.parse(localStorage.getItem('deepstrike.boosts')) || {};
       this.granted = JSON.parse(localStorage.getItem('deepstrike.granted')) || [];
@@ -126,7 +130,9 @@ const Shop = {
   save() {
     try {
       localStorage.setItem('deepstrike.crystal', String(this.crystal));
-      localStorage.setItem('deepstrike.chips', String(this.chips));
+            localStorage.setItem('deepstrike.chips', String(this.chips));
+      localStorage.setItem('deepstrike.boxOpens', String(this.boxOpens));
+      localStorage.setItem('deepstrike.chipsEarned', String(this.chipsEarned));
       localStorage.setItem('deepstrike.shopOwned', JSON.stringify(this.owned));
       localStorage.setItem('deepstrike.boosts', JSON.stringify(this.boosts));
       localStorage.setItem('deepstrike.granted', JSON.stringify(this.granted));
@@ -141,6 +147,7 @@ const Shop = {
     this.crystal += n;
     if (this.crystal >= 500) Ach.unlock('rich_500', game);
     if (this.crystal >= 1000) Ach.unlock('rich_1000', game);
+    if (this.crystal >= 5000) Ach.unlock('rich_5000', game);
     this.save();
   },
 
@@ -186,6 +193,7 @@ const Shop = {
     this.crystal -= sh.price;
     this.ownedShip[id] = true;
     this.save();
+    this._checkShipCollect();
     return { ok: true, msg: '已购入「' + sh.name + '」' };
   },
 
@@ -279,6 +287,8 @@ const Shop = {
     }
     if (pick.t === 'skin') this.owned[pick.item.id] = true;
     else this.ownedShip[pick.item.id] = true;
+    // 绚丽/传奇实物到手:天选之人
+    if ((tier === 'epic' || tier === 'mythic') && typeof Ach !== 'undefined') Ach.unlock('rare_pull');
     return { tier, kind: pick.t, id: pick.item.id, name: pick.item.name };
   },
   /* 批量开箱:先扣费,再逐个开;返回结果数组 */
@@ -289,7 +299,10 @@ const Shop = {
     this.crystal -= cost;
     const results = [];
     for (let i = 0; i < count; i++) results.push(this.boxDrop());
+    this.boxOpens += count;
+    if (this.boxOpens >= 50 && typeof Ach !== 'undefined') Ach.unlock('box_50');
     this._checkSkinCollect();
+    this._checkShipCollect();
     this.save();
     return { ok: true, results };
   },
@@ -333,11 +346,23 @@ const Shop = {
     this.chips -= cost;
     const results = [];
     for (let i = 0; i < count; i++) results.push(this._boxDropBoosted(ex.boost));
+    this.boxOpens += count;
+    if (this.boxOpens >= 50 && typeof Ach !== 'undefined') Ach.unlock('box_50');
     this._checkSkinCollect();
+    this._checkShipCollect();
     this.save();
     return { ok: true, results };
   },
-  addChips(n) { this.chips += n; this.save(); },
+    addChips(n) {
+    this.chips += n;
+    this.chipsEarned += n;
+    if (this.chipsEarned >= 500 && typeof Ach !== 'undefined') Ach.unlock('chip_master');
+    this.save();
+  },
+  _checkShipCollect() {
+    if (typeof Ach === 'undefined') return;
+    if (SHIPS.every(s => this.ownedShip[s.id])) Ach.unlock('ship_all');
+  },
 
   skinSprite() {
     return this.sprites[this.equipped] || this.sprites.proto;

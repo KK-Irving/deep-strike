@@ -162,7 +162,8 @@ class Game {
     this.bombMeter = 0;
     this.wingmen = []; this.rifts = []; this.riftCd = 0;
     this.asteroids = []; this.supplies = [];
-    this.runKills = 0; this.runEliteKills = 0; this.runBossKills = 0; this.runEvoCount = 0;
+        this.runKills = 0; this.runEliteKills = 0; this.runBossKills = 0; this.runEvoCount = 0;
+    this.runBombsUsed = 0; this.runBossNoHit = false;
     this.waveDamageTaken = 0; this.perfectStreak = 0; this.runLowHpKills = 0;
     this._cardChoices = [];
     this._pendingSwap = null; this._swapList = null;
@@ -225,6 +226,18 @@ class Game {
   }
   _refreshMenuHi() {
     this._dom.menuHi.textContent = '最高纪录 ' + this.hi + ' · 每日 ' + this._modeBest('daily') + ' · 周挑战 ' + this._modeBest('weekly');
+  }
+
+  /* 记录某质变武器已通关第 15 波;四种集齐解锁「万法归一」 */
+  _recordPathClear(pk) {
+    try {
+      const done = JSON.parse(localStorage.getItem('deepstrike.pathClears')) || {};
+      if (!done[pk]) {
+        done[pk] = true;
+        localStorage.setItem('deepstrike.pathClears', JSON.stringify(done));
+      }
+      if (['laser', 'spread', 'railgun', 'tesla'].every(k => done[k])) Ach.unlock('path_all', this);
+    } catch (e) { /* 忽略 */ }
   }
   _modeBest(mode) {
     const key = (mode === 'weekly' ? 'deepstrike.weeklyHi.' : 'deepstrike.dailyHi.') + (mode === 'weekly' ? this._weekKey() : this._dailyKey());
@@ -405,7 +418,8 @@ class Game {
       // 等级成长:生命上限 +5 并回复同量
       this._recalc();
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5);
-      if (this.level >= 10) Ach.unlock('level_10', this);
+          if (this.level >= 10) Ach.unlock('level_10', this);
+      if (this.level >= 25) Ach.unlock('level_25', this);
     }
     if (this.pendingLevels > 0 && this.state === 'playing' && this.player.alive && !(this.levelupCooldown > 0)) this.openLevelup();
   }
@@ -608,6 +622,7 @@ class Game {
       this.runEvoCount = (this.runEvoCount || 0) + 1;
       if (this.runEvoCount >= 3) Ach.unlock('evo_3', this);
       if (this.runEvoCount >= 5) Ach.unlock('evo_5', this);
+      if (this.runEvoCount >= 8) Ach.unlock('evo_8', this);
       AudioSys.bond();
       this.banner = { text: '✦ 进化 · ' + u.name, sub: u.desc, life: 3.0, max: 3.0, gold: true };
       this._recalc();
@@ -677,7 +692,8 @@ class Game {
       this.banner = { text: '羁绊觉醒 · ' + cfg.name, sub: cfg.desc, life: 2.6, max: 2.6, gold: true };
       AudioSys.bond();
       if (this.bonds.length >= 3) Ach.unlock('bond_3', this);
-      if (this.bonds.length >= 5) Ach.unlock('bond_5', this);
+            if (this.bonds.length >= 5) Ach.unlock('bond_5', this);
+      if (this.bonds.length >= 8) Ach.unlock('bond_8', this);
     }
     for (const b of lost) {
       const cfg = BONDS.find(x => x.id === b);
@@ -689,6 +705,8 @@ class Game {
     // 满级大师:3 张卡升至满级
     const maxedCount = UPGRADES.filter(x => (this.mods[x.id] || 0) >= x.max && !x.hidden).length;
     if (maxedCount >= 3) Ach.unlock('maxed_3', this);
+    if (maxedCount >= 6) Ach.unlock('maxed_6', this);
+    if (this.maxSlots >= 9) Ach.unlock('slot_9', this);
     this.pendingLevels--;
     if (this.pendingLevels > 0) {
       this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
@@ -747,6 +765,21 @@ class Game {
     if (n >= 20) Ach.unlock('wave_20', this);
     if (n >= 25) Ach.unlock('wave_25', this);
     if (n >= 30) Ach.unlock('wave_30', this);
+    if (n >= 40) Ach.unlock('wave_40', this);
+    if (n >= 50) Ach.unlock('wave_50', this);
+    // 质变武器抵达 20 波精通 + 四通累计;15 波用于 path_all 记录
+    if (n >= 20) {
+      const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : null;
+      if (pk) Ach.unlock('path_' + pk, this);
+    }
+    if (n >= 15) {
+      const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : null;
+      if (pk) this._recordPathClear(pk);
+    }
+    // 不使用炸弹通关第 15 波
+    if (n > 15 && (this.runBombsUsed || 0) === 0) Ach.unlock('nobomb_wave15', this);
+    // 连续无伤波次里程碑
+    if (this.perfectStreak >= 6) Ach.unlock('perfect_6', this);
     this.waveDamageTaken = 0;
     if (n % 5 === 0) {
       this.waveQuota = 1; // 目标:击毁旗舰
@@ -1169,6 +1202,7 @@ class Game {
       chainDmg = Math.max(1, Math.round(chainDmg * 0.82));
     }
     if (hit.size > 1) AudioSys.beam();
+    if (hit.size >= 8) Ach.unlock('tesla_chain8', this);
   }
 
   /* ---------------- 击杀 / 伤害结算 ---------------- */
@@ -1213,11 +1247,16 @@ class Game {
     if (this.combo >= 60) Ach.unlock('combo_60', this);
     if (this.combo >= 15) Ach.unlock('combo_15', this);
     if (this.combo >= 100) Ach.unlock('combo_100', this);
+    if (this.combo >= 200) Ach.unlock('combo_200', this);
+    if (this.combo >= 300) Ach.unlock('combo_300', this);
+    if (this.runKills >= 250) Ach.unlock('run_kill250', this);
     // 累计击杀与单局击杀成就
     const tk = this.stats.kills;
     if (tk >= 100) Ach.unlock('total_100', this);
     if (tk >= 500) Ach.unlock('total_500', this);
     if (tk >= 2000) Ach.unlock('total_2000', this);
+    if (tk >= 5000) Ach.unlock('total_5000', this);
+    if (tk >= 10000) Ach.unlock('total_10000', this);
     if (this.runKills >= 120) Ach.unlock('run_kill120', this);
     // 双子星杀手:双词缀精英
     if (e.elite && e.elite.length >= 2) Ach.unlock('dual_elite', this);
@@ -1225,12 +1264,15 @@ class Game {
     if (this.player.alive && this.player.hp / this.player.maxHp <= 0.1) {
       this.runLowHpKills++;
       if (this.runLowHpKills >= 10) Ach.unlock('lowhp_10', this);
+      if (this.runLowHpKills >= 30) Ach.unlock('lowhp_30', this);
     }
     if (e.elite) {
       this.runEliteKills++;
       const totalElite = this._stat('eliteKills', 0) + this.runEliteKills;
       if (totalElite >= 10) Ach.unlock('elite_10', this);
       if (totalElite >= 50) Ach.unlock('elite_50', this);
+      if (totalElite >= 200) Ach.unlock('elite_200', this);
+      if (this.runEliteKills >= 10) Ach.unlock('run_elite_10', this);
     }
     // 歼灭装填:击坠积累炸弹
     if (this.mods.bombkill) {
@@ -1288,8 +1330,12 @@ class Game {
     if (this.stats.bossKills >= 5) Ach.unlock('boss_5', this);
     if (this.stats.bossKills >= 10) Ach.unlock('boss_10', this);
     if (this.stats.bossKills >= 25) Ach.unlock('boss_25', this);
+    if (this.stats.bossKills >= 50) Ach.unlock('boss_50', this);
+    if (this.stats.bossKills >= 100) Ach.unlock('boss_100', this);
     if (b.variant === 'storm') Ach.unlock('storm_kill', this);
     if (b.variant === 'tyrant') Ach.unlock('tyrant_kill', this);
+    // 完胜旗舰:本波(BOSS 波)未受伤击毁
+    if (this.waveDamageTaken === 0) Ach.unlock('boss_nohit', this);
     const pts = Math.round(b.score * this.multiplier());
     this.score += pts;
     this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
@@ -1438,8 +1484,10 @@ class Game {
     const p = this.player;
     if (p.bombs <= 0 || this.bombActive) return;
     p.bombs--;
+    this.runBombsUsed = (this.runBombsUsed || 0) + 1;
     this.stats.bombsUsed = this._stat('bombsUsed', 0) + 1;
     if (this.stats.bombsUsed >= 50) Ach.unlock('bomb_50', this);
+    if (this.stats.bombsUsed >= 200) Ach.unlock('bomb_200', this);
     this.bombActive = true;
     this.bombT = 0.9;
     AudioSys.bomb();
@@ -1826,7 +1874,11 @@ class Game {
   _gameover() {
     this.state = 'gameover';
     AudioSys.gameover();
-    if (this.mode === 'daily' && this.score >= 5000) Ach.unlock('daily_5000', this);
+        if (this.mode === 'daily' && this.score >= 5000) Ach.unlock('daily_5000', this);
+    if (this.mode === 'daily' && this.score >= 20000) Ach.unlock('daily_20000', this);
+    if (this.mode === 'weekly' && this.score >= 30000) Ach.unlock('weekly_30000', this);
+    if (this.score >= 50000) Ach.unlock('score_50k', this);
+    if (this.score >= 150000) Ach.unlock('score_150k', this);
     if (this.mode !== 'normal') {
       // 挑战模式:独立纪录
       const best = this._challengeBest();
@@ -1847,7 +1899,8 @@ class Game {
     s.kills = this._stat('kills', 0);
     s.bossKills = this._stat('bossKills', 0);
     s.eliteKills = this._stat('eliteKills', 0) + this.runEliteKills;
-    s.totalScore = this._stat('totalScore', 0) + this.score;
+        s.totalScore = this._stat('totalScore', 0) + this.score;
+    if (s.totalScore >= 1000000) Ach.unlock('total_score_1m', this);
     s.bestWave = Math.max(this._stat('bestWave', 0), this.wave);
     this.saveStats();
     const d = this._dom;
