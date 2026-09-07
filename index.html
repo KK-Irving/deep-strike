@@ -86,7 +86,14 @@
       <div class="sec-title">战 机 皮 肤</div>
       <div id="skinGrid" class="shop-grid"></div>
       <div class="sec-title">永 久 强 化</div>
+      <div class="hint left" style="margin:0 0 6px">可多级升级,每级费用递增、数值递增</div>
       <div id="boostGrid" class="shop-grid grid-2"></div>
+      <div class="sec-title">随 机 道 具 · 星 辉 密 匣</div>
+      <div class="hint left" style="margin:0 0 6px">消耗星晶开启,可批量;绚丽皮肤/机体<span style="color:#ff6ad5">极低概率</span>掉出,重复项折算星晶</div>
+      <div id="boxGrid" class="shop-grid grid-2"></div>
+      <div class="sec-title">兑 换 所 <span id="shopChips" style="color:#7ef3ff;font-family:Consolas,monospace">0 ◈</span></div>
+      <div class="hint left" style="margin:0 0 6px">战术芯片来自<span style="color:#ffd166">每日/周挑战</span>结算 · 高档密匣绚丽概率更高</div>
+      <div id="exchangeGrid" class="shop-grid grid-2"></div>
     </div>
     <button id="btnShopBack" class="menu-btn">▸ 返回 <i>Esc</i></button>
   </div>
@@ -148,6 +155,16 @@
   <div class="menu-btns">
     <button id="btnRestart" class="menu-btn primary">▸ 再来一局 <i>Enter/R</i></button>
     <button id="btnOverMenu" class="menu-btn">▸ 回到主菜单 <i>Esc</i></button>
+  </div>
+</div>
+
+<!-- ============ 开箱/兑换结果 ============ -->
+<div id="boxOverlay" class="overlay hidden">
+  <h2 class="lv-title">🎁 开启结果</h2>
+  <div id="boxResultTitle" class="lv-sub"></div>
+  <div id="boxResultList" class="box-list"></div>
+  <div class="menu-btns">
+    <button id="btnBoxClose" class="menu-btn primary">▸ 确定 <i>Enter</i></button>
   </div>
 </div>
 

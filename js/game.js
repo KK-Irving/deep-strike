@@ -181,11 +181,11 @@ class Game {
     this.state = 'playing';
     AudioSys.init();
     if (AudioSys.musicGain) AudioSys.musicGain.gain.value = 0.3;
-    // 机库永久强化:初始资源
-    const bo = Shop.boosts;
-    if (bo.bomb1) this.player.bombs++;
-    if (bo.hp25) this.player.hp = this.player.maxHp;
-    if (bo.shield) this.player.shield = true;
+    // 机库永久强化:初始资源(多级)
+    const bombLv = boostLevel('bomb1');
+    if (bombLv) this.player.bombs += bombLv;
+    if (boostLevel('hp25')) this.player.hp = this.player.maxHp;
+    if (boostLevel('shield')) this.player.shield = true;
     this._showState();
     this.startWave(1);
     if (this.mode === 'daily') this.banner = { text: '每日挑战', sub: this._challengeKey() + ' · 固定关卡,冲击纪录', life: 2.4, max: 2.4, gold: true };
@@ -286,7 +286,7 @@ class Game {
     p.fireInterval = Math.max(0.045, interval);
     p.speed = (sh.speed || 330) * Math.pow(1.15, m.speed || 0);
     p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 70;
-    this.xpMult = 1 + 0.25 * (m.xpchip || 0) + (Shop.boosts.xp10 ? 0.10 : 0);
+    this.xpMult = 1 + 0.25 * (m.xpchip || 0) + 0.06 * boostLevel('xp10');
     this.comboWindow = 2 + 1.5 * (m.combo || 0);
     p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
@@ -297,8 +297,8 @@ class Game {
     this.maxSlots = 5 + (m.slotplus || 0);
     // 生命值系统:上限 = 机体基础 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
     p.maxHp = (sh.hp || 100) + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
-      + (Shop.boosts.hp25 ? 25 : 0) + (this.relics.r_belt ? 30 : 0);
-    p.armorPct = Math.min(0.5, 0.15 * (m.armor || 0) + (sh.perkArmor || 0));
+      + 15 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0);
+    p.armorPct = Math.min(0.5, 0.15 * (m.armor || 0) + (sh.perkArmor || 0) + (boostLevel('shield') >= 2 ? 0.08 : 0));
     p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1);
     p.leechPer = 0.7 * (m.leech || 0);
     p.hp = Math.min(p.hp, p.maxHp);
@@ -1782,7 +1782,15 @@ class Game {
     Shop.lastEarn = Math.floor(this.score / 1000) + (this.runBossKills || 0) * 10 + (this.runEliteKills || 0) * 2;
     if (this.relics.r_grail) Shop.lastEarn *= 2;
     Shop.addCrystal(Shop.lastEarn);
-    d.overCrystals.textContent = '★ +' + Shop.lastEarn + '(星晶 ' + Shop.crystal + ')';
+    // 挑战材料「战术芯片」:仅每日/周挑战产出,按得分/波次给予;周挑战翻倍
+    Shop.lastChips = 0;
+    if (this.mode !== 'normal') {
+      const base = Math.floor(this.score / 2500) + Math.floor(this.wave / 3) + (this.runBossKills || 0);
+      Shop.lastChips = Math.max(1, this.mode === 'weekly' ? base * 2 : base);
+      Shop.addChips(Shop.lastChips);
+    }
+    d.overCrystals.textContent = '★ +' + Shop.lastEarn + '(星晶 ' + Shop.crystal + ')'
+      + (Shop.lastChips ? ' · ◈ +' + Shop.lastChips + '(芯片 ' + Shop.chips + ')' : '');
     d.overRunStats.textContent = this._runStatsText();
     d.overBuild.innerHTML = this._buildSummaryHTML();
     d.newRecord.classList.toggle('hidden', !this.newRecord);

@@ -37,6 +37,8 @@
     if (KEYMAP[e.code]) e.preventDefault();
     if (e.repeat) return;
     AudioSys.init();
+    // 开箱结果弹层优先响应 Enter/Esc
+    if ((e.code === 'Enter' || e.code === 'Escape') && closeBox()) return;
     if (KEYMAP[e.code]) game.keys[KEYMAP[e.code]] = true;
     if (e.code === 'KeyK') game.tryBomb();
     if (e.code === 'KeyM') AudioSys.toggleMute();
@@ -102,7 +104,18 @@
   $('btnStats').addEventListener('click', () => game.showMenuPanel('stats'));
   $('btnHelpBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnStatsBack').addEventListener('click', () => game.showMenuPanel('main'));
-  $('btnOverMenu').addEventListener('click', () => game.toMenu());
+    $('btnOverMenu').addEventListener('click', () => game.toMenu());
+  // 开箱/兑换结果弹层:确定关闭并刷新商城
+  const closeBox = () => {
+    const ov = $('boxOverlay');
+    if (ov && !ov.classList.contains('hidden')) {
+      ov.classList.add('hidden');
+      if (game.state === 'menu' && game.menuPanel === 'shop') Shop.renderPanel();
+      return true;
+    }
+    return false;
+  };
+  $('btnBoxClose').addEventListener('click', closeBox);
 
   // 危险操作二次确认:第一次点击进入待确认态,3 秒未确认自动复原
   function armConfirm(btn, action) {

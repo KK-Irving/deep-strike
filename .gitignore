@@ -1,0 +1,8 @@
+# 依赖与工具产物(Playwright 端到端测试用,不入库)
+node_modules/
+.pw-browsers/
+.npm-cache/
+package-lock.json
+
+# E2E 截图产物
+tools/_shots/

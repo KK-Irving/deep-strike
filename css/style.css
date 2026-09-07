@@ -276,3 +276,56 @@ h2 {
 @keyframes blink { 50% { opacity: 0.35; } }
 
 .stats { display: flex; gap: 34px; margin: 18px 0 6px; }
+
+/* ===== 商城多级强化 / 随机道具 / 兑换 ===== */
+.lv-tag {
+  font-size: 10px; letter-spacing: 1px; color: #ffd166;
+  border: 1px solid rgba(255, 209, 102, 0.4); border-radius: 6px;
+  padding: 1px 6px; margin-left: 4px; font-family: Consolas, monospace;
+}
+.shop-toast {
+  position: fixed; left: 50%; bottom: 12%; transform: translateX(-50%) translateY(10px);
+  background: rgba(10, 20, 45, 0.95); border: 1px solid rgba(126, 243, 255, 0.4);
+  color: #cfe8ff; padding: 10px 20px; border-radius: 10px; font-size: 13px;
+  letter-spacing: 1px; z-index: 60; opacity: 0; pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+}
+.shop-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* 开箱结果弹层 */
+.box-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 46vh; overflow-y: auto; width: min(420px, 86vw);
+  margin: 10px 0 4px; padding: 4px;
+}
+.box-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 12px; border-radius: 8px;
+  border: 1px solid rgba(126, 243, 255, 0.18);
+  background: rgba(10, 20, 45, 0.6);
+}
+.box-row .box-tier {
+  font-size: 11px; letter-spacing: 2px; padding: 1px 8px; border-radius: 6px;
+  border: 1px solid currentColor;
+}
+.box-row .box-item { font-size: 13px; letter-spacing: 1px; color: #e8f6ff; }
+.box-row.tier-junk   { }
+.box-row.tier-junk   .box-tier { color: #9fb8d0; }
+.box-row.tier-common .box-tier { color: #4db8ff; }
+.box-row.tier-rare   { border-color: rgba(46, 232, 200, 0.5); }
+.box-row.tier-rare   .box-tier { color: #2be8c8; }
+.box-row.tier-epic   { border-color: rgba(255, 106, 213, 0.6); box-shadow: 0 0 14px rgba(255, 106, 213, 0.25); }
+.box-row.tier-epic   .box-tier { color: #ff6ad5; }
+.box-row.tier-epic   .box-item { color: #ffd6f6; }
+.box-row.tier-mythic { border-color: rgba(255, 230, 106, 0.7); box-shadow: 0 0 18px rgba(255, 230, 106, 0.35); }
+.box-row.tier-mythic .box-tier { color: #ffe66a; }
+.box-row.tier-mythic .box-item { color: #fff3c8; }
+
+/* ===== 皮肤稀有度分级卡片描边 ===== */
+.shop-card.tier2 { border-color: rgba(126, 243, 255, 0.4); }
+.shop-card.tier3 {
+  border-color: rgba(255, 106, 213, 0.6);
+  box-shadow: 0 0 16px rgba(255, 106, 213, 0.28);
+  background: linear-gradient(160deg, rgba(40, 13, 61, 0.6), rgba(10, 20, 45, 0.6));
+}
+.shop-card.tier3 .shop-name { color: #ffd6f6; text-shadow: 0 0 8px rgba(255, 106, 213, 0.6); }
