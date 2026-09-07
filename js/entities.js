@@ -97,7 +97,10 @@ function initSprites() {
     mender: { color: '#7dff9e', fill: '#103a1e', half: 24, baseR: 13, dotR: 4, dotY: 0,
       path: (g) => { for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; const px = Math.cos(a) * 13, py = Math.sin(a) * 13; i ? g.lineTo(px, py) : g.moveTo(px, py); } } },
     sniper: { color: '#c86bff', fill: '#2a1240', half: 24, baseR: 13, dotR: 3, dotY: 1,
-      path: (g) => { g.moveTo(0, 13); g.lineTo(10, -10); g.lineTo(0, -3); g.lineTo(-10, -10); } }
+      path: (g) => { g.moveTo(0, 13); g.lineTo(10, -10); g.lineTo(0, -3); g.lineTo(-10, -10); } },
+    // 母舰:宽扁的六边形战舰,携带机库舱格,周期释放无人机
+    carrier: { color: '#8fd0ff', fill: '#0c2438', half: 40, baseR: 26, dotR: 5, dotY: 0,
+      path: (g) => { g.moveTo(-24, -8); g.lineTo(24, -8); g.lineTo(28, 4); g.lineTo(14, 12); g.lineTo(-14, 12); g.lineTo(-28, 4); } }
   };
   for (const [type, d] of Object.entries(enemyDefs)) {
     SPRITES.enemy[type] = {
@@ -641,6 +644,13 @@ class Enemy {
       this.vy = 30 * spM; this.amp = rand(40, 80); this.freq = rand(0.8, 1.4);
       this.healCd = rand(2, 3);
       this.color = '#7dff9e'; this.fill = '#103a1e';
+    } else if (type === 'carrier') {
+      // 母舰:血厚、缓行、悬停后周期释放无人机并发射扇形弹,后期压迫核心
+      this.r = 26; this.hp = Math.max(16, Math.round(18 * hpM)); this.score = 600;
+      this.vy = 26 * spM; this.stopY = rand(70, 140); this.stopped = false;
+      this.spawnCd = rand(2.2, 3.2); this.fireCd = rand(1.6, 2.4);
+      this.launchPulse = 0;
+      this.color = '#8fd0ff'; this.fill = '#0c2438';
     } else { // sniper
       this.r = 13; this.hp = Math.max(2, Math.round(3 * hpM)); this.score = 250;
       this.vy = 170 * spM; this.stopY = rand(90, 210); this.stopped = false;
@@ -754,6 +764,38 @@ class Enemy {
         if (healed) {
           this.healPulse = 0.35;
           game.rings.push(new Ring(this.x, this.y, '#7dff9e', 140, 0.4));
+        }
+      }
+    } else if (this.type === 'carrier') {
+      if (this.launchPulse > 0) this.launchPulse -= dt;
+      if (!this.stopped) {
+        this.y += this.vy * dt;
+        if (this.y >= this.stopY) this.stopped = true;
+      } else {
+        this.x = clamp(this.baseX + Math.sin(this.t * 0.5) * 46, 34, W - 34);
+        // 释放无人机(受敌机总数上限约束,避免过载)
+        this.spawnCd -= dt;
+        if (canFire && this.spawnCd <= 0) {
+          this.spawnCd = Math.max(1.6, 3.2 - game.effWave() * 0.06) * this.fireMul;
+          if (game.enemies.length < 60) {
+            const cnt = 2;
+            for (let i = 0; i < cnt; i++) {
+              const d = new Enemy('drone', clamp(this.x + rand(-24, 24), 16, W - 16), game.wave, null, game._env || undefined);
+              d.y = this.y + this.r; d.baseX = d.x;
+              game.enemies.push(d);
+            }
+            this.launchPulse = 0.4;
+            game.rings.push(new Ring(this.x, this.y + this.r, '#8fd0ff', 60, 0.3));
+            AudioSys.enemyShoot();
+          }
+        }
+        // 扇形压制弹
+        this.fireCd -= dt;
+        if (canFire && this.fireCd <= 0) {
+          this.fireCd = 2.6 * this.fireMul;
+          for (let i = -2; i <= 2; i++)
+            game.enemyShot(this.x, this.y + this.r, Math.PI / 2 + i * 0.28, 130 + game.effWave() * 4, 'orange');
+          AudioSys.enemyShoot();
         }
       }
     } else { // sniper

@@ -747,10 +747,12 @@ class Game {
       this.waveMod = WAVE_MODS[irand(0, WAVE_MODS.length - 1)];
     }
     // 环境参数:威胁与词缀共同作用于本波敌机
+    // 火力节奏:除威胁外,追加随波次的持续提速(每波 ×0.985,封顶到第 30 波),后期更具压迫感
+    const waveFire = Math.max(0.62, Math.pow(0.985, Math.min(n, 30)));
     this._env = {
       hpMul: (1 + threat * 0.15) * (this.waveMod && this.waveMod.id === 'iron' ? 1.35 : 1),
-      spdMul: this.waveMod && this.waveMod.id === 'swift' ? 1.2 : 1,
-      fireMul: Math.max(0.45, Math.pow(0.94, threat)) * (this.waveMod && this.waveMod.id === 'barrage' ? 0.6 : 1)
+      spdMul: (this.waveMod && this.waveMod.id === 'swift' ? 1.2 : 1) * (1 + Math.min(0.25, n * 0.008)),
+      fireMul: Math.max(0.4, Math.pow(0.94, threat)) * waveFire * (this.waveMod && this.waveMod.id === 'barrage' ? 0.6 : 1)
     };
     // 里程碑:每 10 波投放补给(炸弹+1 与 25% 生命修复)
     const milestone = n > 10 && (n - 1) % 10 === 0;
@@ -791,18 +793,21 @@ class Game {
     }
     this.banner = { text: 'WAVE ' + n, sub: '', life: 1.8, max: 1.8, red: false };
     AudioSys.waveStart();
-    let budget = 8 + n * 3 + this.threatLevel() * 2;
+    // 出怪配额:线性 + 二次增长,后期数量显著上升(封顶防止过载)
+    let budget = Math.min(120, 8 + n * 3 + Math.floor(n * n * 0.12) + this.threatLevel() * 2);
     let t = 1.0;
     while (budget > 0) {
       const roll = RNG();
       let type = 'drone';
-      if (n >= 3 && roll < 0.15) type = 'tank';
-      else if (n >= 4 && roll < 0.27) type = 'bomber';
-      else if (n >= 5 && roll < 0.34) type = 'shielder';
-      else if (n >= 8 && roll < 0.43) type = 'mender';
-      else if (n >= 2 && roll < 0.67) type = 'waver';
-      else if (n >= 4 && roll < 0.81) type = 'sniper';
-      let cost = type === 'tank' || type === 'mender' ? 3 : (type === 'shielder' ? 4 : (type === 'drone' ? 1 : 2));
+      // 第 6 波起引入「母舰」(carrier):周期释放无人机,增加压迫与丰富度
+      if (n >= 6 && roll < 0.08) type = 'carrier';
+      else if (n >= 3 && roll < 0.22) type = 'tank';
+      else if (n >= 4 && roll < 0.33) type = 'bomber';
+      else if (n >= 5 && roll < 0.40) type = 'shielder';
+      else if (n >= 8 && roll < 0.48) type = 'mender';
+      else if (n >= 2 && roll < 0.70) type = 'waver';
+      else if (n >= 4 && roll < 0.84) type = 'sniper';
+      let cost = type === 'carrier' ? 5 : (type === 'tank' || type === 'mender' ? 3 : (type === 'shielder' ? 4 : (type === 'drone' ? 1 : 2)));
       if (cost > budget) { type = 'drone'; cost = 1; }
       if (type === 'drone') {
         const cnt = Math.min(budget, irand(2, 4));
@@ -1058,19 +1063,20 @@ class Game {
         const rr = p.r + b.r;
         if (dx * dx + dy * dy < rr * rr) {
           b.dead = true;
-          this._playerHit(25);
+          this._playerHit(b.dmg || 25);
           break;
         }
       }
-      // 敌机冲撞 → 玩家
+      // 敌机冲撞 → 玩家(接触伤害随波次小幅增长,封顶 55)
       if (p.alive && p.invuln <= 0) {
+        const contactDmg = Math.min(55, 35 + Math.floor(Math.max(0, this.wave - 1) * 0.8));
         for (const e of this.enemies) {
           if (e.dead) continue;
           const dx = e.x - p.x, dy = e.y - p.y;
           const rr = e.r + p.r;
           if (dx * dx + dy * dy < rr * rr) {
             e.damage(this.relics.r_thorn_crown ? 6 : 3, this);
-            this._playerHit(35);
+            this._playerHit(contactDmg);
             break;
           }
         }
@@ -1504,6 +1510,13 @@ class Game {
   }
 
   /* ---------------- 子弹发射 ---------------- */
+  /* 敌方弹幕伤害:随波次与威胁等级增长(后期弹幕更疼)。
+   * 基础 22,每波 +0.7(封顶 +18),威胁每级 +2;橙色狙击弹额外 +15%。 */
+  enemyDmg(kind) {
+    const base = 22 + Math.min(18, (this.wave - 1) * 0.7) + this.threatLevel() * 2;
+    return Math.round(base * (kind === 'orange' ? 1.15 : 1));
+  }
+
   enemyShot(x, y, angle, speed, kind = 'pink') {
     if (this.enemyBullets.length > 240) return;
     const cfg = kind === 'orange'
@@ -1511,7 +1524,7 @@ class Game {
       : { color: '#ff8fd0', glow: 'rgba(255,70,160,0.32)' };
     this.enemyBullets.push({
       x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      r: 4, color: cfg.color, glow: cfg.glow, dead: false
+      r: 4, color: cfg.color, glow: cfg.glow, dead: false, dmg: this.enemyDmg(kind)
     });
   }
 
