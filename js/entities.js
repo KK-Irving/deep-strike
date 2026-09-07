@@ -748,13 +748,29 @@ class Enemy {
       ctx.stroke();
     }
     ctx.restore();
-    // 血条(屏幕坐标)
-    if (this.elite || (this.hp < this.maxHp && this.maxHp >= 3)) {
-      const w = this.r * 2;
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(this.x - w / 2, this.y - this.r - 9, w, 4);
-      ctx.fillStyle = '#ff5577';
-      ctx.fillRect(this.x - w / 2, this.y - this.r - 9, w * (this.hp / this.maxHp), 4);
+    // 血条(屏幕坐标):固定宽度、钳制比例、带描边;仅在确有减血时显示,
+    // 避免擦伤瞬间闪出一条近满血的长条(修复「一长条闪一下」)
+    const frac = clamp(this.hp / this.maxHp, 0, 1);
+    // 精英/旗舰级(maxHp 高)始终显示;普通敌机仅当血量掉到 <95% 才显示,杜绝一帧长条闪烁
+    const showBar = this.hp > 0 && (this.elite ? frac < 0.999 : (this.maxHp >= 3 && frac <= 0.95));
+    if (showBar) {
+      // 宽度按体型温和缩放并封顶,不随精英巨型化而变成横贯屏幕的长条
+      const w = clamp(this.r * 1.7, 20, 46);
+      const bx = Math.round(this.x - w / 2);
+      const by = Math.round(this.y - this.r - 10);
+      const h = 3;
+      // 背板 + 描边
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(bx - 1, by - 1, w + 2, h + 2);
+      // 填充:高血绿→中黄→低红,读数更直观
+      ctx.fillStyle = frac > 0.5 ? '#5be08a' : (frac > 0.25 ? '#ffd166' : '#ff5577');
+      ctx.fillRect(bx, by, Math.max(0, w * frac), h);
+      // 精英加一条描边高亮
+      if (this.elite) {
+        ctx.strokeStyle = this.eliteColor || 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx - 1.5, by - 1.5, w + 3, h + 3);
+      }
     }
   }
 }
