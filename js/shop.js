@@ -23,8 +23,10 @@ const SKINS = [
   { id: 'abyss',    name: '深渊指挥官',   ach: 'wave_20',  tier: 2, hull: '#06282a', stroke: '#2be8c8', cockpit: '#c8fff4', flame: ['rgba(80,230,200,0.9)', 'rgba(0,120,140,0)'], fx: { glow: 1.6, dual: '#7effe0', sheen: '#c8fff4', trail: 1.4 } },
   { id: 'evoProto', name: '进化原型机',   ach: 'evo_3',    tier: 1, hull: '#12240a', stroke: '#9dff5a', cockpit: '#e8ffd6', flame: ['rgba(157,255,90,0.9)', 'rgba(40,140,0,0)'], fx: { glow: 1.4, dual: '#e8ffd6' } },
   { id: 'phantomX', name: '幽灵X',        ach: 'boss_10',  tier: 2, hull: '#1a1a2e', stroke: '#8fa8ff', cockpit: '#dfe8ff', flame: ['rgba(143,168,255,0.8)', 'rgba(40,60,180,0)'], fx: { glow: 1.6, dual: '#c8d4ff', sheen: '#dfe8ff', trail: 1.3 } },
-  { id: 'prism',    name: '棱镜绚彩',     rare: true, tier: 3, hull: '#2a0d3d', stroke: '#ff6ad5', cockpit: '#fff0fb', flame: ['rgba(255,106,213,0.95)', 'rgba(106,180,255,0)'], desc: '★绚丽·仅密匣/兑换获得', fx: { glow: 2.2, dual: '#6ab4ff', sheen: '#ffffff', trail: 2.0, rainbow: true } },
-  { id: 'celestial',name: '天穹圣辉',     rare: true, tier: 3, hull: '#3a2f05', stroke: '#ffe66a', cockpit: '#fffbe0', flame: ['rgba(255,230,106,0.95)', 'rgba(255,140,0,0)'], desc: '★绚丽·仅密匣/兑换获得', fx: { glow: 2.4, dual: '#fff6cf', sheen: '#ffffff', trail: 2.2, halo: true } }
+  { id: 'prism',    name: '棱镜绚彩',     rare: true, tier: 3, hull: '#2a0d3d', stroke: '#ff6ad5', cockpit: '#fff0fb', flame: ['rgba(255,106,213,0.95)', 'rgba(106,180,255,0)'], desc: '★绚丽·仅密匣/兑换获得 · 流转彩虹光环', fx: { glow: 2.2, dual: '#6ab4ff', sheen: '#ffffff', trail: 2.0, rainbow: true, anim: 'prism' } },
+  { id: 'celestial',name: '天穹圣辉',     rare: true, tier: 3, hull: '#3a2f05', stroke: '#ffe66a', cockpit: '#fffbe0', flame: ['rgba(255,230,106,0.95)', 'rgba(255,140,0,0)'], desc: '★绚丽·仅密匣/兑换获得 · 环绕圣光轨道', fx: { glow: 2.4, dual: '#fff6cf', sheen: '#ffffff', trail: 2.2, halo: true, anim: 'halo' } },
+  { id: 'singularity', name: '奇点', rare: true, tier: 3, hull: '#0d1030', stroke: '#7ea0ff', cockpit: '#e6ecff', flame: ['rgba(126,160,255,0.95)', 'rgba(60,0,160,0)'], desc: '★绚丽·仅密匣/兑换获得 · 引力吸积粒子', fx: { glow: 2.3, dual: '#c8a8ff', sheen: '#ffffff', trail: 2.1, anim: 'orbit' } },
+  { id: 'phoenix', name: '不死鸟', rare: true, tier: 3, hull: '#3d0d0d', stroke: '#ff7a3c', cockpit: '#ffe0c8', flame: ['rgba(255,140,60,0.98)', 'rgba(255,40,0,0)'], desc: '★绚丽·仅密匣/兑换获得 · 烈焰双翼', fx: { glow: 2.5, dual: '#ffd166', sheen: '#fff2d0', trail: 2.4, anim: 'wings' } }
 ];
 
 /* 出击机体:造型/数值/专属特性;ach 指定成就解锁 */
@@ -35,7 +37,8 @@ const SHIPS = [
   { id: 'lancer',    name: '锐锋狙击',   price: 1900, desc: '狙击型:高伤慢射,精准强袭',      hp: 90,  speed: 320, fire: 0.16,  dmgBonus: 2 },
   { id: 'scatter',   name: '散华',       price: 2200, desc: '散射型:高频弱弹,弹幕覆盖',      hp: 95,  speed: 340, fire: 0.09,  dmgBonus: 0, perkSide: 1, perkMagnet: 30 },
   { id: 'tempest',   name: '风暴棱镜',   ach: 'wave_25', desc: '特化型:开局自带侧翼弹',     hp: 90,  speed: 350, fire: 0.11,  dmgBonus: 0, perkSide: 1 },
-  { id: 'titanX',    name: '泰坦·X',     rare: true, desc: '★绚丽机体:全能强袭,仅密匣/兑换获得', hp: 130, speed: 355, fire: 0.10, dmgBonus: 2, perkArmor: 0.08, perkSide: 1 }
+  { id: 'titanX',    name: '泰坦·X',     rare: true, desc: '★绚丽机体:全能强袭,仅密匣/兑换获得', hp: 130, speed: 355, fire: 0.10, dmgBonus: 2, perkArmor: 0.08, perkSide: 1 },
+  { id: 'seraph',    name: '炽天使',     rare: true, desc: '★绚丽机体:环绕圣光,高机动高伤,仅密匣/兑换获得', hp: 120, speed: 365, fire: 0.095, dmgBonus: 2, perkArmor: 0.06, perkMagnet: 50, perkSide: 1, fx: { glow: 2.3, dual: '#fff6cf', sheen: '#ffffff', trail: 2.0, anim: 'halo', shipTier: 3 } }
 ];
 
 /* 机体 hull 造型路径(与皮肤配色组合渲染) */
@@ -46,7 +49,8 @@ const SHIP_SHAPES = {
   tempest:   (g) => { g.moveTo(0, -16); g.lineTo(5, -4); g.lineTo(13, 10); g.lineTo(4, 6); g.lineTo(0, 12); g.lineTo(-4, 6); g.lineTo(-13, 10); g.lineTo(-5, -4); g.closePath(); },
   lancer:    (g) => { g.moveTo(0, -20); g.lineTo(4, 0); g.lineTo(8, 12); g.lineTo(3, 9); g.lineTo(0, 13); g.lineTo(-3, 9); g.lineTo(-8, 12); g.lineTo(-4, 0); g.closePath(); },
   scatter:   (g) => { g.moveTo(0, -14); g.lineTo(8, -6); g.lineTo(16, 6); g.lineTo(7, 9); g.lineTo(0, 13); g.lineTo(-7, 9); g.lineTo(-16, 6); g.lineTo(-8, -6); g.closePath(); },
-  titanX:    (g) => { g.moveTo(0, -18); g.lineTo(10, -5); g.lineTo(14, 9); g.lineTo(5, 7); g.lineTo(0, 13); g.lineTo(-5, 7); g.lineTo(-14, 9); g.lineTo(-10, -5); g.closePath(); }
+  titanX:    (g) => { g.moveTo(0, -18); g.lineTo(10, -5); g.lineTo(14, 9); g.lineTo(5, 7); g.lineTo(0, 13); g.lineTo(-5, 7); g.lineTo(-14, 9); g.lineTo(-10, -5); g.closePath(); },
+  seraph:    (g) => { g.moveTo(0, -19); g.lineTo(7, -6); g.lineTo(16, 2); g.lineTo(9, 8); g.lineTo(4, 7); g.lineTo(0, 13); g.lineTo(-4, 7); g.lineTo(-9, 8); g.lineTo(-16, 2); g.lineTo(-7, -6); g.closePath(); }
 };
 
 /* 永久强化:多级可升级,作用于每次出击。
@@ -210,9 +214,15 @@ const Shop = {
       const sh = SHIPS.find(x => x.id === shipId) || SHIPS[0];
       const sk = SKINS.find(x => x.id === skinId) || SKINS[0];
       const path = (g) => { g.beginPath(); SHIP_SHAPES[sh.id](g); };
+      // fx 合成:皮肤 fx 为主;绚丽机体自带 fx 在皮肤未提供动效时补足(rare 机体始终华丽)
+      let fx = sk.fx || null;
+      if (sh.fx) fx = Object.assign({}, sh.fx, sk.fx || {});
+      // 有效绚丽等级:皮肤 tier 与机体 shipTier 取高
+      const tier = Math.max(sk.tier || 0, (sh.fx && sh.fx.shipTier) || (sh.rare ? 3 : 0));
       this.shipSprites[key] = {
-        body: makeSprite(30, (g) => this._paintHull(g, sk, path)),
-        flame: sk.flame, accent: sk.stroke, half: 30, fx: sk.fx || null
+        body: makeSprite(30, (g) => this._paintHull(g, sk, path, sh)),
+        flame: sk.flame, accent: sk.stroke, half: 30, fx, tier,
+        anim: (fx && fx.anim) || null
       };
     }
     return this.shipSprites[key];
@@ -375,8 +385,9 @@ const Shop = {
 
   /* 皮肤预渲染:与默认机体同路径,替换配色。
    * 越高级(fx)特效越华丽:更强辉光、双色描边、机身高光、绚丽款额外光环。 */
-  _paintHull(g, sk, path) {
-    const fx = sk.fx || {};
+  _paintHull(g, sk, path, sh) {
+    // 皮肤 fx 为主,绚丽机体 fx 补足(静态描边/辉光层面)
+    const fx = (sh && sh.fx) ? Object.assign({}, sh.fx, sk.fx || {}) : (sk.fx || {});
     const glow = fx.glow || 1;
     g.shadowColor = sk.stroke; g.shadowBlur = 14 * glow;
     path(g);
@@ -430,9 +441,19 @@ const Shop = {
         body: makeSprite(30, (g) => this._paintHull(g, sk, vanguardPath)),
         flame: sk.flame,
         accent: sk.stroke,
-        fx: sk.fx || null
+        fx: sk.fx || null,
+        tier: sk.tier || 0,
+        anim: (sk.fx && sk.fx.anim) || null
       };
     }
+  },
+
+  /* 当前装备的绚丽动效描述:{ anim, accent, dual, tier } 或 null(普通皮肤/机体无动效) */
+  activeFx() {
+    const sp = this.shipSprite();
+    if (!sp || !sp.anim || (sp.tier || 0) < 3) return null;
+    const fx = sp.fx || {};
+    return { anim: sp.anim, accent: sp.accent, dual: fx.dual || sp.accent, tier: sp.tier };
   },
 
   /* 商城面板渲染 */

@@ -473,6 +473,9 @@ class Player {
     const spr = (typeof Shop !== 'undefined') ? Shop.shipSprite() : (skin || SPRITES.player);
     ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
     ctx.globalAlpha = 1;
+    // 绚丽机体/皮肤:逐帧动效(仅 tier3,明显区别于普通皮肤的静态描边)
+    const fx = (typeof Shop !== 'undefined' && Shop.activeFx) ? Shop.activeFx() : null;
+    if (fx && !blink) this._drawDazzle(ctx, fx);
     // 护盾
     if (this.shield) {
       const sc = skin ? skin.accent : '#5ac8ff';
@@ -489,6 +492,96 @@ class Player {
       ctx.strokeStyle = 'rgba(255,255,255,0.6)';
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(0, 0, 6, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* 绚丽机体逐帧动效:调用方已 translate 到机体中心。
+   * 四种风格明显区别于普通皮肤(普通皮肤无任何此类动画):
+   *   prism  彩虹流转光环 + 棱镜光斑
+   *   halo   多道环绕圣光轨道弧
+   *   orbit  引力吸积粒子(向内螺旋的光点)
+   *   wings  烈焰双翼(随引擎脉动张合) */
+  _drawDazzle(ctx, fx) {
+    const t = this.engine;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    if (fx.anim === 'prism') {
+      // 彩虹流转光环:色相随时间旋转
+      const hue = (t * 60) % 360;
+      for (let i = 0; i < 3; i++) {
+        ctx.strokeStyle = 'hsla(' + ((hue + i * 120) % 360) + ',100%,65%,0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 20 + i * 3 + Math.sin(t * 3 + i) * 1.5, 0, TAU);
+        ctx.stroke();
+      }
+      // 旋转棱镜光斑
+      for (let i = 0; i < 6; i++) {
+        const a = t * 1.6 + i / 6 * TAU;
+        const r = 22;
+        ctx.fillStyle = 'hsla(' + ((hue + i * 60) % 360) + ',100%,70%,0.8)';
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.8, 0, TAU);
+        ctx.fill();
+      }
+    } else if (fx.anim === 'halo') {
+      // 多道环绕圣光轨道弧
+      ctx.strokeStyle = fx.accent;
+      for (let i = 0; i < 3; i++) {
+        const a0 = t * (1.2 + i * 0.4) + i * 2.1;
+        ctx.globalAlpha = 0.55 - i * 0.12;
+        ctx.lineWidth = 2.4 - i * 0.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 21 + i * 4, a0, a0 + Math.PI * 1.1);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // 轨道端点光珠
+      const a = t * 1.6;
+      ctx.fillStyle = fx.dual;
+      ctx.beginPath(); ctx.arc(Math.cos(a) * 21, Math.sin(a) * 21, 2.4, 0, TAU); ctx.fill();
+    } else if (fx.anim === 'orbit') {
+      // 引力吸积:光点向内螺旋
+      ctx.fillStyle = fx.accent;
+      for (let i = 0; i < 8; i++) {
+        const phase = (t * 0.9 + i / 8) % 1;      // 0→1 循环
+        const r = 6 + (1 - phase) * 26;            // 由外向内
+        const a = i / 8 * TAU + t * 2.2;
+        ctx.globalAlpha = 0.25 + phase * 0.6;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.4 + phase * 1.2, 0, TAU);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = fx.dual;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(0, 0, 8 + Math.sin(t * 4) * 1.5, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else if (fx.anim === 'wings') {
+      // 烈焰双翼:随引擎脉动张合
+      const flap = 0.5 + Math.sin(t * 2.4) * 0.28;
+      for (const side of [-1, 1]) {
+        const grad = ctx.createLinearGradient(side * 6, 0, side * 26, 6);
+        grad.addColorStop(0, fx.accent);
+        grad.addColorStop(1, 'rgba(255,80,0,0)');
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(side * 5, -6);
+        ctx.quadraticCurveTo(side * (20 + flap * 12), -10, side * (24 + flap * 14), 2);
+        ctx.quadraticCurveTo(side * (18 + flap * 10), 2, side * 6, 8);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // 翼尖火星
+      for (const side of [-1, 1]) {
+        ctx.fillStyle = fx.dual;
+        ctx.beginPath();
+        ctx.arc(side * (24 + flap * 14), 2, 1.6 + Math.sin(t * 8) * 0.6, 0, TAU);
+        ctx.fill();
+      }
     }
     ctx.restore();
   }
