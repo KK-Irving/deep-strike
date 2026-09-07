@@ -40,6 +40,8 @@ const UPGRADES = [
   { id: 'rift',     icon: '🌀', name: '空间裂隙',   max: 2, rar: 2, desc: '周期生成黑洞,撕碎弹幕并灼烧敌机' },
   { id: 'laser',    icon: '🔦', name: '激光主炮',   max: 2, rar: 2, desc: '质变:主炮替换为贯穿激光束,持续灼烧一列', path: true },
   { id: 'spread',   icon: '🎇', name: '散射炮',     max: 2, rar: 2, desc: '质变:主炮替换为宽扇散射,近程爆发(弹丸会衰减)', path: true },
+  { id: 'railgun',  icon: '🌩', name: '轨道炮',     max: 2, rar: 2, desc: '质变:蓄力发射高速贯穿磁轨弹,单发高伤(与暴击/贯穿强联动)', path: true },
+  { id: 'tesla',    icon: '⚡', name: '电弧发生器', max: 2, rar: 2, desc: '质变:主炮替换为链式闪电,自动在敌群间跳跃(与并列/裂变强联动)', path: true },
   { id: 'slotplus', icon: '🧬', name: '基因扩展',   max: 2, rar: 2, desc: '隐藏卡:强化槽位 +1', hidden: true }
 ];
 
@@ -58,7 +60,14 @@ const BONDS = [
   { id: 'suppress', name: '压制弹幕', req: ['spread', 'side'],      desc: '散射与侧翼弹丸数 +2' },
   { id: 'symbiosis',name: '生机涌动', req: ['shieldgen', 'regen'],  desc: '护盾破碎时回复 15 点生命' },
   { id: 'ironwill', name: '荆棘装甲', req: ['armor', 'thorn'],      desc: '受击时回复 5 点生命' },
-  { id: 'bloodrush',name: '血怒共振', req: ['leech', 'crit'],       desc: '暴击时额外回复 2 点生命' }
+  { id: 'bloodrush',name: '血怒共振', req: ['leech', 'crit'],       desc: '暴击时额外回复 2 点生命' },
+  // 质变武器专属羁绊(item 2:更多套路)
+  { id: 'railcrit', name: '穿甲协议', req: ['railgun', 'crit'],     desc: '轨道炮蓄力更快,必定暴击' },
+  { id: 'railpierce',name:'无阻贯通', req: ['railgun', 'pierce'],   desc: '轨道炮弹体贯穿无限,伤害随贯穿层叠加' },
+  { id: 'teslachain',name:'雷网',     req: ['tesla', 'multi'],      desc: '闪电额外多一条独立链' },
+  { id: 'teslafork', name: '分叉雷电', req: ['tesla', 'split'],      desc: '闪电每次跳跃分叉命中两个目标' },
+  { id: 'laserlens', name: '聚焦透镜', req: ['laser', 'pierce'],     desc: '激光宽度翻倍,灼烧穿透护盾' },
+  { id: 'scatterstorm',name:'散射风暴',req: ['spread', 'rate'],      desc: '散射额外并发一轮,射速越高越密' }
 ];
 
 const UPGRADE_MAP = {};
@@ -79,7 +88,9 @@ const EVOLUTIONS = [
   { id: 'e_aegis',     base: 'shieldgen',icon: '⚜', name: '圣盾爆发', desc: '护盾破碎时清除全屏弹幕并重创周围敌机' },
   { id: 'e_annihil',   base: 'laser',    icon: '🔆', name: '湮灭主炮', desc: '激光宽度 +60%,伤害 +40%' },
   { id: 'e_maelstrom', base: 'spread',   icon: '💫', name: '万弹齐发', desc: '散射弹丸 +6,且射程不再衰减' },
-  { id: 'e_freeze',    base: 'time',     icon: '⏱', name: '时间冻结', desc: '每波开始时,敌方弹幕静止 2.5 秒' }
+  { id: 'e_freeze',    base: 'time',     icon: '⏱', name: '时间冻结', desc: '每波开始时,敌方弹幕静止 2.5 秒' },
+  { id: 'e_railstorm', base: 'railgun',  icon: '🌠', name: '磁暴风', desc: '轨道炮蓄力更快、弹体贯穿无限,命中引发链式爆轰' },
+  { id: 'e_thunderlord',base: 'tesla',   icon: '🌩', name: '雷霆领主', desc: '闪电跳跃目标 +3,每跳附加麻痹减速' }
 ];
 
 /* 加权抽卡:从未满级的卡片中按稀有度权重抽取 3 张(互不重复)
@@ -87,10 +98,11 @@ const EVOLUTIONS = [
 function drawUpgradeCards(mods, maxSlots, level, evo, count = 3) {
   const ownedCount = UPGRADES.filter(u => (mods[u.id] || 0) > 0 && !u.hidden).length;
   const slotsFull = ownedCount >= maxSlots;
-  const pathId = mods.laser ? 'laser' : (mods.spread ? 'spread' : null);
+    const pathId = UPGRADES.find(u => u.path && (mods[u.id] || 0) > 0);
+  const pathKey = pathId ? pathId.id : null;
   const pool = UPGRADES.filter(u =>
     (mods[u.id] || 0) < u.max &&
-    !(u.path && pathId && pathId !== u.id) &&
+    !(u.path && pathKey && pathKey !== u.id) &&
     !(u.hidden && !slotsFull)
   );
   const weights = RARITY.map((r, i) => r.weight + (i === 2 ? level : 0));

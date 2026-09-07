@@ -375,15 +375,36 @@ class Player {
     const split = m.split || 0;
     const mk = (ox, oy, vx, vy, extra) =>
       P.push(Object.assign({ x: this.x + ox, y: this.y + oy, vx, vy, r: 3, dmg, color: '#dffaff', dead: false, pierce, split }, extra || {}));
-    if (m.spread) {
+    if (m.railgun) {
+      // 轨道炮:高速磁轨弹,单发高伤,天然强贯穿(质变路线)。与暴击/贯穿强联动
+      const railPierce = 3 + 2 * (m.pierce || 0) + (game.bonds.includes('railpierce') ? 99 : 0)
+        + (game.evo.railgun ? 99 : 0);
+      const base = 6 + 3 * (m.railgun - 1) + 2 * this.dmgBonus + 1.5 * (this.weapon - 1);
+      const railDmg = Math.round(base * (game.evo.railgun ? 1.6 : 1));
+      mk(0, -16, 0, -1250, { color: '#bfe4ff', r: 4.4, pierce: railPierce, split, dmg: railDmg, rail: true });
+      for (let i = 1; i <= (m.multi || 0); i++) {
+        mk(-8 - i * 9, -10, 0, -1250, { color: '#bfe4ff', r: 3.6, pierce: railPierce, split, dmg: railDmg, rail: true });
+        mk(8 + i * 9, -10, 0, -1250, { color: '#bfe4ff', r: 3.6, pierce: railPierce, split, dmg: railDmg, rail: true });
+      }
+    } else if (m.tesla) {
+      // 电弧发生器:发射一颗"引雷弹",命中即触发链式闪电(在 game 层结算跳跃)
+      const chains = 1 + (m.tesla - 1) + (m.multi || 0) + (game.bonds.includes('teslachain') ? 1 : 0);
+      const teslaDmg = 2 + this.dmgBonus + (game.evo.tesla ? 2 : 0);
+      for (let c = 0; c < chains; c++) {
+        const ox = chains === 1 ? 0 : (c / (chains - 1) - 0.5) * 22;
+        mk(ox, -12, ox * 6, -900, { color: '#aef0ff', r: 3.2, pierce: 0, split: 0, dmg: teslaDmg, tesla: true });
+      }
+    } else if (m.spread) {
       // 散射炮:宽扇弹幕(质变路线)。卡片协同 —— 弹丸继承 pierce/split,evo 取消衰减并加宽扇形
       const n = 5 + 2 * (m.spread - 1) + 2 * (m.multi || 0) + (this.weapon - 1)
         + (game.bonds.includes('suppress') ? 2 : 0) + (game.evo.spread ? 6 : 0);
       const fade = game.evo.spread ? {} : { life: 0.42 };
       const spPierce = Math.floor(pierce / 2) + (game.evo.spread ? 1 : 0);
       const arc = game.evo.spread ? 0.92 : 0.6;
+      const rounds = game.bonds.includes('scatterstorm') ? 2 : 1;
+      for (let rr = 0; rr < rounds; rr++)
       for (let i = 0; i < n; i++) {
-        const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * arc);
+        const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * arc) + (rr ? 0.12 : 0);
         mk(0, -12, Math.cos(a) * 520, Math.sin(a) * 520,
           Object.assign({ color: '#ffe9a8', r: 2.6, pierce: spPierce, split }, fade));
       }

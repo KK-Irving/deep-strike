@@ -283,6 +283,13 @@ class Game {
     let interval = (p.fireBase || 0.12) * Math.pow(0.85, m.rate || 0);
     if (E.rate) interval *= 0.75;
     if (this.bonds.includes('overdrive')) interval *= 0.85;
+    // 轨道炮:蓄力式慢射(高单发伤害);穿甲协议/磁暴风进化缩短蓄力
+    if (m.railgun) {
+      let railMul = 3.2 - 0.4 * (m.railgun - 1);
+      if (this.bonds.includes('railcrit')) railMul *= 0.7;
+      if (E.railgun) railMul *= 0.65;
+      interval *= railMul;
+    }
     p.fireInterval = Math.max(0.045, interval);
     p.speed = (sh.speed || 330) * Math.pow(1.15, m.speed || 0);
     p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 70;
@@ -341,6 +348,8 @@ class Game {
       * (this._beamCrit > 0 ? critPulse : 1); // 过载脉冲窗口内爆发
     let halfW = 2.5 + 0.8 * (lvl - 1) + 0.4 * (p.weapon - 1) + 0.6 * (m.pierce || 0);
     if (this.evo.laser) halfW *= 1.6;
+    const lensPen = this.bonds.includes('laserlens');
+    if (lensPen) halfW *= 2;
     const beamDps = dps * (this.evo.laser ? 1.4 : 1);
     // 主光束 + multi 侧束 + split 分裂副束(split 使每束旁再生一道细束)
     const xs = [p.x];
@@ -360,8 +369,8 @@ class Game {
       for (const e of this.enemies) {
         if (e.dead || e.elitePhased) continue;
         if (e.y < p.y - 6 && Math.abs(e.x - bx) < e.r + w) {
-          // 护盾开启的护盾兵:激光仅 30% 烧蚀通过
-          const mul = (e.type === 'shielder' && e.shieldOff <= 0) ? 0.3 : 1;
+          // 护盾开启的护盾兵:激光仅 30% 烧蚀通过(聚焦透镜羁绊无视护盾)
+          const mul = (e.type === 'shielder' && e.shieldOff <= 0 && !lensPen) ? 0.3 : 1;
           e.damage(dmgHere * dt * mul, this, true);
           hitAny = true;
         }
@@ -1080,8 +1089,11 @@ class Game {
   _hitTarget(b, e) {
     let dmg = b.dmg;
     const cc = 0.2 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0);
-    const guaranteed = b.homing && this.bonds.includes('hunt');
+    const guaranteed = (b.homing && this.bonds.includes('hunt'))
+      || (b.rail && this.bonds.includes('railcrit'));
     const crit = guaranteed || (cc > 0 && RNG() < cc);
+    // 无阻贯通:轨道炮伤害随剩余贯穿层叠加
+    if (b.rail && this.bonds.includes('railpierce')) dmg += Math.min(20, (b.pierce || 0));
     if (crit) dmg = Math.round(dmg * (this.bonds.includes('execute') ? 4.5 : 3));
     // 处决者:暴击对精英与旗舰额外 +50%
     if (crit && this.evo.crit && (e.elite || e.isBoss)) dmg = Math.round(dmg * 1.5);
@@ -1119,7 +1131,44 @@ class Game {
         if (ddx * ddx + ddy * ddy < 4900) this.boss.damage(splash, this, true);
       }
     }
+    // 电弧发生器:命中触发链式闪电
+    if (b.tesla) { b.dead = true; this._teslaChain(e, dmg); }
     e.damage(dmg, this);
+  }
+
+  /* 链式闪电:从命中点在敌群间跳跃,每跳伤害衰减;雷霆领主/分叉雷电增强 */
+  _teslaChain(origin, dmg) {
+    const m = this.mods;
+    let jumps = 2 + (m.tesla || 1) + (this.evo.tesla ? 3 : 0);
+    const fork = this.bonds.includes('teslafork');
+    const hit = new Set([origin]);
+    let sources = [origin];
+    let chainDmg = Math.max(1, Math.round(dmg * 0.8));
+    for (let j = 0; j < jumps; j++) {
+      const nextSources = [];
+      const perSource = fork ? 2 : 1;
+      for (const src of sources) {
+        const cands = this.enemies
+          .filter(o => !o.dead && !o.elitePhased && !hit.has(o))
+          .map(o => ({ o, d: (o.x - src.x) ** 2 + (o.y - src.y) ** 2 }))
+          .filter(c => c.d < 22500) // 150px 内可跳
+          .sort((a, b) => a.d - b.d)
+          .slice(0, perSource);
+        for (const c of cands) {
+          hit.add(c.o);
+          c.o.damage(chainDmg, this, true);
+          this.rings.push(new Ring((src.x + c.o.x) / 2, (src.y + c.o.y) / 2, '#aef0ff', 22, 0.18));
+          this._sparks(c.o.x, c.o.y, '#cdefff', 3);
+          // 雷霆领主:麻痹减速
+          if (this.evo.tesla) { c.o.vy *= 0.6; }
+          nextSources.push(c.o);
+        }
+      }
+      if (!nextSources.length) break;
+      sources = nextSources;
+      chainDmg = Math.max(1, Math.round(chainDmg * 0.82));
+    }
+    if (hit.size > 1) AudioSys.beam();
   }
 
   /* ---------------- 击杀 / 伤害结算 ---------------- */

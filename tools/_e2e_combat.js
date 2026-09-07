@@ -73,11 +73,11 @@ function startServer() {
           if (b.life !== undefined) { b.life -= dt; if (b.life <= 0) { b.dead = true; continue; } }
           b.x += b.vx * dt; b.y += b.vy * dt;
           for (const e of dummies) {
+            if (e === b.lastHit) continue;
             const dx = b.x - e.x, dy = b.y - e.y;
             if (dx * dx + dy * dy < (e.r + b.r) * (e.r + b.r)) {
-              const dmg = b.dmg || 1;
-              e.damage(dmg);
-              if (b.pierce > 0) b.pierce--; else b.dead = true;
+              // 走真实命中结算(暴击/裂变/贯穿/链式闪电/溅射)
+              g._hitTarget(b, e);
               break;
             }
           }
@@ -102,6 +102,11 @@ function startServer() {
     // evo 适配:与 +卡 完全相同的卡组,额外附加 evo,验证 evo 带来净增益
     out.laser_evo = measure((g) => { g.mods = { laser: 2, dmg: 3, pierce: 2, crit: 2, split: 1, multi: 1 }; g.evo = { laser: true }; });
     out.spread_evo = measure((g) => { g.mods = { spread: 2, dmg: 3, pierce: 2, split: 1 }; g.evo = { spread: true }; });
+    // 新增质变武器:轨道炮 / 电弧
+    out.rail_base = measure((g) => { g.mods = { railgun: 1 }; });
+    out.rail_cards = measure((g) => { g.mods = { railgun: 2, dmg: 3, pierce: 2, crit: 2, multi: 1 }; });
+    out.tesla_base = measure((g) => { g.mods = { tesla: 1 }; });
+    out.tesla_cards = measure((g) => { g.mods = { tesla: 2, dmg: 3, multi: 2, split: 1 }; });
     g.state = 'menu';
     return out;
   });
@@ -114,6 +119,8 @@ function startServer() {
   console.log('默认主炮   base=' + r(result.gun_base) + '  +卡=' + r(result.gun_cards));
   console.log('激光       base=' + r(result.laser_base) + '  +卡=' + r(result.laser_cards) + '  +evo=' + r(result.laser_evo));
   console.log('散射       base=' + r(result.spread_base) + '  +卡=' + r(result.spread_cards) + '  +evo=' + r(result.spread_evo));
+  console.log('轨道炮     base=' + r(result.rail_base) + '  +卡=' + r(result.rail_cards));
+  console.log('电弧       base=' + r(result.tesla_base) + '  +卡=' + r(result.tesla_cards));
 
   let bad = 0;
   const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
@@ -125,6 +132,10 @@ function startServer() {
   // 质变 + 卡 不弱于 默认 + 卡(允许 0.8x 容差,因为默认主炮命中率/弹道不同)
   check(result.laser_cards >= result.gun_cards * 0.8, '激光+卡 不明显弱于 默认+卡');
   check(result.spread_cards >= result.gun_cards * 0.8, '散射+卡 不明显弱于 默认+卡');
+  check(result.rail_base > 0, '轨道炮能造成伤害');
+  check(result.rail_cards > result.rail_base * 1.5, '轨道炮随卡片显著变强(>1.5x)');
+  check(result.tesla_base > 0, '电弧能造成伤害(链式闪电生效)');
+  check(result.tesla_cards > result.tesla_base * 1.5, '电弧随卡片显著变强(>1.5x)');
   console.log(bad ? ('\nFAILED: ' + bad) : '\n战斗协同验证完成');
   process.exitCode = bad ? 1 : 0;
 })().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
