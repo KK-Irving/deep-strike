@@ -92,7 +92,8 @@ const Shop = {
   sprites: {},        // 皮肤预渲染精灵
   shipSprites: {},    // 机体x皮肤组合缓存
   lastEarn: 0,        // 上局获得星晶(结算展示)
-  lastChips: 0,       // 上局获得芯片(结算展示)
+    lastChips: 0,       // 上局获得芯片(结算展示)
+  lastChipsCapped: false, // 本期(日/周)芯片已领取,本局不再发放
   boxOpens: 0,        // 累计开箱次数(成就)
   chipsEarned: 0,     // 累计获得芯片(成就)
   _boxTimers: [],     // 开箱动画计时器句柄

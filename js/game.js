@@ -207,6 +207,21 @@ class Game {
   _challengeKey() {
     return this.mode === 'weekly' ? this._weekKey() : this._dailyKey();
   }
+  /* 挑战芯片领取闸门:按当前真实日期/周判断本期是否已领取 */
+  _claimStoreKey() {
+    return this.mode === 'weekly' ? 'deepstrike.weeklyClaim' : 'deepstrike.dailyClaim';
+  }
+  _canClaimChips() {
+    if (this.mode === 'normal') return false;
+    try {
+      const claimed = localStorage.getItem(this._claimStoreKey());
+      return claimed !== this._challengeKey();
+    } catch (e) { return true; }
+  }
+  _markChipsClaimed() {
+    try { localStorage.setItem(this._claimStoreKey(), this._challengeKey()); }
+    catch (e) { /* 忽略 */ }
+  }
   _challengeSeed() {
     const k = this._challengeKey();
     let h = 2166136261;
@@ -1923,18 +1938,38 @@ class Game {
     d.finalHi.textContent = this.mode !== 'normal' ? this._challengeBest() : this.hi;
     this._refreshMenuHi();
     // 星晶结算:得分/1000 + 旗舰 10 + 精英 2
-    Shop.lastEarn = Math.floor(this.score / 1000) + (this.runBossKills || 0) * 10 + (this.runEliteKills || 0) * 2;
+    Shop.lastEarn = Math.floor(this.score / 1600) + (this.runBossKills || 0) * 6 + (this.runEliteKills || 0) * 1;
     if (this.relics.r_grail) Shop.lastEarn *= 2;
     Shop.addCrystal(Shop.lastEarn);
     // 挑战材料「战术芯片」:仅每日/周挑战产出,按得分/波次给予;周挑战翻倍
     Shop.lastChips = 0;
     if (this.mode !== 'normal') {
-      const base = Math.floor(this.score / 2500) + Math.floor(this.wave / 3) + (this.runBossKills || 0);
-      Shop.lastChips = Math.max(1, this.mode === 'weekly' ? base * 2 : base);
-      Shop.addChips(Shop.lastChips);
+      // 挑战芯片:每日/每周仅可领取一次,数额按表现浮动并钳制在目标区间
+      // (每日 10~15,每周 40~60);重复挑战同一日/周不再发放(仍可刷分/纪录)
+      Shop.lastChipsCapped = false;
+      if (this._canClaimChips()) {
+        if (this.mode === 'weekly') {
+          const perf = Math.floor(this.score / 6000) + Math.floor(this.wave / 3) + (this.runBossKills || 0) * 2;
+          Shop.lastChips = clamp(40 + perf, 40, 60);
+        } else {
+          const perf = Math.floor(this.score / 8000) + Math.floor(this.wave / 5) + (this.runBossKills || 0);
+          Shop.lastChips = clamp(10 + perf, 10, 15);
+        }
+        Shop.addChips(Shop.lastChips);
+        this._markChipsClaimed();
+      } else {
+        // 今日/本周已领取:不再发放芯片
+        Shop.lastChips = 0;
+        Shop.lastChipsCapped = true;
+      }
     }
     d.overCrystals.textContent = '★ +' + Shop.lastEarn + '(星晶 ' + Shop.crystal + ')'
       + (Shop.lastChips ? ' · ◈ +' + Shop.lastChips + '(芯片 ' + Shop.chips + ')' : '');
+    // 芯片已领取提示:本期(今日/本周)奖励已领,追加说明
+    if (Shop.lastChipsCapped && this.mode !== 'normal') {
+      const period = this.mode === 'weekly' ? '本周' : '今日';
+      d.overCrystals.textContent += ' · ' + period + '芯片奖励已领取';
+    }
     d.overRunStats.textContent = this._runStatsText();
     d.overBuild.innerHTML = this._buildSummaryHTML();
     d.newRecord.classList.toggle('hidden', !this.newRecord);
