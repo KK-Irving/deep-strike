@@ -323,35 +323,58 @@ class Game {
   beamTick(dt) {
     const p = this.player, m = this.mods;
     const lvl = m.laser;
-    const dps = (7 + 4 * (lvl - 1) + 2.5 * p.dmgBonus)
+    // 卡片协同:dmg 线性增益、pierce 加宽并增伤、crit 周期过载脉冲、split 分裂侧束、要害/处决羁绊放大
+    const critChance = 0.2 * (m.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0);
+    // 过载脉冲:按暴击率周期性爆发额外伤害(把"暴击"转译为持续武器的节奏)
+    this._beamCritT = (this._beamCritT || 0) - dt;
+    let critPulse = 1;
+    if (critChance > 0 && this._beamCritT <= 0) {
+      this._beamCritT = Math.max(0.25, 0.9 - critChance);
+      critPulse = this.bonds.includes('execute') ? 3.2 : (this.evo.crit ? 2.6 : 2.2);
+      this._beamCrit = 0.12; // 过载可见时长
+    }
+    this._beamCrit = Math.max(0, (this._beamCrit || 0) - dt);
+    const dps = (8 + 4.5 * (lvl - 1) + 3.2 * p.dmgBonus)
       * (this.bonds.includes('focus') ? 1.6 : 1)
-      * (1 + 0.15 * (p.weapon - 1));
-    let halfW = 2.5 + 0.8 * (lvl - 1) + 0.4 * (p.weapon - 1);
+      * (1 + 0.18 * (p.weapon - 1))
+      * (1 + 0.25 * (m.pierce || 0))          // 贯穿:每层 +25% 灼烧
+      * (this._beamCrit > 0 ? critPulse : 1); // 过载脉冲窗口内爆发
+    let halfW = 2.5 + 0.8 * (lvl - 1) + 0.4 * (p.weapon - 1) + 0.6 * (m.pierce || 0);
     if (this.evo.laser) halfW *= 1.6;
     const beamDps = dps * (this.evo.laser ? 1.4 : 1);
+    // 主光束 + multi 侧束 + split 分裂副束(split 使每束旁再生一道细束)
     const xs = [p.x];
     for (let i = 1; i <= (m.multi || 0); i++) { xs.push(p.x - 7 - i * 8, p.x + 7 + i * 8); }
-    this.beams = xs.map(x => ({ x, halfW }));
+    const splitN = m.split || 0;
+    const splitBeams = [];
+    if (splitN > 0) for (const bx of xs) { splitBeams.push(bx - 6 - splitN * 3, bx + 6 + splitN * 3); }
+    const allX = xs.concat(splitBeams);
+    const splitDps = beamDps * 0.4;
+    this.beams = allX.map((x, i) => ({ x, halfW: i < xs.length ? halfW : halfW * 0.6, split: i >= xs.length, hot: this._beamCrit > 0 }));
     let hitAny = false;
-    for (const bx of xs) {
+    for (let bi = 0; bi < allX.length; bi++) {
+      const bx = allX[bi];
+      const isSplit = bi >= xs.length;
+      const w = isSplit ? halfW * 0.6 : halfW;
+      const dmgHere = isSplit ? splitDps : beamDps;
       for (const e of this.enemies) {
         if (e.dead || e.elitePhased) continue;
-        if (e.y < p.y - 6 && Math.abs(e.x - bx) < e.r + halfW) {
+        if (e.y < p.y - 6 && Math.abs(e.x - bx) < e.r + w) {
           // 护盾开启的护盾兵:激光仅 30% 烧蚀通过
           const mul = (e.type === 'shielder' && e.shieldOff <= 0) ? 0.3 : 1;
-          e.damage(beamDps * dt * mul, this, true);
+          e.damage(dmgHere * dt * mul, this, true);
           hitAny = true;
         }
       }
       // 激光烧蚀陨石
       for (const a of this.asteroids) {
-        if (!a.dead && a.y < p.y - 6 && Math.abs(a.x - bx) < a.r + halfW) {
-          a.damage(beamDps * dt, this);
+        if (!a.dead && a.y < p.y - 6 && Math.abs(a.x - bx) < a.r + w) {
+          a.damage(dmgHere * dt, this);
           hitAny = true;
         }
       }
-      if (this.boss && this.boss.state === 'fight' && Math.abs(this.boss.x - bx) < this.boss.r + halfW) {
-        this.boss.damage(beamDps * dt, this, true);
+      if (this.boss && this.boss.state === 'fight' && Math.abs(this.boss.x - bx) < this.boss.r + w) {
+        this.boss.damage(dmgHere * dt, this, true);
         hitAny = true;
       }
     }
@@ -1478,9 +1501,14 @@ class Game {
       for (const bm of this.beams) {
         const flick = 0.72 + 0.28 * Math.sin(tk * 42 + bm.x);
         const bottom = this.player.y - 14;
-        ctx.fillStyle = 'rgba(255,110,170,' + (0.16 * flick).toFixed(3) + ')';
-        ctx.fillRect(bm.x - bm.halfW * 2.2, 0, bm.halfW * 4.4, bottom);
-        ctx.fillStyle = 'rgba(255,228,246,' + (0.72 * flick).toFixed(3) + ')';
+        // 过载脉冲:光束转为炽白金色并加宽;分裂副束偏青
+        const hot = bm.hot;
+        const glowCol = hot ? 'rgba(255,196,120,' : (bm.split ? 'rgba(120,240,255,' : 'rgba(255,110,170,');
+        const coreCol = hot ? 'rgba(255,250,230,' : (bm.split ? 'rgba(224,255,255,' : 'rgba(255,228,246,');
+        const wMul = hot ? 3.0 : 2.2;
+        ctx.fillStyle = glowCol + (0.16 * flick).toFixed(3) + ')';
+        ctx.fillRect(bm.x - bm.halfW * wMul, 0, bm.halfW * wMul * 2, bottom);
+        ctx.fillStyle = coreCol + ((hot ? 0.9 : 0.72) * flick).toFixed(3) + ')';
         ctx.fillRect(bm.x - bm.halfW * 0.7, 0, bm.halfW * 1.4, bottom);
       }
     }

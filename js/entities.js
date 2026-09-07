@@ -376,13 +376,16 @@ class Player {
     const mk = (ox, oy, vx, vy, extra) =>
       P.push(Object.assign({ x: this.x + ox, y: this.y + oy, vx, vy, r: 3, dmg, color: '#dffaff', dead: false, pierce, split }, extra || {}));
     if (m.spread) {
-      // 散射炮:宽扇弹丸(质变路线),弹丸射程衰减
+      // 散射炮:宽扇弹幕(质变路线)。卡片协同 —— 弹丸继承 pierce/split,evo 取消衰减并加宽扇形
       const n = 5 + 2 * (m.spread - 1) + 2 * (m.multi || 0) + (this.weapon - 1)
         + (game.bonds.includes('suppress') ? 2 : 0) + (game.evo.spread ? 6 : 0);
       const fade = game.evo.spread ? {} : { life: 0.42 };
+      const spPierce = Math.floor(pierce / 2) + (game.evo.spread ? 1 : 0);
+      const arc = game.evo.spread ? 0.92 : 0.6;
       for (let i = 0; i < n; i++) {
-        const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * 0.6);
-        mk(0, -12, Math.cos(a) * 520, Math.sin(a) * 520, Object.assign({ color: '#ffe9a8', r: 2.6 }, fade));
+        const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * arc);
+        mk(0, -12, Math.cos(a) * 520, Math.sin(a) * 520,
+          Object.assign({ color: '#ffe9a8', r: 2.6, pierce: spPierce, split }, fade));
       }
     } else if (!m.laser) {
       switch (this.weapon) {
