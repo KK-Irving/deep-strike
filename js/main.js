@@ -109,6 +109,16 @@
   const closeBox = () => {
     const ov = $('boxOverlay');
     if (ov && !ov.classList.contains('hidden')) {
+      // 若动画仍在进行,首次 Enter/Esc 先跳到结果揭晓,再次才关闭
+      const anim = $('boxAnim');
+      if (anim && anim.style.display !== 'none' && typeof Shop._boxSkip === 'function') {
+        Shop._boxSkip();
+        return true;
+      }
+      // 关闭并清理动画/揭晓计时器,避免残留回调
+      if (Shop._clearBoxAnim) Shop._clearBoxAnim();
+      (Shop._revealTimers || []).forEach(clearTimeout);
+      Shop._revealTimers = [];
       ov.classList.add('hidden');
       if (game.state === 'menu' && game.menuPanel === 'shop') Shop.renderPanel();
       return true;

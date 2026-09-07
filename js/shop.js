@@ -85,6 +85,9 @@ const Shop = {
   lastChips: 0,       // 上局获得芯片(结算展示)
   boxOpens: 0,        // 累计开箱次数(成就)
   chipsEarned: 0,     // 累计获得芯片(成就)
+  _boxTimers: [],     // 开箱动画计时器句柄
+  _revealTimers: [],  // 结果逐条揭晓计时器句柄
+  _boxSkip: null,     // 跳过动画的回调(动画进行中有效)
 
   load() {
     try {
@@ -614,29 +617,118 @@ const Shop = {
     this._toastT = setTimeout(() => t.classList.remove('show'), 1600);
   },
 
-  /* 开箱/兑换结果弹层 */
+  /* 开箱/兑换结果弹层:先播放蓄力→爆发动画,再逐条揭晓,增强期待感 */
   showBoxResults(results, title) {
     const tierName = { junk: '星晶', common: '普通', rare: '稀有', epic: '绚丽', mythic: '传奇' };
     const overlay = document.getElementById('boxOverlay');
     const list = document.getElementById('boxResultList');
     const ttl = document.getElementById('boxResultTitle');
     if (!overlay || !list) {
-      // 无弹层则退化为 toast 汇总
       const best = results.reduce((a, b) => (this._tierRank(b.tier) > this._tierRank(a.tier) ? b : a), results[0]);
       this._toast('开启完成 · 最佳:' + best.name);
       return;
     }
     if (ttl) ttl.textContent = title + ' · 共 ' + results.length + ' 次';
+    // 最佳品级:决定爆发颜色与力度(越稀有越震撼)
+    const best = results.reduce((a, b) => (this._tierRank(b.tier) > this._tierRank(a.tier) ? b : a), results[0]);
+    const bestRank = this._tierRank(best.tier);
+    const tierColor = { junk: '#9fb8d0', common: '#4db8ff', rare: '#2be8c8', epic: '#ff6ad5', mythic: '#ffe66a' };
+    const burstCol = tierColor[best.tier] || '#7ef3ff';
+
+    // 预构建结果行(先隐藏,动画后逐条 reveal)
+    const buildRows = () => {
+      list.innerHTML = '';
+      for (const r of results) {
+        const row = document.createElement('div');
+        row.className = 'box-row tier-' + r.tier;
+        row.innerHTML =
+          '<span class="box-tier">' + (tierName[r.tier] || r.tier) + '</span>' +
+          '<span class="box-item">' + r.name + '</span>';
+        list.appendChild(row);
+      }
+    };
+    // 逐条揭晓(带入场动画;稀有以上配停顿与音效)
+    const revealRows = () => {
+      buildRows();
+      const rows = Array.prototype.slice.call(list.children);
+      rows.forEach((row, i) => {
+        row.style.visibility = 'hidden';
+        this._revealTimers.push(setTimeout(() => {
+          row.style.visibility = '';
+          row.classList.add('reveal');
+          const r = results[i];
+          if (typeof AudioSys !== 'undefined') {
+            if (this._tierRank(r.tier) >= 3) { AudioSys.record && AudioSys.record(); }
+            else if (this._tierRank(r.tier) === 2) { AudioSys.bond && AudioSys.bond(); }
+            else { AudioSys.cardPick && AudioSys.cardPick(); }
+          }
+        }, 220 + i * 90));
+      });
+    };
+
+    const anim = document.getElementById('boxAnim');
+    const crate = document.getElementById('boxCrate');
+    const flash = document.getElementById('boxFlash');
+    const rays = document.getElementById('boxRays');
+    const hint = document.getElementById('boxAnimHint');
+    const closeBtn = document.getElementById('btnBoxClose');
+
+    // 清理上一次可能残留的计时器/状态
+    this._clearBoxAnim();
+    this._revealTimers = [];
+
+    // 无动画元素则退化为即时展示
+    if (!anim || !crate) { buildRows(); overlay.classList.remove('hidden'); return; }
+
+    // 初始:仅显示动画舞台,隐藏结果与确定按钮
     list.innerHTML = '';
-    for (const r of results) {
-      const row = document.createElement('div');
-      row.className = 'box-row tier-' + r.tier;
-      row.innerHTML =
-        '<span class="box-tier">' + (tierName[r.tier] || r.tier) + '</span>' +
-        '<span class="box-item">' + r.name + '</span>';
-      list.appendChild(row);
-    }
+    anim.style.display = '';
+    if (hint) hint.style.display = '';
+    if (closeBtn) closeBtn.style.visibility = 'hidden';
+    crate.className = 'box-crate';
+    crate.style.color = burstCol;
+    if (flash) { flash.className = 'box-flash'; flash.style.background = 'radial-gradient(circle, ' + burstCol + ' 0%, rgba(0,0,0,0) 70%)'; }
+    if (rays) { rays.className = 'box-rays'; rays.style.background = 'repeating-conic-gradient(' + burstCol + ' 0deg 6deg, rgba(0,0,0,0) 6deg 30deg)'; rays.style.width = '200px'; rays.style.height = '200px'; rays.style.borderRadius = '50%'; }
     overlay.classList.remove('hidden');
+
+    // 动画完成 → 展示结果与按钮
+    const finish = () => {
+      if (anim) anim.style.display = 'none';
+      if (hint) hint.style.display = 'none';
+      if (closeBtn) closeBtn.style.visibility = '';
+      revealRows();
+    };
+    // 跳过:立即结束动画并展示(点击舞台/提示)
+    this._boxSkip = () => { this._clearBoxAnim(); finish(); };
+    if (anim) anim.onclick = this._boxSkip;
+    if (hint) hint.onclick = this._boxSkip;
+
+    // 蓄力阶段:抖动逐级加剧;稀有度越高蓄力越久(期待拉满)
+    const chargeMs = 520 + bestRank * 180;
+    this._boxTimers.push(setTimeout(() => { crate.classList.add('charging'); if (typeof AudioSys !== 'undefined' && AudioSys.powerup) AudioSys.powerup(); }, 120));
+    this._boxTimers.push(setTimeout(() => { crate.classList.add('hard'); }, chargeMs * 0.6));
+    // 爆发
+    this._boxTimers.push(setTimeout(() => {
+      crate.classList.add('burst');
+      if (flash) flash.classList.add('go');
+      if (rays) rays.classList.add('go');
+      if (typeof AudioSys !== 'undefined') {
+        if (bestRank >= 3 && AudioSys.bomb) AudioSys.bomb();
+        else if (AudioSys.explode) AudioSys.explode(bestRank >= 2);
+      }
+    }, chargeMs));
+    // 爆发后揭晓
+    this._boxTimers.push(setTimeout(finish, chargeMs + 560));
+  },
+  /* 清理开箱动画的计时器与临时绑定 */
+  _clearBoxAnim() {
+    (this._boxTimers || []).forEach(clearTimeout);
+    this._boxTimers = [];
+    const anim = document.getElementById('boxAnim');
+    const hint = document.getElementById('boxAnimHint');
+    if (anim) anim.onclick = null;
+    if (hint) hint.onclick = null;
+    this._boxSkip = null;
   },
   _tierRank(t) { return { junk: 0, common: 1, rare: 2, epic: 3, mythic: 4 }[t] || 0; }
 };

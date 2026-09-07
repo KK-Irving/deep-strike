@@ -321,6 +321,69 @@ h2 {
 .box-row.tier-mythic .box-tier { color: #ffe66a; }
 .box-row.tier-mythic .box-item { color: #fff3c8; }
 
+/* ===== 开箱动画:蓄力 → 爆发 → 逐条揭晓 ===== */
+.box-anim {
+  position: relative; width: 100%; min-height: 172px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 6px 0 2px;
+}
+.box-crate {
+  position: relative; width: 92px; height: 82px; cursor: pointer;
+  font-size: 60px; line-height: 82px; text-align: center;
+  filter: drop-shadow(0 0 12px rgba(126, 243, 255, 0.5));
+  animation: crateShake 0.5s ease-in-out infinite;
+  transform-origin: 50% 70%;
+}
+/* 蓄力:抖动逐渐加剧(由 JS 通过 charging 级别切换动画时长) */
+.box-crate.charging { animation: crateShake 0.24s ease-in-out infinite; }
+.box-crate.charging.hard { animation: crateShake 0.12s ease-in-out infinite; }
+/* 爆发瞬间:放大后回弹并隐藏 */
+.box-crate.burst { animation: crateBurst 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+@keyframes crateShake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  25% { transform: translateX(-3px) rotate(-4deg); }
+  75% { transform: translateX(3px) rotate(4deg); }
+}
+@keyframes crateBurst {
+  0% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(1.5); opacity: 1; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+/* 爆发光环 */
+.box-flash {
+  position: absolute; left: 50%; top: 50%; width: 40px; height: 40px;
+  border-radius: 50%; transform: translate(-50%, -50%) scale(0);
+  pointer-events: none; opacity: 0;
+}
+.box-flash.go { animation: boxFlash 0.6s ease-out forwards; }
+@keyframes boxFlash {
+  0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.95; }
+  100% { transform: translate(-50%, -50%) scale(9); opacity: 0; }
+}
+/* 放射光束(爆发时短暂显现) */
+.box-rays {
+  position: absolute; left: 50%; top: 50%; width: 4px; height: 200px;
+  transform: translate(-50%, -50%); pointer-events: none; opacity: 0;
+}
+.box-rays.go { animation: boxRays 0.6s ease-out forwards; }
+@keyframes boxRays {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(0); }
+  40% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2) rotate(30deg); }
+}
+.box-hint { font-size: 11px; letter-spacing: 2px; color: rgba(159, 232, 255, 0.6); margin-top: 4px; }
+/* 逐条揭晓:每行入场动画 */
+.box-row.reveal { animation: boxRowIn 0.34s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+@keyframes boxRowIn {
+  0% { opacity: 0; transform: translateY(-10px) scale(0.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* 绚丽/传奇行:入场后持续微光脉动,强化「中大奖」反馈 */
+.box-row.tier-epic.reveal   { animation: boxRowIn 0.34s cubic-bezier(0.2,1.2,0.4,1) both, epicGlow 1.4s ease-in-out 0.34s infinite; }
+.box-row.tier-mythic.reveal { animation: boxRowIn 0.34s cubic-bezier(0.2,1.2,0.4,1) both, mythicGlow 1.3s ease-in-out 0.34s infinite; }
+@keyframes epicGlow   { 50% { box-shadow: 0 0 22px rgba(255, 106, 213, 0.6); } }
+@keyframes mythicGlow { 50% { box-shadow: 0 0 26px rgba(255, 230, 106, 0.75); } }
+
 /* ===== 皮肤稀有度分级卡片描边 ===== */
 .shop-card.tier2 { border-color: rgba(126, 243, 255, 0.4); }
 .shop-card.tier3 {
