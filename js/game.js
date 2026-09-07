@@ -363,7 +363,7 @@ class Game {
     if (this.evo.laser) halfW *= 1.6;
     const lensPen = this.bonds.includes('laserlens');
     if (lensPen) halfW *= 2;
-    const beamDps = dps * (this.evo.laser ? 1.4 : 1);
+    const beamDps = dps * (this.evo.laser ? 1.25 : 1);   // 平衡:略降激光 evo 统治力(1.4→1.25)
     // 主光束 + multi 侧束 + split 分裂副束(split 使每束旁再生一道细束)
     const xs = [p.x];
     for (let i = 1; i <= (m.multi || 0); i++) { xs.push(p.x - 7 - i * 8, p.x + 7 + i * 8); }
@@ -1178,11 +1178,12 @@ class Game {
   /* 链式闪电:从命中点在敌群间跳跃,每跳伤害衰减;雷霆领主/分叉雷电增强 */
   _teslaChain(origin, dmg) {
     const m = this.mods;
-    let jumps = 2 + (m.tesla || 1) + (this.evo.tesla ? 3 : 0);
+    let jumps = 3 + (m.tesla || 1) + (this.evo.tesla ? 3 : 0);
     const fork = this.bonds.includes('teslafork');
     const hit = new Set([origin]);
     let sources = [origin];
-    let chainDmg = Math.max(1, Math.round(dmg * 0.8));
+    // 链式基础提高到满伤,衰减放缓(0.82→0.9),使电弧多目标总输出与其它质变武器持平
+    let chainDmg = Math.max(1, Math.round(dmg * 1.0));
     for (let j = 0; j < jumps; j++) {
       const nextSources = [];
       const perSource = fork ? 2 : 1;
@@ -1205,7 +1206,7 @@ class Game {
       }
       if (!nextSources.length) break;
       sources = nextSources;
-      chainDmg = Math.max(1, Math.round(chainDmg * 0.82));
+      chainDmg = Math.max(1, Math.round(chainDmg * 0.9));
     }
     if (hit.size > 1) AudioSys.beam();
     if (hit.size >= 8) Ach.unlock('tesla_chain8', this);

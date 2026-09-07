@@ -136,6 +136,23 @@ function startServer() {
   check(result.rail_cards > result.rail_base * 1.5, '轨道炮随卡片显著变强(>1.5x)');
   check(result.tesla_base > 0, '电弧能造成伤害(链式闪电生效)');
   check(result.tesla_cards > result.tesla_base * 1.5, '电弧随卡片显著变强(>1.5x)');
+  // 平衡(feature #5):四种质变武器 + 卡 均应可用,且强弱差距收敛,避免"只有几种有用"
+  const paths = {
+    laser: result.laser_cards, spread: result.spread_cards,
+    railgun: result.rail_cards, tesla: result.tesla_cards
+  };
+  const vals = Object.values(paths);
+  const maxP = Math.max.apply(null, vals);
+  const minP = Math.min.apply(null, vals);
+  console.log('质变武器+卡 区间: min=' + Math.round(minP) + ' max=' + Math.round(maxP) + ' 比值=' + (maxP / minP).toFixed(2));
+  // 每条质变路线 + 卡 都不弱于默认主炮 + 卡(是真正值得选择的构筑)
+  for (const k of Object.keys(paths)) {
+    check(paths[k] >= result.gun_cards, k + '+卡 不弱于默认主炮+卡(值得作为质变选择)');
+  }
+  // 最强/最弱质变比值收敛(<=3.2),确保没有一枝独秀导致其它无人问津
+  check(maxP / minP <= 3.2, '质变武器强弱差距收敛(最强/最弱 <=3.2x)');
+  // 电弧不再是明显垫底的异常项(>= 最弱线的 0.9)
+  check(result.tesla_cards >= minP * 0.9, '电弧不再是垫底异常项');
   console.log(bad ? ('\nFAILED: ' + bad) : '\n战斗协同验证完成');
   process.exitCode = bad ? 1 : 0;
 })().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });

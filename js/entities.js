@@ -392,7 +392,8 @@ class Player {
     } else if (m.tesla) {
       // 电弧发生器:发射一颗"引雷弹",命中即触发链式闪电(在 game 层结算跳跃)
       const chains = 1 + (m.tesla - 1) + (m.multi || 0) + (game.bonds.includes('teslachain') ? 1 : 0);
-      const teslaDmg = 2 + this.dmgBonus + (game.evo.tesla ? 2 : 0);
+      // 平衡:提高电弧触发弹基础伤害(2→3 且吃满 dmg 加成),配合链式增强使多目标输出达标
+      const teslaDmg = 3 + Math.round(1.3 * this.dmgBonus) + (game.evo.tesla ? 3 : 0);
       for (let c = 0; c < chains; c++) {
         const ox = chains === 1 ? 0 : (c / (chains - 1) - 0.5) * 22;
         mk(ox, -12, ox * 6, -900, { color: '#aef0ff', r: 3.2, pierce: 0, split: 0, dmg: teslaDmg, tesla: true });
@@ -405,11 +406,13 @@ class Player {
       const spPierce = Math.floor(pierce / 2) + (game.evo.spread ? 1 : 0);
       const arc = game.evo.spread ? 0.92 : 0.6;
       const rounds = game.bonds.includes('scatterstorm') ? 2 : 1;
+      // 平衡:散射每发弹丸伤害小幅提升(×1.2),使其总输出进入可用区间而不过强
+      const spDmg = Math.max(1, Math.round((1 + this.dmgBonus) * 1.2));
       for (let rr = 0; rr < rounds; rr++)
       for (let i = 0; i < n; i++) {
         const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * arc) + (rr ? 0.12 : 0);
         mk(0, -12, Math.cos(a) * 520, Math.sin(a) * 520,
-          Object.assign({ color: '#ffe9a8', r: 2.6, pierce: spPierce, split }, fade));
+          Object.assign({ color: '#ffe9a8', r: 2.6, pierce: spPierce, split, dmg: spDmg }, fade));
       }
     } else if (!m.laser) {
       switch (this.weapon) {
