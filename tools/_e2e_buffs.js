@@ -62,14 +62,17 @@ function startServer() {
     const frostDy = e2.y - y1;
     game.enemies.length = 0; game.buffs.frost = 0;
     out.frostRatio = Math.round((frostDy / normalDy) * 100) / 100; // ≈0.45
-    // 4) 磁力风暴:全场吸取
-    game.orbs.length = 0; game.powerups.length = 0;
+    // 4) 磁力风暴:全场吸取(密闭环境:清场+停刷怪+停火,避免波次生物掉落新晶体干扰计数)
+    game.orbs.length = 0; game.powerups.length = 0; game.enemies.length = 0;
+    game.spawnQueue.length = 0; game.waveQuota = 99999; game.trickleT = 999;
+    game.autoFire = false;
     for (let i = 0; i < 5; i++) game.orbs.push(new XPOrb(20 + i * 100, 100, 2));
     game.powerups.push(new PowerUp(400, 150, 'bomb'));
     game.player.x = 240; game.player.y = 600; game.player.magnetR = 10;
     game._applyPower('magstorm');
     const allVac = game.orbs.every(o => o.vac) && game.powerups.every(p => p.vac);
     for (let i = 0; i < 240 && game.orbs.length + game.powerups.length > 0; i++) game.update(1 / 60);
+    game.autoFire = true;
     out.magVac = allVac;
     out.magCollected = game.orbs.length + game.powerups.length === 0;
     // 5) 增益倒计时衰减
