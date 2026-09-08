@@ -100,6 +100,8 @@ const Shop = {
   _revealTimers: [],  // 结果逐条揭晓计时器句柄
   _boxSkip: null,     // 跳过动画的回调(动画进行中有效)
   _saveT: 0,          // 延迟落盘句柄(局内高频进账合并写入)
+  pityRare: 0,        // 距上次稀有+的抽数(10 抽保底)
+  pityEpic: 0,        // 距上次绚丽(episode/mythic)的抽数(40 抽保底)
 
   load() {
     try {
@@ -113,6 +115,8 @@ const Shop = {
       this.equipped = localStorage.getItem('deepstrike.skin') || 'proto';
       this.equippedShip = localStorage.getItem('deepstrike.ship') || 'vanguard';
       this.ownedShip = JSON.parse(localStorage.getItem('deepstrike.shipsOwned')) || {};
+      this.pityRare = +localStorage.getItem('deepstrike.pityRare') || 0;
+      this.pityEpic = +localStorage.getItem('deepstrike.pityEpic') || 0;
     } catch (e) { /* 忽略 */ }
     if (!this.ownedShip.vanguard) this.ownedShip.vanguard = true;
     if (!this.ownedShip[this.equippedShip]) this.equippedShip = 'vanguard';
@@ -158,6 +162,8 @@ const Shop = {
       localStorage.setItem('deepstrike.skin', this.equipped);
       localStorage.setItem('deepstrike.ship', this.equippedShip);
       localStorage.setItem('deepstrike.shipsOwned', JSON.stringify(this.ownedShip));
+      localStorage.setItem('deepstrike.pityRare', String(this.pityRare));
+      localStorage.setItem('deepstrike.pityEpic', String(this.pityEpic));
     } catch (e) { /* 忽略 */ }
   },
 
@@ -371,7 +377,9 @@ const Shop = {
     if (typeof Ach !== 'undefined') Ach.unlock('rare_pull');
     return { tier: pick.tier, kind: pick.t, id: pick.item.id, name: pick.item.name };
   },
-  /* boost 档位改写掉落概率 */
+  /* boost 档位改写掉落概率 + 保底(pity):
+   * 40 抽未出绚丽 → 本抽必出绚丽(epic 75% / mythic 25%);10 抽未出稀有+ → 本抽必出稀有。
+   * 荣耀秘匣为独立必得产品,不消耗/不重置保底计数。 */
   _boxDropBoosted(boost) {
     const rnd = () => (RNG ? RNG() : Math.random());
     const r = rnd();
@@ -382,15 +390,23 @@ const Shop = {
       : boost === 1
       ? { junk: 0.42, common: 0.68, rare: 0.935, epic: 0.985 } // epic 5% + mythic 1.5% = 6.5%
       : { junk: 0.60, common: 0.85, rare: 0.965, epic: 0.99 }; // epic 2.5% + mythic 1% = 3.5%
-    if (r < T.junk) {
+    let tier = r < T.junk ? 'junk' : r < T.common ? 'common' : r < T.rare ? 'rare' : r < T.epic ? 'epic' : 'mythic';
+    // 保底兜底
+    if (this.pityEpic >= 39 && (tier === 'junk' || tier === 'common' || tier === 'rare')) {
+      tier = rnd() < 0.75 ? 'epic' : 'mythic';
+    } else if (this.pityRare >= 9 && (tier === 'junk' || tier === 'common')) {
+      tier = 'rare';
+    }
+    // 计数:绚丽重置双保底;稀有+重置稀有保底;其余累加
+    if (tier === 'epic' || tier === 'mythic') { this.pityEpic = 0; this.pityRare = 0; }
+    else if (tier === 'rare') { this.pityRare = 0; this.pityEpic++; }
+    else { this.pityEpic++; this.pityRare++; }
+    if (tier === 'junk') {
       const amt = 60 + Math.floor(rnd() * 61);
       this.crystal += amt;
-      return { tier: 'junk', kind: 'crystal', amount: amt, name: '星晶 +' + amt };
+      return { tier, kind: 'crystal', amount: amt, name: '星晶 +' + amt };
     }
-    if (r < T.common) return this._grantPool('common');
-    if (r < T.rare) return this._grantPool('rare');
-    if (r < T.epic) return this._grantPool('epic');
-    return this._grantPool('mythic');
+    return this._grantPool(tier);
   },
   exchange(exId, count) {
     const ex = this.EXCHANGE.find(x => x.id === exId);
@@ -593,9 +609,13 @@ const Shop = {
         const cost = this.BOX_PRICE * n;
         const card = document.createElement('div');
         card.className = 'shop-card boost';
+        // 保底进度仅在 ×1 卡展示一次
+        const pityLine = n === 1
+          ? '<br><span style="color:#ffd166">距绚丽保底 ' + this.pityEpic + '/40 · 距稀有保底 ' + this.pityRare + '/10</span>'
+          : '';
         card.innerHTML =
           '<div class="shop-name">🎁 星辉密匣 ×' + n + '</div>' +
-          '<div class="shop-desc">开启获随机好物 · 绚丽皮肤/机体极低概率</div>' +
+          '<div class="shop-desc">开启获随机好物 · 绚丽皮肤/机体极低概率' + pityLine + '</div>' +
           '<button class="shop-btn primary" data-openbox="' + n + '">★ ' + cost + '</button>';
         boxGrid.appendChild(card);
       };
