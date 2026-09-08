@@ -80,6 +80,13 @@ function boostLevel(id) {
   return (+v) || 0;
 }
 
+/* 出击准备:芯片购买的战前增益,一次性,下次出击自动生效 */
+const LOADOUTS = [
+  { id: 'bomb2',  icon: '💣', name: '出击弹药', desc: '下次出击炸弹 +1', price: 15 },
+  { id: 'lv3',    icon: '⬆', name: '紧急改装', desc: '下次出击立即获得 2 次强化选择', price: 25 },
+  { id: 'relic5', icon: '👑', name: '情报网络', desc: '下次出击首件遗物五选一', price: 40 }
+];
+
 const Shop = {
   crystal: 0,
   chips: 0,           // 战术芯片(挑战产出货币)
@@ -102,6 +109,7 @@ const Shop = {
   _saveT: 0,          // 延迟落盘句柄(局内高频进账合并写入)
   pityRare: 0,        // 距上次稀有+的抽数(10 抽保底)
   pityEpic: 0,        // 距上次绚丽(episode/mythic)的抽数(40 抽保底)
+  loadout: {},        // 出击准备:待生效的战前增益 {bomb2:1, lv3:1, relic5:1}
 
   load() {
     try {
@@ -117,6 +125,7 @@ const Shop = {
       this.ownedShip = JSON.parse(localStorage.getItem('deepstrike.shipsOwned')) || {};
       this.pityRare = +localStorage.getItem('deepstrike.pityRare') || 0;
       this.pityEpic = +localStorage.getItem('deepstrike.pityEpic') || 0;
+      this.loadout = JSON.parse(localStorage.getItem('deepstrike.loadout')) || {};
     } catch (e) { /* 忽略 */ }
     if (!this.ownedShip.vanguard) this.ownedShip.vanguard = true;
     if (!this.ownedShip[this.equippedShip]) this.equippedShip = 'vanguard';
@@ -164,6 +173,7 @@ const Shop = {
       localStorage.setItem('deepstrike.shipsOwned', JSON.stringify(this.ownedShip));
       localStorage.setItem('deepstrike.pityRare', String(this.pityRare));
       localStorage.setItem('deepstrike.pityEpic', String(this.pityEpic));
+      localStorage.setItem('deepstrike.loadout', JSON.stringify(this.loadout));
     } catch (e) { /* 忽略 */ }
   },
 
@@ -286,6 +296,26 @@ const Shop = {
     this.equipped = id;
     this.save();
     return true;
+  },
+
+  /* 购买出击准备(每种至多待生效一份) */
+  buyLoadout(id) {
+    const cfg = LOADOUTS.find(x => x.id === id);
+    if (!cfg) return { ok: false, msg: '无效选项' };
+    if (this.loadout[id]) return { ok: false, msg: '已备好,待下次出击生效' };
+    if (this.chips < cfg.price) return { ok: false, msg: '芯片不足(需 ' + cfg.price + ')' };
+    this.chips -= cfg.price;
+    this.loadout[id] = 1;
+    this.save();
+    return { ok: true, msg: '「' + cfg.name + '」已备好,下次出击生效' };
+  },
+
+  /* 开局消耗:返回并清空待生效增益(游戏 start 时调用) */
+  consumeLoadout() {
+    const l = this.loadout || {};
+    this.loadout = {};
+    this.save();
+    return l;
   },
 
   /* ============================================================
@@ -638,6 +668,25 @@ const Shop = {
           '<button class="shop-btn primary" data-ex="' + ex.id + '">◈ ' + ex.chips + '</button>';
         exGrid.appendChild(card);
       }
+    }
+    // 出击准备(战前增益,一次性)
+    const loGrid = $('loadoutGrid');
+    if (loGrid) {
+      loGrid.innerHTML = '';
+      for (const lo of LOADOUTS) {
+        const pending = !!this.loadout[lo.id];
+        const card = document.createElement('div');
+        card.className = 'shop-card boost';
+        card.innerHTML =
+          '<div class="shop-name">' + lo.icon + ' ' + lo.name + '</div>' +
+          '<div class="shop-desc">' + lo.desc + '</div>' +
+          (pending
+            ? '<button class="shop-btn" disabled>已备好 ✓</button>'
+            : '<button class="shop-btn primary" data-buylo="' + lo.id + '">◈ ' + lo.price + '</button>');
+        loGrid.appendChild(card);
+      }
+      loGrid.querySelectorAll('[data-buylo]').forEach(el =>
+        el.addEventListener('click', () => { const r = this.buyLoadout(el.dataset.buylo); if (!r.ok) this._toast(r.msg); this.renderPanel(); }));
     }
     // 购买/装备事件
     skinGrid.querySelectorAll('[data-equip]').forEach(el =>

@@ -49,9 +49,10 @@
     // 升级选卡快捷键(遗物模式下选择遗物;满槽替换模式下选择要丢弃的模块)
     if (game.state === 'levelup') {
       if (game._relicMode) {
-        if (e.code === 'Digit1' || e.code === 'Numpad1') game.chooseRelic(0);
-        if (e.code === 'Digit2' || e.code === 'Numpad2') game.chooseRelic(1);
-        if (e.code === 'Digit3' || e.code === 'Numpad3') game.chooseRelic(2);
+        // 情报网络增益下遗物五选一,支持 1~5
+        const relicKeys = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'];
+        const ri = relicKeys.indexOf(e.code);
+        if (ri >= 0) game.chooseRelic(ri);
         return;
       }
       if (e.code === 'Escape' && game._pendingSwap) { game.cancelSwap(); return; }

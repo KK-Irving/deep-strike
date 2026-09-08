@@ -220,8 +220,18 @@ class Game {
     if (bombLv) this.player.bombs += Math.ceil(bombLv / 2); // 砍半:每 2 级 +1 炸弹(满级 +5)
     if (boostLevel('hp25')) this.player.hp = this.player.maxHp;
     if (boostLevel('shield')) this.player.shield = true;
+    // 出击准备:消耗一次性战前增益(芯片购买)
+    this._relicFive = false;
+    const load = Shop.consumeLoadout();
+    if (load.bomb2) this.player.bombs = Math.min(5, this.player.bombs + 1);
+    if (load.lv3) this.pendingLevels += 2;
+    if (load.relic5) this._relicFive = true;
+    if (load.bomb2 || load.lv3 || load.relic5)
+      this._addFloat(new FloatText(this.player.x, this.player.y - 40, '出击准备生效', '#ffd166', 13));
     this._showState();
     this.startWave(1);
+    // 紧急改装:开局立即弹出强化选择
+    if (load.lv3 && this.pendingLevels > 0) this.openLevelup();
     if (this.mode === 'daily') this.banner = { text: '每日挑战', sub: this._challengeKey() + ' · 固定关卡,冲击纪录', life: 2.4, max: 2.4, gold: true };
     if (this.mode === 'weekly') this.banner = { text: '周挑战', sub: this._challengeKey() + (this._mut ? ' · ' + this._mut.icon + ' ' + this._mut.name + ':' + this._mut.desc : '') + ' · 威胁+1,冲击纪录', life: 3.0, max: 3.0, gold: true };
     if (this.mode === 'boss') this.banner = { text: '旗舰连战', sub: '连续击毁不断强化的旗舰 · 每阶段升级+遗物 · 每日芯片限领', life: 2.6, max: 2.6, gold: true };
@@ -586,14 +596,16 @@ class Game {
     row.appendChild(skip);
   }
 
-  /* 遗物三选一:复用升级界面 */
+  /* 遗物三选一(情报网络增益下五选一):复用升级界面 */
   _openRelicChoice() {
     if (this.state !== 'playing') return;
     const avail = RELICS.filter(x => !this.relics[x.id]);
     if (!avail.length) return;
+    const want = this._relicFive ? 5 : 3;
+    this._relicFive = false;
     const picks = [];
     const pool = avail.slice();
-    for (let i = 0; i < 3 && pool.length; i++) {
+    for (let i = 0; i < want && pool.length; i++) {
       picks.push(pool.splice(irand(0, pool.length - 1), 1)[0]);
     }
     this._relicMode = true;
