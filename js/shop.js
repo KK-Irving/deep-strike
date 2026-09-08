@@ -339,6 +339,7 @@ const Shop = {
     for (let i = 0; i < count; i++) results.push(this.boxDrop());
     this.boxOpens += count;
     if (this.boxOpens >= 50 && typeof Ach !== 'undefined') Ach.unlock('box_50');
+    if (typeof DailyTasks !== 'undefined') DailyTasks.bump('box', count);
     this._checkSkinCollect();
     this._checkShipCollect();
     this.save();
@@ -419,6 +420,7 @@ const Shop = {
     for (let i = 0; i < count; i++) results.push(ex.glory ? this._grantGlory() : this._boxDropBoosted(ex.boost));
     this.boxOpens += count;
     if (this.boxOpens >= 50 && typeof Ach !== 'undefined') Ach.unlock('box_50');
+    if (typeof DailyTasks !== 'undefined') DailyTasks.bump('box', count);
     this._checkSkinCollect();
     this._checkShipCollect();
     this.save();

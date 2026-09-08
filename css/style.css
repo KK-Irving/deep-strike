@@ -268,6 +268,21 @@ h2 {
 
 .hi-score { margin-top: 16px; font-size: 13px; color: rgba(255, 209, 102, 0.8); letter-spacing: 2px; }
 
+/* ---------- 每日任务面板 ---------- */
+.task-panel {
+  margin-top: 16px; width: min(320px, 86vw); text-align: left;
+  border: 1px solid rgba(126, 243, 255, 0.2); border-radius: 10px;
+  padding: 10px 14px; background: rgba(10, 20, 45, 0.5);
+}
+.task-panel .sec-title { margin-bottom: 6px; }
+.task-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12.5px; }
+.task-check { color: #51e08a; font-family: Consolas, monospace; }
+.task-text { flex: 1; color: rgba(207, 232, 255, 0.85); }
+.task-prog { color: #7ef3ff; font-family: Consolas, monospace; font-size: 11.5px; }
+.task-row.done .task-check { color: #ffd166; }
+.task-row.done .task-text { color: rgba(255, 209, 102, 0.9); }
+.task-row.done .task-prog { color: #ffd166; }
+
 .new-record {
   color: #ffd166; font-size: 15px; letter-spacing: 4px; margin-bottom: 8px;
   text-shadow: 0 0 12px rgba(255, 209, 102, 0.8);

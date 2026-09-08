@@ -73,6 +73,7 @@ class Game {
       lvSub: document.getElementById('lvSub'),
       overCrystals: document.getElementById('overCrystals'),
       menuShop: document.getElementById('menuShop'),
+      taskPanel: document.getElementById('taskPanel'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
     };
@@ -116,6 +117,11 @@ class Game {
       }
     }
     d.achList.innerHTML = html;
+  }
+
+  /* 每日任务面板(主菜单) */
+  _refreshTasks() {
+    if (typeof DailyTasks !== 'undefined') DailyTasks.render(this._dom.taskPanel);
   }
 
   /* ---- 菜单子页面切换 ---- */
@@ -297,6 +303,7 @@ class Game {
       d.menuHelp.classList.toggle('hidden', this.menuPanel !== 'help');
       d.menuStats.classList.toggle('hidden', this.menuPanel !== 'stats');
       d.menuShop.classList.toggle('hidden', this.menuPanel !== 'shop');
+      if (this.menuPanel === 'main') this._refreshTasks();
       if (this.menuPanel === 'shop') Shop.renderPanel();
     }
   }
@@ -774,6 +781,7 @@ class Game {
   startWave(n) {
     this.wave = n; this.waveTime = 0; this.spawnQueue = []; this.waveClearT = -1;
     this.waveKills = 0; this.trickleT = 0;
+    if (typeof DailyTasks !== 'undefined') DailyTasks.bump('wave', n, this);
     // 挑战模式:按波派生独立子流——出怪序列/词缀只取决于日期种子与波号,
     // 与此前战斗过程(掉落/暴击/粒子)消耗了多少随机数无关,任意尝试严格一致
     if (this.mode !== 'normal') RNG = mulberry32((this._seedBase ^ Math.imul(n, 0x9E3779B1)) >>> 0);
@@ -1295,6 +1303,12 @@ class Game {
     this.stats.kills = this._stat('kills', 0) + 1;
     this.waveKills++;
     this.runKills++;
+    // 每日任务进度
+    if (typeof DailyTasks !== 'undefined') {
+      DailyTasks.bump('kills', 1, this);
+      if (e.elite) DailyTasks.bump('elite', 1, this);
+      DailyTasks.bump('combo', this.combo, this);
+    }
     // 成就
     Ach.unlock('first_kill', this);
     if (this.runKills >= 60) Ach.unlock('run_kill60', this);
@@ -1377,6 +1391,7 @@ class Game {
     this.stats.bossKills = this._stat('bossKills', 0) + 1;
     this.runBossKills = (this.runBossKills || 0) + 1;
     this.waveKills++;
+    if (typeof DailyTasks !== 'undefined') DailyTasks.bump('boss', 1, this);
     // 旗舰奖励:击毁后获得一次额外升级机会 + 一件遗物三选一
     this.pendingLevels++;
     this.pendingRelic = true;
@@ -2001,6 +2016,10 @@ class Game {
     if (s.totalScore >= 1000000) Ach.unlock('total_score_1m', this);
     s.bestWave = Math.max(this._stat('bestWave', 0), this.wave);
     this.saveStats();
+    if (typeof DailyTasks !== 'undefined') {
+      DailyTasks.bump('score', this.score, this);
+      DailyTasks.save(); // 进度跨局累计,局末持久化一次
+    }
     const d = this._dom;
     d.finalScore.textContent = this.score;
     d.finalWave.textContent = this.wave;
