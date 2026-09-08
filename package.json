@@ -1,6 +1,6 @@
 {
   "name": "deep-strike",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "一款纯前端、零依赖的纵版街机肉鸽射击游戏(打飞机)。画面由 Canvas 2D 实时绘制,音效与背景音乐由 WebAudio 实时合成——没有任何素材文件,也不需要服务器。",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

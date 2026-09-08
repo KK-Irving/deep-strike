@@ -95,7 +95,8 @@ const ACHIEVEMENTS = [
   { id: 'ship_all',   cat: '收集', name: '机库全解锁', desc: '拥有全部出击机体', reward: 500 },
   { id: 'box_50',     cat: '收集', name: '开匣成瘾',   desc: '累计开启 50 次星辉密匣', reward: 300 },
   { id: 'rare_pull',  cat: '收集', name: '天选之人',   desc: '从密匣/兑换中开出一件绚丽物品', reward: 400 },
-  { id: 'chip_master',cat: '收集', name: '芯片工匠',   desc: '累计获得 500 枚战术芯片', reward: 350 }
+  { id: 'chip_master',cat: '收集', name: '芯片工匠',   desc: '累计获得 500 枚战术芯片', reward: 350 },
+  { id: 'codex_all',  cat: '收集', name: '博物学家',   desc: '敌机图鉴收录全部敌机与旗舰', reward: 500 }
 ];
 
 const Ach = {

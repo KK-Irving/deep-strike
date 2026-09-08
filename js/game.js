@@ -4,6 +4,23 @@
  * 状态机 / 波次导演 / 碰撞 / 特效 / HUD 渲染
  * ============================================================ */
 
+/* 敌机图鉴:收录条目与首次击坠星晶奖励(击毁即收录,全部收录解锁博物学家) */
+const BESTIARY_INFO = {
+  drone:        { name: '无人机',   reward: 5 },
+  waver:        { name: '摇摆机',   reward: 8 },
+  bomber:       { name: '自爆蜂',   reward: 10 },
+  sniper:       { name: '狙击机',   reward: 10 },
+  mender:       { name: '治疗机',   reward: 12 },
+  jammer:       { name: '干扰机',   reward: 12 },
+  tank:         { name: '重装舰',   reward: 15 },
+  shielder:     { name: '护盾兵',   reward: 15 },
+  carrier:      { name: '母舰',     reward: 20 },
+  boss_flag:    { name: '敌方旗舰', reward: 30 },
+  boss_storm:   { name: '暴风旗舰', reward: 30 },
+  boss_tyrant:  { name: '暴君旗舰', reward: 40 },
+  boss_dread:   { name: '要塞旗舰', reward: 50 }
+};
+
 /* 遗物:旗舰击毁后掉落的被动神器(唯一,不占卡槽) */
 const RELICS = [
   { id: 'r_thorn_crown', icon: '👑', name: '荆棘王冠', desc: '接触伤害 ×2,撞击敌机更疼' },
@@ -80,6 +97,7 @@ class Game {
       stScore: document.getElementById('stScore'),
       stBoss: document.getElementById('stBoss'),
       achList: document.getElementById('achList'),
+      bestiaryGrid: document.getElementById('bestiaryGrid'),
       levelup: document.getElementById('levelupOverlay'),
       lvSub: document.getElementById('lvSub'),
       overCrystals: document.getElementById('overCrystals'),
@@ -137,6 +155,22 @@ class Game {
       }
     }
     d.achList.innerHTML = html;
+    // 敌机图鉴
+    if (d.bestiaryGrid) {
+      const best = this.stats.best || {}, seen = this.stats.bestSeen || {};
+      const keys = Object.keys(BESTIARY_INFO);
+      const got = keys.filter(k => seen[k]).length;
+      let bhtml = '<div class="ach-head">已收录 ' + got + ' / ' + keys.length + ' · 首次击毁发放星晶</div>';
+      for (const k of keys) {
+        const info = BESTIARY_INFO[k];
+        if (seen[k]) {
+          bhtml += '<div class="best-item on"><b>' + info.name + '</b><span>击坠 ' + best[k] + '</span><i>+' + info.reward + '★</i></div>';
+        } else {
+          bhtml += '<div class="best-item off"><b>???</b><span>尚未击毁</span><i>+' + info.reward + '★</i></div>';
+        }
+      }
+      d.bestiaryGrid.innerHTML = bhtml;
+    }
   }
 
   /* 每日任务面板(主菜单) */
@@ -1396,6 +1430,22 @@ class Game {
     if (hit.size >= 8) Ach.unlock('tesla_chain8', this);
   }
 
+  /* 敌机图鉴:分类型击坠累计,首次收录发放星晶 */
+  _bestiaryKill(key) {
+    this.stats.best = this.stats.best || {};
+    this.stats.best[key] = (this.stats.best[key] || 0) + 1;
+    if (!this.stats.bestSeen) this.stats.bestSeen = {};
+    if (this.stats.bestSeen[key]) return;
+    this.stats.bestSeen[key] = true;
+    const info = BESTIARY_INFO[key];
+    const reward = info ? info.reward : 5;
+    Shop.addCrystal(reward, this);
+    if (this.state === 'playing' && this.player.alive)
+      this._addFloat(new FloatText(this.player.x, this.player.y - 46, '📖 图鉴新收录 +' + reward + '★', '#ffd166', 12));
+    if (Object.keys(this.stats.bestSeen).length >= Object.keys(BESTIARY_INFO).length)
+      Ach.unlock('codex_all', this);
+  }
+
   /* ---------------- 击杀 / 伤害结算 ---------------- */
   killEnemy(e) {
     this.combo++;
@@ -1431,6 +1481,7 @@ class Game {
     this.stats.kills = this._stat('kills', 0) + 1;
     this.waveKills++;
     this.runKills++;
+    this._bestiaryKill(e.type);
     // 每日任务进度
     if (typeof DailyTasks !== 'undefined') {
       DailyTasks.bump('kills', 1, this);
@@ -1519,6 +1570,7 @@ class Game {
     this.stats.bossKills = this._stat('bossKills', 0) + 1;
     this.runBossKills = (this.runBossKills || 0) + 1;
     this.waveKills++;
+    this._bestiaryKill('boss_' + b.variant);
     if (typeof DailyTasks !== 'undefined') DailyTasks.bump('boss', 1, this);
     // 旗舰奖励:击毁后获得一次额外升级机会 + 一件遗物三选一
     this.pendingLevels++;

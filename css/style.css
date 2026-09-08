@@ -409,3 +409,17 @@ h2 {
   background: linear-gradient(160deg, rgba(40, 13, 61, 0.6), rgba(10, 20, 45, 0.6));
 }
 .shop-card.tier3 .shop-name { color: #ffd6f6; text-shadow: 0 0 8px rgba(255, 106, 213, 0.6); }
+
+/* ---------- 敌机图鉴 ---------- */
+.best-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; text-align: left; }
+.best-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 9px; border-radius: 8px;
+  border: 1px solid rgba(126, 243, 255, 0.16);
+  background: rgba(10, 20, 45, 0.5);
+}
+.best-item b { flex: 1; font-size: 12px; letter-spacing: 1px; color: #eaf7ff; }
+.best-item span { font-size: 10.5px; color: rgba(159, 184, 208, 0.8); font-family: Consolas, monospace; }
+.best-item i { font-style: normal; font-size: 10.5px; color: #ffd166; font-family: Consolas, monospace; }
+.best-item.off { opacity: 0.5; }
+.best-item.off b { color: rgba(207, 232, 255, 0.5); }
