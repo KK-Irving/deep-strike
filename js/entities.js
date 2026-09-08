@@ -10,6 +10,9 @@ let RNG = Math.random;
 const rand = (a, b) => a + RNG() * (b - a);
 const irand = (a, b) => Math.floor(a + RNG() * (b - a + 1));
 const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+/* 纯表现层随机(粒子/星空/震屏/音效抖动):始终走 Math.random,
+ * 不消耗挑战模式的种子流——每帧消耗量随帧率波动,若混用会让每日挑战序列漂移 */
+const crand = (a, b) => a + Math.random() * (b - a);
 
 /* mulberry32 播种随机数生成器 */
 function mulberry32(seed) {
@@ -239,11 +242,11 @@ class Starfield {
     for (let i = 0; i < 100; i++) this.stars.push(this._make(true));
   }
   _make(anyY) {
-    const layer = irand(0, 2);
+    const layer = Math.floor(Math.random() * 3);
     return {
       layer,
-      x: rand(0, W),
-      y: anyY ? rand(0, H) : rand(-30, -2),
+      x: crand(0, W),
+      y: anyY ? crand(0, H) : crand(-30, -2),
       speed: [26, 55, 105][layer],
       size: [1, 1.6, 2.4][layer],
       alpha: [0.35, 0.6, 0.95][layer],
@@ -364,9 +367,9 @@ class Player {
       // 尾焰粒子随皮肤配色
       const accent = (typeof Shop !== 'undefined') ? Shop.accent() : '#39d7ff';
       game._addParticle(new Particle(
-        this.x + rand(-2.5, 2.5), this.y + 13,
-        rand(-14, 14), rand(90, 160),
-        rand(0.12, 0.28), rand(1.2, 2.4),
+        this.x + crand(-2.5, 2.5), this.y + 13,
+        crand(-14, 14), crand(90, 160),
+        crand(0.12, 0.28), crand(1.2, 2.4),
         Math.random() < 0.7 ? accent : '#bff7ff'));
     }
   }
@@ -1182,10 +1185,10 @@ class Boss {
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
-    // 舰体(按变体取预渲染精灵)
-    const spr = (this.variant === 'storm' ? SPRITES.boss.storm : SPRITES.boss.flag).body;
+    // 舰体(按变体取预渲染精灵——暴君旗舰用专属紫色舰体)
+    const spr = SPRITES.boss[this.variant];
     ctx.globalAlpha = 1;
-    ctx.drawImage(spr, -SPRITES.boss[this.variant].half, -SPRITES.boss[this.variant].half, SPRITES.boss[this.variant].half * 2, SPRITES.boss[this.variant].half * 2);
+    ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
     // 核心
     const pr = 11 + Math.sin(this.t * 5) * 3;
     ctx.fillStyle = this.flash > 0 ? '#ffffff' : cfg.core;

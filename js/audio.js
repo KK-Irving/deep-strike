@@ -113,7 +113,7 @@ const AudioSys = {
     // 拾取音限频,避免成串晶体同时拾取时爆音
     if (!this.ctx || this.ctx.currentTime - this._lastXpT < 0.05) return;
     this._lastXpT = this.ctx.currentTime;
-    this.tone({ freq: 760 + rand(0, 160), end: 1300, dur: 0.06, type: 'sine', vol: 0.06 });
+    this.tone({ freq: 760 + Math.random() * 160, end: 1300, dur: 0.06, type: 'sine', vol: 0.06 });
   },
   missile() {
     this.tone({ freq: 240, end: 620, dur: 0.18, type: 'sawtooth', vol: 0.07 });

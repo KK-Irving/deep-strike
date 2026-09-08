@@ -99,6 +99,7 @@ const Shop = {
   _boxTimers: [],     // 开箱动画计时器句柄
   _revealTimers: [],  // 结果逐条揭晓计时器句柄
   _boxSkip: null,     // 跳过动画的回调(动画进行中有效)
+  _saveT: 0,          // 延迟落盘句柄(局内高频进账合并写入)
 
   load() {
     try {
@@ -160,13 +161,20 @@ const Shop = {
     } catch (e) { /* 忽略 */ }
   },
 
-  /* 结算获得星晶(富豪成就联动) */
+  /* 结算获得星晶(富豪成就联动)。
+   * 局内精英击坠会高频调用,走延迟落盘合并写入,避免每次全量序列化 localStorage */
   addCrystal(n, game) {
     this.crystal += n;
     if (this.crystal >= 500) Ach.unlock('rich_500', game);
     if (this.crystal >= 1000) Ach.unlock('rich_1000', game);
     if (this.crystal >= 5000) Ach.unlock('rich_5000', game);
-    this.save();
+    this._saveSoon();
+  },
+
+  /* 延迟落盘:短时间内多次变动只写一次;购买/开箱等关键操作仍即时 save() */
+  _saveSoon() {
+    if (this._saveT) return;
+    this._saveT = setTimeout(() => { this._saveT = 0; this.save(); }, 800);
   },
 
   /* 成就奖励发放(星晶 + 可能的皮肤),供 Ach.unlock 调用 */
@@ -503,7 +511,6 @@ const Shop = {
       const owned = !!this.owned[sk.id];
       const equipped = this.equipped === sk.id;
       const card = document.createElement('div');
-      card.className = 'shop-card' + (equipped ? ' using' : '');
       let action;
       if (equipped) action = '<button class="shop-btn" disabled>使用中</button>';
       else if (owned) action = '<button class="shop-btn primary" data-equip="' + sk.id + '">装 备</button>';

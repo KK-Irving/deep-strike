@@ -98,7 +98,7 @@ const EVOLUTIONS = [
 function drawUpgradeCards(mods, maxSlots, level, evo, count = 3) {
   const ownedCount = UPGRADES.filter(u => (mods[u.id] || 0) > 0 && !u.hidden).length;
   const slotsFull = ownedCount >= maxSlots;
-    const pathId = UPGRADES.find(u => u.path && (mods[u.id] || 0) > 0);
+  const pathId = UPGRADES.find(u => u.path && (mods[u.id] || 0) > 0);
   const pathKey = pathId ? pathId.id : null;
   const pool = UPGRADES.filter(u =>
     (mods[u.id] || 0) < u.max &&

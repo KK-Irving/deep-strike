@@ -162,10 +162,11 @@ class Game {
     this.bombMeter = 0;
     this.wingmen = []; this.rifts = []; this.riftCd = 0;
     this.asteroids = []; this.supplies = [];
-        this.runKills = 0; this.runEliteKills = 0; this.runBossKills = 0; this.runEvoCount = 0;
+    this.runKills = 0; this.runEliteKills = 0; this.runBossKills = 0; this.runEvoCount = 0;
     this.runBombsUsed = 0; this.runBossNoHit = false;
     this.waveDamageTaken = 0; this.perfectStreak = 0; this.runLowHpKills = 0;
     this._cardChoices = [];
+    this._drawCount = 0;
     this._pendingSwap = null; this._swapList = null;
     this.evo = {}; this.bulletFreezeT = 0;
     this.relics = {}; this.pendingRelic = false; this._relicMode = false; this._relicChoices = [];
@@ -177,7 +178,9 @@ class Game {
   start(challengeMode) {
     this.mode = challengeMode || 'normal';
     // 每日/周挑战:播种固定波次序列与抽卡序列;周挑战威胁+1
-    RNG = this.mode === 'normal' ? Math.random : mulberry32(this._challengeSeed());
+    // 种子基准保留,供 startWave 按波派生与 _drawChoices 按抽卡序号派生
+    this._seedBase = this.mode === 'normal' ? 0 : this._challengeSeed();
+    RNG = this.mode === 'normal' ? Math.random : mulberry32(this._seedBase);
     this._reset();
     this.state = 'playing';
     AudioSys.init();
@@ -199,10 +202,15 @@ class Game {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
   _weekKey() {
+    // ISO 8601 周号:周一为一周之始,含首个周四的周为第 1 周,跨年归属正确
     const d = new Date();
-    const start = new Date(d.getFullYear(), 0, 1);
-    const week = Math.ceil((((d - start) / 86400000) + start.getDay() + 1) / 7);
-    return d.getFullYear() + '-W' + String(week).padStart(2, '0');
+    const thursday = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    thursday.setDate(thursday.getDate() - ((thursday.getDay() + 6) % 7) + 3);
+    const isoYear = thursday.getFullYear();
+    const first = new Date(isoYear, 0, 4);
+    first.setDate(first.getDate() - ((first.getDay() + 6) % 7) + 3);
+    const week = 1 + Math.round((thursday - first) / (7 * 86400000));
+    return isoYear + '-W' + String(week).padStart(2, '0');
   }
   _challengeKey() {
     return this.mode === 'weekly' ? this._weekKey() : this._dailyKey();
@@ -433,7 +441,7 @@ class Game {
       // 等级成长:生命上限 +5 并回复同量
       this._recalc();
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5);
-          if (this.level >= 10) Ach.unlock('level_10', this);
+      if (this.level >= 10) Ach.unlock('level_10', this);
       if (this.level >= 25) Ach.unlock('level_25', this);
     }
     if (this.pendingLevels > 0 && this.state === 'playing' && this.player.alive && !(this.levelupCooldown > 0)) this.openLevelup();
@@ -441,6 +449,18 @@ class Game {
 
   _ownedIds() {
     return UPGRADES.filter(u => (this.mods[u.id] || 0) > 0 && !u.hidden).map(u => u.id);
+  }
+
+  /* 抽卡:挑战模式下按抽卡序号派生独立子流——第 N 抽的随机取数对全天
+   * 所有尝试一致(具体出卡仍受各自构筑过滤影响),且不影响波内种子流 */
+  _drawChoices() {
+    if (this.mode === 'normal') return drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
+    const idx = this._drawCount++;
+    const saved = RNG;
+    RNG = mulberry32((this._seedBase ^ Math.imul(idx + 1, 0x85EBCA6B)) >>> 0);
+    const picks = drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
+    RNG = saved;
+    return picks;
   }
 
   /* 羁绊重构:根据当前模组重算激活羁绊,返回增减 */
@@ -454,7 +474,7 @@ class Game {
 
   openLevelup() {
     if (this.state !== 'playing' || this.pendingLevels <= 0) return;
-    this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
+    this._cardChoices = this._drawChoices();
     // 卡池耗尽兜底(全部满级):转化为奖励分,避免软锁
     if (this._cardChoices.length === 0) {
       const bonus = 500 * this.pendingLevels;
@@ -643,7 +663,7 @@ class Game {
       this._recalc();
       this.pendingLevels--;
       if (this.pendingLevels > 0) {
-        this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
+        this._cardChoices = this._drawChoices();
         this._renderCards();
       } else {
         this.state = 'playing';
@@ -707,7 +727,7 @@ class Game {
       this.banner = { text: '羁绊觉醒 · ' + cfg.name, sub: cfg.desc, life: 2.6, max: 2.6, gold: true };
       AudioSys.bond();
       if (this.bonds.length >= 3) Ach.unlock('bond_3', this);
-            if (this.bonds.length >= 5) Ach.unlock('bond_5', this);
+      if (this.bonds.length >= 5) Ach.unlock('bond_5', this);
       if (this.bonds.length >= 8) Ach.unlock('bond_8', this);
     }
     for (const b of lost) {
@@ -724,7 +744,7 @@ class Game {
     if (this.maxSlots >= 9) Ach.unlock('slot_9', this);
     this.pendingLevels--;
     if (this.pendingLevels > 0) {
-      this._cardChoices = drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
+      this._cardChoices = this._drawChoices();
       // 升级链中途卡池耗尽兜底:剩余等级转化为奖励分
       if (this._cardChoices.length === 0) {
         const bonus = 500 * this.pendingLevels;
@@ -751,6 +771,9 @@ class Game {
   startWave(n) {
     this.wave = n; this.waveTime = 0; this.spawnQueue = []; this.waveClearT = -1;
     this.waveKills = 0; this.trickleT = 0;
+    // 挑战模式:按波派生独立子流——出怪序列/词缀只取决于日期种子与波号,
+    // 与此前战斗过程(掉落/暴击/粒子)消耗了多少随机数无关,任意尝试严格一致
+    if (this.mode !== 'normal') RNG = mulberry32((this._seedBase ^ Math.imul(n, 0x9E3779B1)) >>> 0);
     // 时间冻结:每波开始静止敌方弹幕
     if (this.evo.time) this.bulletFreezeT = 2.5;
     // 补给号角:波首掉落随机道具
@@ -1560,17 +1583,17 @@ class Game {
 
   _sparks(x, y, color, n = 6) {
     for (let i = 0; i < n; i++) {
-      const a = rand(0, TAU), sp = rand(60, 220);
-      this._addParticle(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.15, 0.35), rand(1.5, 3), color));
+      const a = crand(0, TAU), sp = crand(60, 220);
+      this._addParticle(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, crand(0.15, 0.35), crand(1.5, 3), color));
     }
   }
 
   _explode(x, y, r, color, scale = 1) {
     const n = Math.round((10 + r) * scale);
     for (let i = 0; i < n; i++) {
-      const a = rand(0, TAU), sp = rand(30, 260) * scale;
-      const c = RNG() < 0.5 ? color : (RNG() < 0.5 ? '#ffd166' : '#ff8c42');
-      this._addParticle(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.3, 0.8) * scale, rand(1.5, 4) * scale, c));
+      const a = crand(0, TAU), sp = crand(30, 260) * scale;
+      const c = Math.random() < 0.5 ? color : (Math.random() < 0.5 ? '#ffd166' : '#ff8c42');
+      this._addParticle(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, crand(0.3, 0.8) * scale, crand(1.5, 4) * scale, c));
     }
     this.rings.push(new Ring(x, y, color, (r + 20) * scale, 0.4));
   }
@@ -1590,7 +1613,8 @@ class Game {
   _shakeOff() {
     if (this.shakeT <= 0) return null;
     const f = this.shakeT / this.shakeDur;
-    return [rand(-1, 1) * this.shakeMag * f, rand(-1, 1) * this.shakeMag * f];
+    // 震屏在渲染帧调用,频率随机型帧率波动——必须用表现层随机,不碰种子流
+    return [crand(-1, 1) * this.shakeMag * f, crand(-1, 1) * this.shakeMag * f];
   }
 
   /* ---------------- 渲染 ---------------- */
@@ -1713,9 +1737,10 @@ class Game {
       ctx.fillText('击坠 ' + this.waveKills + ' / ' + this.waveQuota, W - 14, 38);
     }
     if (AudioSys.muted) {
+      // 放在右列最下方(挑战标签 y54 / 威胁等级 y68 之下),避免与目标进度文字叠印
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.font = '12px sans-serif';
-      ctx.fillText('♪ OFF', W - 14, 38);
+      ctx.fillText('♪ OFF', W - 14, 82);
     }
     // 挑战模式标识
     if (this.mode !== 'normal') {
@@ -1903,7 +1928,7 @@ class Game {
   _gameover() {
     this.state = 'gameover';
     AudioSys.gameover();
-        if (this.mode === 'daily' && this.score >= 5000) Ach.unlock('daily_5000', this);
+    if (this.mode === 'daily' && this.score >= 5000) Ach.unlock('daily_5000', this);
     if (this.mode === 'daily' && this.score >= 20000) Ach.unlock('daily_20000', this);
     if (this.mode === 'weekly' && this.score >= 30000) Ach.unlock('weekly_30000', this);
     if (this.score >= 50000) Ach.unlock('score_50k', this);
@@ -1928,7 +1953,7 @@ class Game {
     s.kills = this._stat('kills', 0);
     s.bossKills = this._stat('bossKills', 0);
     s.eliteKills = this._stat('eliteKills', 0) + this.runEliteKills;
-        s.totalScore = this._stat('totalScore', 0) + this.score;
+    s.totalScore = this._stat('totalScore', 0) + this.score;
     if (s.totalScore >= 1000000) Ach.unlock('total_score_1m', this);
     s.bestWave = Math.max(this._stat('bestWave', 0), this.wave);
     this.saveStats();
@@ -1963,6 +1988,8 @@ class Game {
         Shop.lastChipsCapped = true;
       }
     }
+    // 结算即落盘:局内星晶为延迟批量写入,此处强制刷新一次
+    Shop.save();
     d.overCrystals.textContent = '★ +' + Shop.lastEarn + '(星晶 ' + Shop.crystal + ')'
       + (Shop.lastChips ? ' · ◈ +' + Shop.lastChips + '(芯片 ' + Shop.chips + ')' : '');
     // 芯片已领取提示:本期(今日/本周)奖励已领,追加说明
