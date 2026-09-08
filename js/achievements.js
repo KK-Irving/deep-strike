@@ -85,6 +85,7 @@ const ACHIEVEMENTS = [
   { id: 'level_10',     cat: '挑战', name: '极速成长', desc: '单局达到 10 级', reward: 50 },
   { id: 'level_25',     cat: '挑战', name: '登峰造极', desc: '单局达到 25 级', reward: 300 },
   { id: 'nobomb_wave15',cat: '挑战', name: '弹尽粮绝', desc: '不使用炸弹通关第 15 波', reward: 350 },
+  { id: 'curse_10',     cat: '挑战', name: '与狼共舞', desc: '携带诅咒卡抵达第 10 波', reward: 250 },
   // ---- 收集 ----
   { id: 'rich_500',   cat: '收集', name: '小有积蓄',   desc: '星晶余额达到 500★', reward: 100 },
   { id: 'rich_1000',  cat: '收集', name: '星晶大亨',   desc: '星晶余额达到 1000★', reward: 200 },

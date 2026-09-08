@@ -377,6 +377,7 @@ class Game {
     const E = this.evo || {};   // 进化状态
     const sh = this.shipDef || {};
     p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0) + (sh.dmgBonus || 0);
+    p.dmgMul = m.glass ? 2 : 1; // 玻璃大炮:全局伤害倍率
     let interval = (p.fireBase || 0.12) * Math.pow(0.85, m.rate || 0);
     if (E.rate) interval *= 0.75;
     if (this.bonds.includes('overdrive')) interval *= 0.85;
@@ -389,7 +390,7 @@ class Game {
     }
     // 回旋刃:双程伤害故投掷偏慢;疾风投掷/龙卷之核缩短间隔
     if (m.boomer) {
-      interval *= 1.7;
+      interval *= 1.45;
       if (this.bonds.includes('boomerch')) interval *= 0.75;
       if (E.boomer) interval *= 0.85;
     }
@@ -404,11 +405,12 @@ class Game {
     const timePerStack = this.bonds.includes('chrono') ? 0.30 : 0.18;
     this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
     if (this.relics.r_voidwatch) this.bulletSlow = Math.max(0.3, this.bulletSlow * 0.9);
+    if (m.pact) this.bulletSlow = Math.min(1.25, this.bulletSlow * 1.15); // 贪婪契约:敌弹加速
     // 卡槽系统:基础 5 槽,隐藏卡扩展
     this.maxSlots = 5 + (m.slotplus || 0);
     // 生命值系统:上限 = 机体基础 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
-    p.maxHp = (sh.hp || 100) + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
-      + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0);
+    p.maxHp = Math.round(((sh.hp || 100) + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
+      + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0)) * (m.glass ? 0.6 : 1));
     p.armorPct = Math.min(0.5, 0.15 * (m.armor || 0) + (sh.perkArmor || 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 护盾:每级 +1.2% 减伤(满级 +12%)
     p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1);
     p.leechPer = 0.7 * (m.leech || 0);
@@ -435,7 +437,8 @@ class Game {
     const p = this.player, m = this.mods;
     const lvl = m.laser;
     // 卡片协同:dmg 线性增益、pierce 加宽并增伤、crit 周期过载脉冲、split 分裂侧束、要害/处决羁绊放大
-    const critChance = 0.2 * (m.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0);
+    const critChance = 0.2 * (m.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0)
+      + (m.brittle ? 0.3 : 0);
     // 过载脉冲:按暴击率周期性爆发额外伤害(把"暴击"转译为持续武器的节奏)
     this._beamCritT = (this._beamCritT || 0) - dt;
     let critPulse = 1;
@@ -449,7 +452,8 @@ class Game {
       * (this.bonds.includes('focus') ? 1.6 : 1)
       * (1 + 0.18 * (p.weapon - 1))
       * (1 + 0.25 * (m.pierce || 0))          // 贯穿:每层 +25% 灼烧
-      * (this._beamCrit > 0 ? critPulse : 1); // 过载脉冲窗口内爆发
+      * (this._beamCrit > 0 ? critPulse : 1) // 过载脉冲窗口内爆发
+      * (p.dmgMul || 1);
     let halfW = 2.5 + 0.8 * (lvl - 1) + 0.4 * (p.weapon - 1) + 0.6 * (m.pierce || 0);
     if (this.evo.laser) halfW *= 1.6;
     const lensPen = this.bonds.includes('laserlens');
@@ -578,9 +582,9 @@ class Game {
       const cur = this.mods[u.id] || 0;
       const needSwap = slotsFull && !cur && !u.hidden && !u.isEvo;
       const el = document.createElement('button');
-      el.className = 'card r' + u.rar + (u.hidden ? ' hidden-card' : '') + (u.isEvo ? ' evo-card' : '');
+      el.className = 'card r' + u.rar + (u.hidden ? ' hidden-card' : '') + (u.isEvo ? ' evo-card' : '') + (u.curse ? ' curse' : '');
       el.innerHTML =
-        '<div class="card-rar" style="color:' + r.color + '">' + (u.hidden ? '隐藏卡' : r.name) + (u.isEvo ? ' ✦' : u.rar === 2 ? ' ★' : '') + '</div>' +
+        '<div class="card-rar" style="color:' + (u.curse ? '#ff5577' : r.color) + '">' + (u.curse ? '诅咒 ⚠' : (u.hidden ? '隐藏卡' : r.name)) + (u.isEvo ? ' ✦' : u.rar === 2 ? ' ★' : '') + '</div>' +
         '<div class="card-icon">' + u.icon + '</div>' +
         '<div class="card-name">' + u.name + '</div>' +
         '<div class="card-desc">' + u.desc + '</div>' +
@@ -906,6 +910,8 @@ class Game {
       }
       // 不使用炸弹通关第 15 波
       if (n > 15 && (this.runBombsUsed || 0) === 0) Ach.unlock('nobomb_wave15', this);
+      // 与狼共舞:携带诅咒卡抵达第 10 波
+      if (n >= 10 && UPGRADES.some(x => x.curse && (this.mods[x.id] || 0) > 0)) Ach.unlock('curse_10', this);
     }
     // 连续无伤波次里程碑
     if (this.perfectStreak >= 6) Ach.unlock('perfect_6', this);
@@ -1302,7 +1308,8 @@ class Game {
   /* 单发子弹命中结算:暴击 / 贯穿 / 裂变 */
   _hitTarget(b, e) {
     let dmg = b.dmg;
-    let cc = 0.2 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0);
+    let cc = 0.2 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0)
+      + (this.mods.brittle ? 0.3 : 0);
     // 虚空之刃:回旋刃暴击率 ×1.5
     if (b.boom && this.bonds.includes('voidedge')) cc *= 1.5;
     const guaranteed = (b.homing && this.bonds.includes('hunt'))
@@ -1476,7 +1483,7 @@ class Game {
         }
       }
     }
-    const mult = this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1);
+    const mult = this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1) * (this.mods.pact ? 1.5 : 1);
     const pts = Math.round(e.score * mult);
     this.score += pts;
     this._addFloat(new FloatText(e.x, e.y - 8, '+' + pts, mult > 1 ? '#ffd166' : '#e8f6ff', e.r > 18 ? 16 : 13));
@@ -1528,7 +1535,7 @@ class Game {
     if (b.variant === 'dread') Ach.unlock('dread_kill', this);
     // 完胜旗舰:本波(BOSS 波)未受伤击毁
     if (this.waveDamageTaken === 0) Ach.unlock('boss_nohit', this);
-    const pts = Math.round(b.score * this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1));
+    const pts = Math.round(b.score * this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1) * (this.mods.pact ? 1.5 : 1));
     this.score += pts;
     this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
     // 连战模式:击毁旗舰回复 15% 生命,支撑连续作战
@@ -1639,7 +1646,7 @@ class Game {
       this._thornBlast();
       return;
     }
-    const real = Math.max(1, Math.round(dmg * (1 - p.armorPct)));
+    const real = Math.max(1, Math.round(dmg * (1 - p.armorPct) * (this.mods.brittle ? 1.5 : 1)));
     p.hp -= real;
     this.waveDamageTaken++;
     this.combo = 0;
@@ -2196,6 +2203,7 @@ class Game {
     // 星晶结算:得分/1600 + 旗舰×6 + 精英×1;贪婪周 ×1.5;高难 ×1.5
     Shop.lastEarn = Math.floor(this.score / 1600) + (this.runBossKills || 0) * 6 + (this.runEliteKills || 0) * 1;
     if (this._mut && this._mut.id === 'greed') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
+    if (this.mods.pact) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (this.hard) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (this.relics.r_grail) Shop.lastEarn *= 2;
     Shop.addCrystal(Shop.lastEarn);

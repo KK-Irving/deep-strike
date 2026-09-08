@@ -294,7 +294,7 @@ class Player {
     this.beamOn = false;
     this.engine = 0; this.showHitbox = false;
     // 肉鸽模组衍生数值(由 game._recalc 刷新)
-    this.dmgBonus = 0; this.fireInterval = 0.12; this.magnetR = 140;
+    this.dmgBonus = 0; this.dmgMul = 1; this.fireInterval = 0.12; this.magnetR = 140;
     this.homingCd = 0; this.webCd = 0; this.shieldCd = 0; this.shieldInterval = 12;
     this.wingAngle = 0;
   }
@@ -353,7 +353,7 @@ class Player {
       this.webCd -= dt;
       if (this.webCd <= 0) {
         this.webCd = 0.9;
-        const n = 10, dmg = 1 + this.dmgBonus;
+        const n = 10, dmg = (1 + this.dmgBonus) * this.dmgMul;
         for (let i = 0; i < n; i++) {
           const a = i / n * TAU + this.engine * 0.4;
           game.playerBullets.push({
@@ -386,7 +386,7 @@ class Player {
   _fire(game) {
     const P = game.playerBullets;
     const m = game.mods;
-    const dmg = 1 + this.dmgBonus;
+    const dmg = (1 + this.dmgBonus) * this.dmgMul;
     const pierce = (m.pierce || 0) + (game.evo.pierce ? 2 : 0);
     const split = m.split || 0;
     const mk = (ox, oy, vx, vy, extra) =>
@@ -395,7 +395,7 @@ class Player {
       // 轨道炮:高速磁轨弹,单发高伤,天然强贯穿(质变路线)。与暴击/贯穿强联动
       const railPierce = 3 + 2 * (m.pierce || 0) + (game.bonds.includes('railpierce') ? 99 : 0)
         + (game.evo.railgun ? 99 : 0);
-      const base = 6 + 3 * (m.railgun - 1) + 2 * this.dmgBonus + 1.5 * (this.weapon - 1);
+      const base = (6 + 3 * (m.railgun - 1) + 2 * this.dmgBonus + 1.5 * (this.weapon - 1)) * this.dmgMul;
       const railDmg = Math.round(base * (game.evo.railgun ? 1.6 : 1));
       mk(0, -16, 0, -1250, { color: '#bfe4ff', r: 4.4, pierce: railPierce, split, dmg: railDmg, rail: true });
       for (let i = 1; i <= (m.multi || 0); i++) {
@@ -406,7 +406,7 @@ class Player {
       // 电弧发生器:发射一颗"引雷弹",命中即触发链式闪电(在 game 层结算跳跃)
       const chains = 1 + (m.tesla - 1) + (m.multi || 0) + (game.bonds.includes('teslachain') ? 1 : 0);
       // 平衡:提高电弧触发弹基础伤害(2→3 且吃满 dmg 加成),配合链式增强使多目标输出达标
-      const teslaDmg = 3 + Math.round(1.3 * this.dmgBonus) + (game.evo.tesla ? 3 : 0);
+      const teslaDmg = (3 + Math.round(1.3 * this.dmgBonus) + (game.evo.tesla ? 3 : 0)) * this.dmgMul;
       for (let c = 0; c < chains; c++) {
         const ox = chains === 1 ? 0 : (c / (chains - 1) - 0.5) * 22;
         mk(ox, -12, ox * 6, -900, { color: '#aef0ff', r: 3.2, pierce: 0, split: 0, dmg: teslaDmg, tesla: true });
@@ -420,7 +420,7 @@ class Player {
       const arc = game.evo.spread ? 0.92 : 0.6;
       const rounds = game.bonds.includes('scatterstorm') ? 2 : 1;
       // 平衡:散射每发弹丸伤害小幅提升(×1.2),使其总输出进入可用区间而不过强
-      const spDmg = Math.max(1, Math.round((1 + this.dmgBonus) * 1.2));
+      const spDmg = Math.max(1, Math.round((1 + this.dmgBonus) * 1.2 * this.dmgMul));
       for (let rr = 0; rr < rounds; rr++)
       for (let i = 0; i < n; i++) {
         const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * arc) + (rr ? 0.12 : 0);
@@ -429,7 +429,7 @@ class Player {
       }
     } else if (m.boomer) {
       // 回旋刃:掷出减速→折返,去回双重切割;并列弹道生成并排多枚
-      const dmg = 8 + 3 * (m.boomer - 1) + 2 * this.dmgBonus + (this.weapon - 1);
+      const dmg = (9 + 3 * (m.boomer - 1) + 2 * this.dmgBonus + (this.weapon - 1)) * this.dmgMul;
       const n = 1 + (m.multi || 0);
       for (let i = 0; i < n; i++) {
         const off = n === 1 ? 0 : (i / (n - 1) - 0.5) * 30;
@@ -483,7 +483,7 @@ class Player {
       game.playerBullets.push({
         x: this.x, y: this.y - 8,
         vx: Math.cos(a) * 300, vy: Math.sin(a) * 300,
-        r: 4, dmg: 2 + this.dmgBonus + (game.evo.homing ? 2 : 0), color: '#ffd166', dead: false,
+        r: 4, dmg: Math.round((2 + this.dmgBonus + (game.evo.homing ? 2 : 0)) * this.dmgMul), color: '#ffd166', dead: false,
         homing: true, life: 2.6, pierce: 0, split: 0
       });
     }
@@ -1469,8 +1469,8 @@ class Wingman {
         const aim = Math.atan2(ty - this.y, tx - this.x);
         const missile = game.bonds.includes('squad');
         game.playerBullets.push(missile
-          ? { x: this.x, y: this.y, vx: Math.cos(aim) * 300, vy: Math.sin(aim) * 300, r: 4, dmg: 2 + game.player.dmgBonus, color: '#ffd166', dead: false, homing: true, life: 2.2, pierce: 0, split: 0 }
-          : { x: this.x, y: this.y, vx: Math.cos(aim) * 480, vy: Math.sin(aim) * 480, r: 2.6, dmg: 1 + game.player.dmgBonus, color: '#9ffcf0', dead: false, pierce: 0, split: 0 });
+          ? { x: this.x, y: this.y, vx: Math.cos(aim) * 300, vy: Math.sin(aim) * 300, r: 4, dmg: Math.round((2 + game.player.dmgBonus) * (game.player.dmgMul || 1)), color: '#ffd166', dead: false, homing: true, life: 2.2, pierce: 0, split: 0 }
+          : { x: this.x, y: this.y, vx: Math.cos(aim) * 480, vy: Math.sin(aim) * 480, r: 2.6, dmg: Math.round((1 + game.player.dmgBonus) * (game.player.dmgMul || 1)), color: '#9ffcf0', dead: false, pierce: 0, split: 0 });
         AudioSys.missile();
       }
     }

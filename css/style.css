@@ -175,6 +175,8 @@ h2 {
 .card.evo-card { background: rgba(60, 44, 10, 0.6); animation: evoPulse 1.6s ease-in-out infinite; }
 @keyframes evoPulse { 50% { box-shadow: 0 0 26px rgba(255, 209, 102, 0.55); } }
 .chip.evo { color: #ffd166; border-color: rgba(255, 209, 102, 0.55); }
+.card.curse { border-color: rgba(255, 85, 119, 0.6); }
+.card.curse:hover { border-color: #ff5577; box-shadow: 0 10px 30px rgba(255, 85, 119, 0.4); }
 .card.hidden-card { border-style: dashed; }
 .card.hidden-card:hover { border-color: #51e08a; box-shadow: 0 10px 30px rgba(81, 224, 138, 0.4); }
 .card.swap { opacity: 0.92; }

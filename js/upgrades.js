@@ -43,6 +43,9 @@ const UPGRADES = [
   { id: 'railgun',  icon: '🌩', name: '轨道炮',     max: 2, rar: 2, desc: '质变:蓄力发射高速贯穿磁轨弹,单发高伤(与暴击/贯穿强联动)', path: true },
   { id: 'tesla',    icon: '⚡', name: '电弧发生器', max: 2, rar: 2, desc: '质变:主炮替换为链式闪电,自动在敌群间跳跃(与并列/裂变强联动)', path: true },
   { id: 'boomer',   icon: '↻',  name: '回旋刃',     max: 2, rar: 2, desc: '质变:掷出双程回旋刃,去回双重切割(可并排多枚)', path: true },
+  { id: 'glass',    icon: '💥', name: '玻璃大炮',   max: 1, rar: 2, curse: true, desc: '诅咒:所有伤害 +100%,生命上限 -40%' },
+  { id: 'brittle',  icon: '🗡️', name: '脆刃',       max: 1, rar: 2, curse: true, desc: '诅咒:暴击率 +30%,受到伤害 ×1.5' },
+  { id: 'pact',     icon: '📜', name: '贪婪契约',   max: 1, rar: 2, curse: true, desc: '诅咒:得分与星晶获取 +50%,敌弹速度 +15%' },
   { id: 'slotplus', icon: '🧬', name: '基因扩展',   max: 2, rar: 2, desc: '隐藏卡:强化槽位 +1', hidden: true }
 ];
 
@@ -111,7 +114,7 @@ function drawUpgradeCards(mods, maxSlots, level, evo, count = 3) {
     !(u.hidden && !slotsFull)
   );
   const weights = RARITY.map((r, i) => r.weight + (i === 2 ? level : 0));
-  const cardWeight = (u) => weights[u.rar] + (u.hidden ? 45 : 0);
+  const cardWeight = (u) => u.curse ? 12 : (weights[u.rar] + (u.hidden ? 45 : 0)); // 诅咒卡固定低权重
   const picks = [];
   for (let n = 0; n < count && pool.length; n++) {
     let total = 0;
