@@ -104,6 +104,7 @@
   $('btnShopBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnHelp').addEventListener('click', () => game.showMenuPanel('help'));
   $('btnStats').addEventListener('click', () => game.showMenuPanel('stats'));
+  $('btnHard').addEventListener('click', () => { AudioSys.init(); game.toggleHard(); });
   $('btnHelpBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnStatsBack').addEventListener('click', () => game.showMenuPanel('main'));
     $('btnOverMenu').addEventListener('click', () => game.toMenu());

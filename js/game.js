@@ -50,6 +50,7 @@ class Game {
     this.stars = new Starfield();
     this.player = new Player();
     this.hi = this._loadHi();
+    this.hard = this._loadHard();
     this.shakeMag = 0; this.shakeT = 0; this.shakeDur = 1;
     this.flashT = 0; this.flashColor = 'rgba(255,255,255,';
     this.bombActive = false; this.bombT = 0;
@@ -84,6 +85,7 @@ class Game {
       overCrystals: document.getElementById('overCrystals'),
       menuShop: document.getElementById('menuShop'),
       taskPanel: document.getElementById('taskPanel'),
+      btnHard: document.getElementById('btnHard'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
     };
@@ -93,6 +95,14 @@ class Game {
 
   _loadHi() { try { return +localStorage.getItem('deepstrike.hi') || 0; } catch (e) { return 0; } }
   _saveHi() { try { localStorage.setItem('deepstrike.hi', String(this.hi)); } catch (e) { /* 忽略 */ } }
+
+  /* 高难模式:威胁+2 / 伤害上调 / 星晶 ×1.5,持久化,所有模式可用 */
+  _loadHard() { try { return localStorage.getItem('deepstrike.hard') === '1'; } catch (e) { return false; } }
+  toggleHard() {
+    this.hard = !this.hard;
+    try { localStorage.setItem('deepstrike.hard', this.hard ? '1' : '0'); } catch (e) { /* 忽略 */ }
+    this._showState();
+  }
 
   /* ---- 战绩档案(累计统计) ---- */
   _loadStats() {
@@ -332,7 +342,10 @@ class Game {
       d.menuHelp.classList.toggle('hidden', this.menuPanel !== 'help');
       d.menuStats.classList.toggle('hidden', this.menuPanel !== 'stats');
       d.menuShop.classList.toggle('hidden', this.menuPanel !== 'shop');
-      if (this.menuPanel === 'main') this._refreshTasks();
+      if (this.menuPanel === 'main') {
+        this._refreshTasks();
+        if (d.btnHard) d.btnHard.innerHTML = '▸ 高难模式:' + (this.hard ? '开' : '关') + ' <i>星晶×1.5</i>';
+      }
       if (this.menuPanel === 'shop') Shop.renderPanel();
     }
   }
@@ -342,10 +355,10 @@ class Game {
   /* 弹速增长封顶波数:防止后期弹速无限膨胀 */
   effWave() { return Math.min(this.wave, 18); }
 
-  /* 无尽模式威胁等级:第 15 波起每 5 波 +1;周挑战全程 +1 */
+  /* 无尽模式威胁等级:第 15 波起每 5 波 +1;周挑战全程 +1;高难 +2 */
   threatLevel() {
     const base = Math.floor(Math.max(0, this.wave - 10) / 5);
-    return base + (this.mode === 'weekly' ? 1 : 0);
+    return base + (this.mode === 'weekly' ? 1 : 0) + (this.hard ? 2 : 0);
   }
 
   /* ---------------- 肉鸽升级系统 ---------------- */
@@ -1160,9 +1173,9 @@ class Game {
           break;
         }
       }
-      // 敌机冲撞 → 玩家(接触伤害随波次小幅增长,封顶 55)
+      // 敌机冲撞 → 玩家(接触伤害随波次小幅增长,封顶 65;高难额外 +10)
       if (p.alive && p.invuln <= 0) {
-        const contactDmg = Math.min(55, 35 + Math.floor(Math.max(0, this.wave - 1) * 0.8));
+        const contactDmg = Math.min(65, 35 + Math.floor(Math.max(0, this.wave - 1) * 0.8) + (this.hard ? 10 : 0));
         for (const e of this.enemies) {
           if (e.dead) continue;
           const dx = e.x - p.x, dy = e.y - p.y;
@@ -1643,7 +1656,7 @@ class Game {
    * 连战模式按虚拟波号(阶段 ×5)成长,与旗舰强度同步。 */
   enemyDmg(kind) {
     const w = this.mode === 'boss' ? this.wave * 5 : this.wave;
-    const base = 22 + Math.min(18, (w - 1) * 0.7) + this.threatLevel() * 2;
+    const base = 22 + Math.min(18, (w - 1) * 0.7) + this.threatLevel() * 2 + (this.hard ? 5 : 0);
     return Math.round(base * (kind === 'orange' ? 1.15 : 1));
   }
 
@@ -1876,6 +1889,13 @@ class Game {
       ctx.textAlign = 'left';
       ctx.fillText(this._mut.icon + ' 周变异·' + this._mut.name + ' · ' + this._mut.desc, 14, 82);
     }
+    // 高难模式标识
+    if (this.hard) {
+      ctx.fillStyle = '#ff5577';
+      ctx.font = 'bold 11px Consolas, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText('☠ 高难 ×1.5★', W - 14, 96);
+    }
     // 生命条(数值化生命)
     {
       const bw = 104, bx = 14, by = H - 27;
@@ -2088,9 +2108,10 @@ class Game {
     d.finalWave.textContent = this.wave;
     d.finalHi.textContent = this.mode !== 'normal' ? this._challengeBest() : this.hi;
     this._refreshMenuHi();
-    // 星晶结算:得分/1600 + 旗舰×6 + 精英×1;贪婪周 ×1.5
+    // 星晶结算:得分/1600 + 旗舰×6 + 精英×1;贪婪周 ×1.5;高难 ×1.5
     Shop.lastEarn = Math.floor(this.score / 1600) + (this.runBossKills || 0) * 6 + (this.runEliteKills || 0) * 1;
     if (this._mut && this._mut.id === 'greed') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
+    if (this.hard) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (this.relics.r_grail) Shop.lastEarn *= 2;
     Shop.addCrystal(Shop.lastEarn);
     // 挑战材料「战术芯片」:连战与每日/周挑战产出;按期限领一次
