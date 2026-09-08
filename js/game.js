@@ -491,6 +491,14 @@ class Game {
         this.boss.damage(dmgHere * dt, this, true);
         hitAny = true;
       }
+      if (this.boss && this.boss.state === 'fight' && this.boss.pods) {
+        for (const pod of this.boss.pods) {
+          if (pod.dead) continue;
+          const px = this.boss.x + pod.ox;
+          if (Math.abs(px - bx) < pod.r + w && this.boss.y + pod.oy < p.y - 6)
+            this.boss.hitPod(pod, dmgHere * dt * 0.6, this);
+        }
+      }
     }
     this._beamSndT = (this._beamSndT || 0) - dt;
     if (hitAny && this._beamSndT <= 0) {
@@ -1177,9 +1185,29 @@ class Game {
       }
       if (!b.dead && this.boss && !this.boss.dead && this.boss.state === 'fight' && this.boss !== b.lastHit) {
         const bo = this.boss;
-        const dx = b.x - bo.x, dy = b.y - bo.y;
-        const rr = bo.r + b.r;
-        if (dx * dx + dy * dy < rr * rr) this._hitTarget(b, bo);
+        let podHit = false;
+        // 要塞炮塔:优先于舰体判定
+        if (bo.pods) {
+          for (const pod of bo.pods) {
+            if (pod.dead) continue;
+            const px = bo.x + pod.ox, py = bo.y + pod.oy;
+            const ddx = b.x - px, ddy = b.y - py;
+            const rr = pod.r + b.r;
+            if (ddx * ddx + ddy * ddy < rr * rr) {
+              bo.hitPod(pod, b.dmg, this);
+              b.dead = true;
+              this._sparks(b.x, b.y, '#ffb14d', 4);
+              AudioSys.hit();
+              podHit = true;
+              break;
+            }
+          }
+        }
+        if (!podHit) {
+          const dx = b.x - bo.x, dy = b.y - bo.y;
+          const rr = bo.r + b.r;
+          if (dx * dx + dy * dy < rr * rr) this._hitTarget(b, bo);
+        }
       }
       // 陨石吸收玩家弹幕
       if (!b.dead) {
@@ -1497,6 +1525,7 @@ class Game {
     if (this.stats.bossKills >= 100) Ach.unlock('boss_100', this);
     if (b.variant === 'storm') Ach.unlock('storm_kill', this);
     if (b.variant === 'tyrant') Ach.unlock('tyrant_kill', this);
+    if (b.variant === 'dread') Ach.unlock('dread_kill', this);
     // 完胜旗舰:本波(BOSS 波)未受伤击毁
     if (this.waveDamageTaken === 0) Ach.unlock('boss_nohit', this);
     const pts = Math.round(b.score * this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1));
@@ -1684,7 +1713,12 @@ class Game {
     const bombDmg = this.relics.r_dragon ? 23 : 8;
     for (const e of this.enemies) e.damage(bombDmg, this);
     for (const a of this.asteroids) a.damage(6, this);
-    if (this.boss) this.boss.damage(this.relics.r_dragon ? 35 : 20, this);
+    if (this.boss) {
+      this.boss.damage(this.relics.r_dragon ? 35 : 20, this);
+      if (this.boss.pods)
+        for (const pod of this.boss.pods)
+          if (!pod.dead) this.boss.hitPod(pod, this.relics.r_dragon ? 12 : 5, this);
+    }
     this.rings.push(new Ring(p.x, p.y, '#aef3ff', 300, 0.7));
   }
 

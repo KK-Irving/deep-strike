@@ -38,6 +38,7 @@ const ACHIEVEMENTS = [
   { id: 'boss_50',    cat: 'BOSS', name: '旗舰梦魇',   desc: '累计击毁 50 艘旗舰', reward: 400 },
   { id: 'boss_100',   cat: 'BOSS', name: '舰队终结者', desc: '累计击毁 100 艘旗舰', reward: 700 },
   { id: 'storm_kill', cat: 'BOSS', name: '驭风者',     desc: '击毁一艘暴风旗舰', reward: 150 },
+  { id: 'dread_kill', cat: 'BOSS', name: '拆塔专家',   desc: '击毁一艘要塞旗舰', reward: 250 },
   { id: 'tyrant_kill',cat: 'BOSS', name: '弑君者',     desc: '击毁一艘暴君旗舰', reward: 200 },
   { id: 'boss_nohit', cat: 'BOSS', name: '完胜旗舰',   desc: '一局中无伤击毁一艘旗舰', reward: 300 },
   // ---- 连击 ----

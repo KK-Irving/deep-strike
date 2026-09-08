@@ -1081,14 +1081,20 @@ class Enemy {
 }
 
 /* ============================================================
- * BOSS 旗舰:三阶段弹幕;第 10/20/30…波出现「暴风」变体
+ * BOSS 旗舰:三阶段弹幕;第 10/20/30…波「暴风」,25 波起「暴君」,
+ * 第 40 波起偶数段「要塞」(两侧可破坏炮塔,全部摧毁后火力节奏减弱)
  * ============================================================ */
 const BOSS_VARIANTS = {
   flag:   { name: '敌方旗舰', color: '#ff5577', glow: '#ff3355', hull: '#3a1220', turret: '#55182b', core: '#ff2b4e' },
   storm:  { name: '暴风旗舰', color: '#3fe8c8', glow: '#17bfa0', hull: '#12424e', turret: '#1d5f70', core: '#2be8c8' },
-  tyrant: { name: '暴君旗舰', color: '#c86bff', glow: '#8a2be2', hull: '#1e1030', turret: '#3a1a55', core: '#c86bff' }
+  tyrant: { name: '暴君旗舰', color: '#c86bff', glow: '#8a2be2', hull: '#1e1030', turret: '#3a1a55', core: '#c86bff' },
+  dread:  { name: '要塞旗舰', color: '#ffb14d', glow: '#ff8c1a', hull: '#3a2a10', turret: '#5a4218', core: '#ffd166' }
 };
-const bossVariant = (wave) => (wave >= 25 ? 'tyrant' : (wave >= 10 && Math.floor(wave / 5) % 2 === 0 ? 'storm' : 'flag'));
+const bossVariant = (wave) => (
+  wave >= 40 && Math.floor(wave / 5) % 2 === 0 ? 'dread'
+    : wave >= 25 ? 'tyrant'
+      : (wave >= 10 && Math.floor(wave / 5) % 2 === 0 ? 'storm' : 'flag')
+);
 
 class Boss {
   constructor(wave) {
@@ -1107,6 +1113,14 @@ class Boss {
     this.escortCd = tyrant ? 4 : storm ? 4.5 : 6;
     this.phase = 0;
     this.burstCycle = 0;
+    // 要塞旗舰:两侧可破坏炮塔(命中判定独立于舰体)
+    if (this.variant === 'dread') {
+      const podHp = 90 + wave * 6;
+      this.pods = [
+        { ox: -34, oy: -6, r: 12, hp: podHp, max: podHp, dead: false },
+        { ox: 34, oy: -6, r: 12, hp: podHp, max: podHp, dead: false }
+      ];
+    }
   }
 
   update(dt, game) {
@@ -1135,6 +1149,28 @@ class Boss {
 
   _attack(game) {
     const x = this.x, y = this.y + 26;
+    if (this.variant === 'dread') {
+      // 要塞:重压瞄准扇面, phase>=1 追加螺旋;存活炮塔各自追加狙击
+      const a = game.aimedAngle(x, y);
+      const n = this.phase === 0 ? 3 : this.phase === 1 ? 5 : 4;
+      const speed = 200 + Math.min(this.wave, 18) * 4;
+      for (let i = 0; i < n; i++)
+        game.enemyShot(x, y, a + (i - (n - 1) / 2) * 0.16, speed, 'orange');
+      if (this.phase >= 1) {
+        const a0 = this.t * 3.4;
+        for (let i = 0; i < 4; i++)
+          game.enemyShot(x, y, a0 + i * Math.PI / 2, 150);
+      }
+      for (const pod of (this.pods || [])) {
+        if (pod.dead) continue;
+        const pa = game.aimedAngle(x + pod.ox, y + pod.oy);
+        game.enemyShot(x + pod.ox, y + pod.oy + 10, pa, 230 + Math.min(this.wave, 18) * 3, 'orange');
+      }
+      this.fireCd = (this.phase === 0 ? 1.0 : this.phase === 1 ? 0.9 : 0.75)
+        * (this.podsAlive() === 0 ? 1.3 : 1);
+      AudioSys.enemyShoot();
+      return;
+    }
     if (this.variant === 'tyrant') {
       if (this.phase === 0) {
         // 瞄准五连
@@ -1214,6 +1250,23 @@ class Boss {
     AudioSys.enemyShoot();
   }
 
+  podsAlive() {
+    return this.pods ? this.pods.filter(p => !p.dead).length : 0;
+  }
+  hitPod(pod, n, game) {
+    if (this.dead || this.state !== 'fight' || pod.dead) return;
+    pod.hp -= n;
+    this.flash = 0.05;
+    if (pod.hp <= 0) {
+      pod.dead = true;
+      const px = this.x + pod.ox, py = this.y + pod.oy;
+      game._explode(px, py, 16, '#ffb14d', 0.9);
+      game.shake(6, 0.25);
+      AudioSys.explode(false);
+      if (this.podsAlive() === 0)
+        game.banner = { text: '要塞武装解除', sub: '旗舰火力节奏减弱', life: 2.0, max: 2.0, gold: true };
+    }
+  }
   damage(n, game, silent) {
     if (this.dead || this.state !== 'fight') return;
     this.hp -= n;
@@ -1256,6 +1309,30 @@ class Boss {
     ctx.strokeStyle = 'rgba(255,255,255,0.5)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
+    // 要塞炮塔(存活:描边圈+血量弧;摧毁:焦黑残骸)
+    if (this.pods) {
+      for (const pod of this.pods) {
+        const px = pod.ox, py = pod.oy;
+        if (pod.dead) {
+          ctx.globalAlpha = 0.35;
+          ctx.fillStyle = '#221a08';
+          ctx.beginPath(); ctx.arc(px, py, pod.r * 0.7, 0, TAU); ctx.fill();
+          ctx.globalAlpha = 1;
+          continue;
+        }
+        const frac = clamp(pod.hp / pod.max, 0, 1);
+        ctx.strokeStyle = 'rgba(255,177,77,0.9)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(px, py, pod.r, 0, TAU); ctx.stroke();
+        ctx.fillStyle = '#2a1e0a';
+        ctx.beginPath(); ctx.arc(px, py, pod.r - 3, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#ffb14d';
+        ctx.beginPath(); ctx.arc(px, py, 3 + Math.sin(this.t * 6 + pod.ox) * 1, 0, TAU); ctx.fill();
+        ctx.strokeStyle = frac > 0.5 ? '#5be08a' : (frac > 0.25 ? '#ffd166' : '#ff5577');
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(px, py, pod.r + 4, -Math.PI / 2, -Math.PI / 2 + frac * TAU); ctx.stroke();
+      }
+    }
     ctx.restore();
   }
 }
