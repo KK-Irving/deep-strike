@@ -160,6 +160,8 @@ class Game {
     this.xp = 0; this.level = 1; this.xpNext = 12; this.pendingLevels = 0;
     this.xpMult = 1; this.comboWindow = 2;
     this.bombMeter = 0;
+    // 限时增益(道具):x2 双倍得分 / frenzy 狂热射速 / frost 寒霜减速(单位秒)
+    this.buffs = { x2: 0, frenzy: 0, frost: 0 };
     this.wingmen = []; this.rifts = []; this.riftCd = 0;
     this.asteroids = []; this.supplies = [];
     this.runKills = 0; this.runEliteKills = 0; this.runBossKills = 0; this.runEvoCount = 0;
@@ -386,7 +388,8 @@ class Game {
     if (this.evo.laser) halfW *= 1.6;
     const lensPen = this.bonds.includes('laserlens');
     if (lensPen) halfW *= 2;
-    const beamDps = dps * (this.evo.laser ? 1.25 : 1);   // 平衡:略降激光 evo 统治力(1.4→1.25)
+    const beamDps = dps * (this.evo.laser ? 1.25 : 1)   // 平衡:略降激光 evo 统治力(1.4→1.25)
+      * (this.buffs.frenzy > 0 ? 1.3 : 1);              // 狂热:持续武器以增伤等价受益
     // 主光束 + multi 侧束 + split 分裂副束(split 使每束旁再生一道细束)
     const xs = [p.x];
     for (let i = 1; i <= (m.multi || 0); i++) { xs.push(p.x - 7 - i * 8, p.x + 7 + i * 8); }
@@ -956,8 +959,8 @@ class Game {
       const b = this.enemyBullets[i];
       // 时间冻结:波首静止弹幕
       if (this.bulletFreezeT > 0) continue;
-      // 时滞力场
-      const sdt = dt * this.bulletSlow;
+      // 时滞力场 + 寒霜
+      const sdt = dt * this.bulletSlow * (this.buffs.frost > 0 ? 0.4 : 1);
       b.x += b.vx * sdt; b.y += b.vy * sdt;
       if (b.dead || b.y > H + 20 || b.y < -30 || b.x < -20 || b.x > W + 20) this.enemyBullets.splice(i, 1);
     }
@@ -1331,7 +1334,7 @@ class Game {
         }
       }
     }
-    const mult = this.multiplier();
+    const mult = this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1);
     const pts = Math.round(e.score * mult);
     this.score += pts;
     this._addFloat(new FloatText(e.x, e.y - 8, '+' + pts, mult > 1 ? '#ffd166' : '#e8f6ff', e.r > 18 ? 16 : 13));
@@ -1381,7 +1384,7 @@ class Game {
     if (b.variant === 'tyrant') Ach.unlock('tyrant_kill', this);
     // 完胜旗舰:本波(BOSS 波)未受伤击毁
     if (this.waveDamageTaken === 0) Ach.unlock('boss_nohit', this);
-    const pts = Math.round(b.score * this.multiplier());
+    const pts = Math.round(b.score * this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1));
     this.score += pts;
     this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
     for (let i = 0; i < 10; i++)
@@ -1405,7 +1408,8 @@ class Game {
     let type = force;
     if (!type) {
       const r = RNG();
-      type = r < 0.42 ? 'power' : r < 0.68 ? 'shield' : r < 0.92 ? 'bomb' : 'life';
+      type = r < 0.32 ? 'power' : r < 0.54 ? 'shield' : r < 0.74 ? 'bomb' : r < 0.82 ? 'life'
+        : r < 0.89 ? 'x2' : r < 0.95 ? 'frenzy' : r < 0.98 ? 'frost' : 'magstorm';
     }
     this.powerups.push(new PowerUp(x, y, type));
   }
@@ -1441,6 +1445,22 @@ class Game {
         this.score += 300;
         this._addFloat(new FloatText(p.x, p.y - 24, '+300', '#ffd166'));
       }
+    } else if (type === 'x2') {
+      this.buffs.x2 = 10;
+      this._addFloat(new FloatText(p.x, p.y - 24, '×2 双倍得分!', '#ffd166'));
+    } else if (type === 'frenzy') {
+      this.buffs.frenzy = 10;
+      this._addFloat(new FloatText(p.x, p.y - 24, '狂热!', '#ff9a3c'));
+    } else if (type === 'frost') {
+      this.buffs.frost = 5;
+      this._addFloat(new FloatText(p.x, p.y - 24, '寒霜!', '#aef0ff'));
+    } else if (type === 'magstorm') {
+      // 全场吸取:晶体/道具/空投立刻飞向玩家
+      for (const o of this.orbs) o.vac = true;
+      for (const pu of this.powerups) pu.vac = true;
+      for (const su of this.supplies) su.vac = true;
+      this._addFloat(new FloatText(p.x, p.y - 24, '磁力风暴!', '#c86bff'));
+      AudioSys.rift();
     }
   }
 
@@ -1608,6 +1628,8 @@ class Game {
     if (this.bulletFreezeT > 0) this.bulletFreezeT -= dt;
     if (this.levelupCooldown > 0) this.levelupCooldown -= dt;
     if (this.banner) this.banner.life -= dt;
+    // 限时增益倒计时
+    for (const k in this.buffs) if (this.buffs[k] > 0) this.buffs[k] -= dt;
   }
 
   _shakeOff() {
@@ -1761,6 +1783,17 @@ class Game {
       ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(this.waveMod.icon + ' ' + this.waveMod.name + ' · ' + this.waveMod.desc, 14, 54);
+    }
+    // 限时增益倒计时
+    const bt = [];
+    if (this.buffs.x2 > 0) bt.push('×2 ' + Math.ceil(this.buffs.x2) + 's');
+    if (this.buffs.frenzy > 0) bt.push('狂热 ' + Math.ceil(this.buffs.frenzy) + 's');
+    if (this.buffs.frost > 0) bt.push('寒霜 ' + Math.ceil(this.buffs.frost) + 's');
+    if (bt.length) {
+      ctx.fillStyle = '#c86bff';
+      ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('✦ ' + bt.join(' · '), 14, 68);
     }
     // 生命条(数值化生命)
     {

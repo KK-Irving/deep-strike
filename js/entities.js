@@ -328,7 +328,8 @@ class Player {
     this.fireCd -= dt;
     if ((k.fire || game.autoFire) && this.fireCd <= 0) {
       this._fire(game);
-      this.fireCd = this.fireInterval;
+      // 狂热:射击间隔 ×0.667(质变主炮同样受益,激光走 beamTick 增伤)
+      this.fireCd = this.fireInterval * ((game.buffs && game.buffs.frenzy > 0) ? 0.667 : 1);
     }
     // 追踪导弹:周期自动发射
     if (game.mods.homing) {
@@ -792,15 +793,17 @@ class Enemy {
   }
 
   update(dt, game) {
-    this.t += dt;
+    // 寒霜:敌机行动与火力节奏整体减速(仅普通敌机,旗舰免疫)
+    const edt = dt * ((game.buffs && game.buffs.frost > 0) ? 0.45 : 1);
+    this.t += edt;
     this.flash = Math.max(0, this.flash - dt);
     // 幽影词缀:周期相位(免疫伤害且停止开火)
     if (this.elite && this.elite.includes('phantom')) {
       if (this.elitePhased) {
-        this.phaseDur -= dt;
+        this.phaseDur -= edt;
         if (this.phaseDur <= 0) this.elitePhased = false;
       } else {
-        this.phaseCd -= dt;
+        this.phaseCd -= edt;
         if (this.phaseCd <= 0) { this.elitePhased = true; this.phaseDur = 1.0; this.phaseCd = 2.6; }
       }
     }
@@ -813,20 +816,20 @@ class Enemy {
     const onScreen = this.y > 0;
     const canFire = onScreen && !this.elitePhased;
     if (this.type === 'drone') {
-      this.y += this.vy * dt;
+      this.y += this.vy * edt;
       this.x = clamp(this.baseX + Math.sin(this.t * this.freq) * this.amp, 16, W - 16);
     } else if (this.type === 'waver') {
-      this.y += this.vy * dt;
+      this.y += this.vy * edt;
       this.x = clamp(this.baseX + Math.sin(this.t * this.freq) * this.amp, 16, W - 16);
-      this.fireCd -= dt;
+      this.fireCd -= edt;
       if (canFire && this.fireCd <= 0) {
         this.fireCd = rand(1.8, 3.2) * this.fireMul;
         game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 150 + game.effWave() * 5);
         AudioSys.enemyShoot();
       }
     } else if (this.type === 'tank') {
-      this.y += this.vy * dt;
-      this.fireCd -= dt;
+      this.y += this.vy * edt;
+      this.fireCd -= edt;
       if (canFire && this.fireCd <= 0) {
         this.fireCd = 2.4 * this.fireMul;
         for (let i = -1; i <= 1; i++)
@@ -836,12 +839,12 @@ class Enemy {
     } else if (this.type === 'bomber') {
       // 追踪俯冲 + 引信
       const aim = game.aimedAngle(this.x, this.y);
-      const f = Math.min(1, 3.2 * dt);
+      const f = Math.min(1, 3.2 * edt);
       this.dvx += (Math.cos(aim) * this.vy - this.dvx) * f;
       this.dvy += (Math.sin(aim) * this.vy - this.dvy) * f;
-      this.x = clamp(this.x + this.dvx * dt, 14, W - 14);
-      this.y += this.dvy * dt;
-      this.fuse -= dt;
+      this.x = clamp(this.x + this.dvx * edt, 14, W - 14);
+      this.y += this.dvy * edt;
+      this.fuse -= edt;
       const pdx = game.player.x - this.x, pdy = game.player.y - this.y;
       if (!this.dead && (pdx * pdx + pdy * pdy < 8100 || this.fuse <= 0)) {
         this.dead = true;
@@ -852,19 +855,19 @@ class Enemy {
         AudioSys.explode(false);
       }
     } else if (this.type === 'shielder') {
-      this.y += this.vy * dt;
+      this.y += this.vy * edt;
       this.x = clamp(this.baseX + Math.sin(this.t * 0.7) * 30, 20, W - 20);
       if (this.shieldOff > 0) {
-        this.shieldOff -= dt;
+        this.shieldOff -= edt;
       } else {
-        this.shieldCycle -= dt;
+        this.shieldCycle -= edt;
         if (this.shieldCycle <= 0) { this.shieldOff = 1.2; this.shieldCycle = 2.4; }
       }
     } else if (this.type === 'mender') {
-      this.y += this.vy * dt;
+      this.y += this.vy * edt;
       this.x = clamp(this.baseX + Math.sin(this.t * this.freq) * this.amp, 20, W - 20);
-      this.healCd -= dt;
-      if (this.healPulse > 0) this.healPulse -= dt;
+      this.healCd -= edt;
+      if (this.healPulse > 0) this.healPulse -= edt;
       if (canFire && this.healCd <= 0) {
         this.healCd = 4;
         let healed = 0;
@@ -879,14 +882,14 @@ class Enemy {
         }
       }
     } else if (this.type === 'carrier') {
-      if (this.launchPulse > 0) this.launchPulse -= dt;
+      if (this.launchPulse > 0) this.launchPulse -= edt;
       if (!this.stopped) {
-        this.y += this.vy * dt;
+        this.y += this.vy * edt;
         if (this.y >= this.stopY) this.stopped = true;
       } else {
         this.x = clamp(this.baseX + Math.sin(this.t * 0.5) * 46, 34, W - 34);
         // 释放无人机(受敌机总数上限约束,避免过载)
-        this.spawnCd -= dt;
+        this.spawnCd -= edt;
         if (canFire && this.spawnCd <= 0) {
           this.spawnCd = Math.max(1.6, 3.2 - game.effWave() * 0.06) * this.fireMul;
           if (game.enemies.length < 60) {
@@ -902,7 +905,7 @@ class Enemy {
           }
         }
         // 扇形压制弹
-        this.fireCd -= dt;
+        this.fireCd -= edt;
         if (canFire && this.fireCd <= 0) {
           this.fireCd = 2.6 * this.fireMul;
           for (let i = -2; i <= 2; i++)
@@ -912,11 +915,11 @@ class Enemy {
       }
     } else { // sniper
       if (!this.stopped) {
-        this.y += this.vy * dt;
+        this.y += this.vy * edt;
         if (this.y >= this.stopY) this.stopped = true;
       } else {
         this.x = clamp(this.baseX + Math.sin(this.t * 0.8) * 40, 30, W - 30);
-        this.fireCd -= dt;
+        this.fireCd -= edt;
         if (canFire && this.fireCd <= 0) {
           this.fireCd = Math.max(1.2, 2.6 - game.wave * 0.12) * this.fireMul;
           game.enemyShot(this.x, this.y + this.r, game.aimedAngle(this.x, this.y), 210 + game.effWave() * 6);
@@ -1210,7 +1213,11 @@ class PowerUp {
     power: { color: '#ff5470', label: 'P' },
     shield: { color: '#4db8ff', label: 'S' },
     bomb: { color: '#51e08a', label: 'B' },
-    life: { color: '#ff77a9', label: '♥' }
+    life: { color: '#ff77a9', label: '♥' },
+    x2: { color: '#ffd166', label: '×2' },
+    frenzy: { color: '#ff9a3c', label: 'F' },
+    frost: { color: '#aef0ff', label: '❄' },
+    magstorm: { color: '#c86bff', label: 'M' }
   };
   constructor(x, y, type) {
     this.x = x; this.y = y; this.type = type;
@@ -1218,11 +1225,11 @@ class PowerUp {
   }
   update(dt, game) {
     this.t += dt;
-    // 引力场:进入吸取范围后飞向玩家
+    // 引力场:进入吸取范围后飞向玩家(磁力风暴强制全吸)
     const p = game.player;
     if (p.alive) {
       const dx = p.x - this.x, dy = p.y - this.y;
-      if (dx * dx + dy * dy < p.magnetR * p.magnetR) {
+      if (this.vac || dx * dx + dy * dy < p.magnetR * p.magnetR) {
         const f = Math.min(1, dt * 6);
         this.x += dx * f;
         this.y += dy * f;
@@ -1263,8 +1270,8 @@ class XPOrb {
     const p = game.player;
     const dx = p.x - this.x, dy = p.y - this.y;
     const d = Math.hypot(dx, dy) || 1;
-    // 磁吸范围内立即吸取;掉落 5 秒后自动飞向玩家兜底,保证经验不浪费
-    if (p.alive && (d < p.magnetR || this.age > 5)) {
+    // 磁吸范围内立即吸取;掉落 5 秒后自动飞向玩家兜底,保证经验不浪费;磁力风暴强制全吸
+    if (p.alive && (this.vac || d < p.magnetR || this.age > 5)) {
       const sp = clamp(240 + (p.magnetR - d) * 2.4, 220, 560);
       const f = Math.min(1, 9 * dt);
       this.vx += (dx / d * sp - this.vx) * f;
@@ -1493,7 +1500,7 @@ class Asteroid {
 /* ============================================================
  * 补给空投:缓慢降落的标准补给箱,接住即获得对应物资
  * ============================================================ */
-const SUPPLY_LOOT = ['power', 'shield', 'bomb', 'life', 'star'];
+const SUPPLY_LOOT = ['power', 'shield', 'bomb', 'life', 'star', 'x2', 'frenzy'];
 class SupplyDrop {
   constructor(x, kind) {
     this.x = x; this.y = -20; this.kind = kind;
@@ -1504,10 +1511,10 @@ class SupplyDrop {
     this.y += 30 * dt;
     this.x += Math.sin(this.t * 1.4) * 14 * dt;
     const p = game.player;
-    // 引力场:进入吸取范围后飞向玩家
+    // 引力场:进入吸取范围后飞向玩家(磁力风暴强制全吸)
     if (p.alive) {
       const dx2 = p.x - this.x, dy2 = p.y - this.y;
-      if (dx2 * dx2 + dy2 * dy2 < p.magnetR * p.magnetR) {
+      if (this.vac || dx2 * dx2 + dy2 * dy2 < p.magnetR * p.magnetR) {
         const f = Math.min(1, dt * 6);
         this.x += dx2 * f;
         this.y += dy2 * f;
