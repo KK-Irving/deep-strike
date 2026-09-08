@@ -187,8 +187,8 @@ class Game {
     this.mode = challengeMode || 'normal';
     // 每日/周挑战:播种固定波次序列与抽卡序列;周挑战威胁+1
     // 种子基准保留,供 startWave 按波派生与 _drawChoices 按抽卡序号派生
-    this._seedBase = this.mode === 'normal' ? 0 : this._challengeSeed();
-    RNG = this.mode === 'normal' ? Math.random : mulberry32(this._seedBase);
+    this._seedBase = this._challengeSeed();
+    RNG = this.isChallenge() ? mulberry32(this._seedBase) : Math.random;
     this._reset();
     this.state = 'playing';
     AudioSys.init();
@@ -202,6 +202,7 @@ class Game {
     this.startWave(1);
     if (this.mode === 'daily') this.banner = { text: '每日挑战', sub: this._challengeKey() + ' · 固定关卡,冲击纪录', life: 2.4, max: 2.4, gold: true };
     if (this.mode === 'weekly') this.banner = { text: '周挑战', sub: this._challengeKey() + ' · 威胁+1,词缀更凶,冲击纪录', life: 2.4, max: 2.4, gold: true };
+    if (this.mode === 'boss') this.banner = { text: '旗舰连战', sub: '连续击毁不断强化的旗舰 · 每阶段升级+遗物 · 每日芯片限领', life: 2.6, max: 2.6, gold: true };
   }
 
   /* ---- 每日挑战 ---- */
@@ -223,6 +224,8 @@ class Game {
   _challengeKey() {
     return this.mode === 'weekly' ? this._weekKey() : this._dailyKey();
   }
+  /* 是否种子挑战模式(每日/周)——旗舰连战与普通模式使用真随机 */
+  isChallenge() { return this.mode === 'daily' || this.mode === 'weekly'; }
   /* 挑战芯片领取闸门:按当前真实日期/周判断本期是否已领取 */
   _claimStoreKey() {
     return this.mode === 'weekly' ? 'deepstrike.weeklyClaim' : 'deepstrike.dailyClaim';
@@ -255,8 +258,14 @@ class Game {
     try { localStorage.setItem(this._challengePrefix() + this._challengeKey(), String(score)); }
     catch (e) { /* 忽略 */ }
   }
+  /* 旗舰连战:永久最佳纪录 + 每日芯片限领 */
+  _bossBest() { try { return +localStorage.getItem('deepstrike.bossHi') || 0; } catch (e) { return 0; } }
+  _saveBossBest(s) { try { localStorage.setItem('deepstrike.bossHi', String(s)); } catch (e) { /* 忽略 */ } }
+  _canBossClaim() { try { return localStorage.getItem('deepstrike.bossClaim') !== this._dailyKey(); } catch (e) { return true; } }
+  _markBossClaimed() { try { localStorage.setItem('deepstrike.bossClaim', this._dailyKey()); } catch (e) { /* 忽略 */ } }
   _refreshMenuHi() {
-    this._dom.menuHi.textContent = '最高纪录 ' + this.hi + ' · 每日 ' + this._modeBest('daily') + ' · 周挑战 ' + this._modeBest('weekly');
+    this._dom.menuHi.textContent = '最高纪录 ' + this.hi + ' · 每日 ' + this._modeBest('daily')
+      + ' · 周挑战 ' + this._modeBest('weekly') + ' · 连战 ' + this._bossBest();
   }
 
   /* 记录某质变武器已通关第 15 波;四种集齐解锁「万法归一」 */
@@ -464,7 +473,7 @@ class Game {
   /* 抽卡:挑战模式下按抽卡序号派生独立子流——第 N 抽的随机取数对全天
    * 所有尝试一致(具体出卡仍受各自构筑过滤影响),且不影响波内种子流 */
   _drawChoices() {
-    if (this.mode === 'normal') return drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
+    if (!this.isChallenge()) return drawUpgradeCards(this.mods, this.maxSlots, this.level, this.evo);
     const idx = this._drawCount++;
     const saved = RNG;
     RNG = mulberry32((this._seedBase ^ Math.imul(idx + 1, 0x85EBCA6B)) >>> 0);
@@ -784,15 +793,15 @@ class Game {
     if (typeof DailyTasks !== 'undefined') DailyTasks.bump('wave', n, this);
     // 挑战模式:按波派生独立子流——出怪序列/词缀只取决于日期种子与波号,
     // 与此前战斗过程(掉落/暴击/粒子)消耗了多少随机数无关,任意尝试严格一致
-    if (this.mode !== 'normal') RNG = mulberry32((this._seedBase ^ Math.imul(n, 0x9E3779B1)) >>> 0);
+    if (this.isChallenge()) RNG = mulberry32((this._seedBase ^ Math.imul(n, 0x9E3779B1)) >>> 0);
     // 时间冻结:每波开始静止敌方弹幕
     if (this.evo.time) this.bulletFreezeT = 2.5;
     // 补给号角:波首掉落随机道具
     if (this.relics.r_horn) this._dropPower(rand(60, W - 60), -20);
     const threat = this.threatLevel();
-    // 波次词缀:第 6 波起 40% 概率(BOSS 波除外)
+    // 波次词缀:第 6 波起 40% 概率(BOSS 波与连战模式除外)
     this.waveMod = null;
-    if (n >= 6 && n % 5 !== 0 && RNG() < (this.mode === 'weekly' ? 0.7 : 0.4)) {
+    if (this.mode !== 'boss' && n >= 6 && n % 5 !== 0 && RNG() < (this.mode === 'weekly' ? 0.7 : 0.4)) {
       this.waveMod = WAVE_MODS[irand(0, WAVE_MODS.length - 1)];
     }
     // 环境参数:威胁与词缀共同作用于本波敌机
@@ -810,31 +819,36 @@ class Game {
       if (this.player.bombs < bombCap) this.player.bombs++;
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + Math.round(this.player.maxHp * 0.25));
     }
-    if (n >= 5) Ach.unlock('wave_5', this);
-    if (n >= 10) Ach.unlock('wave_10', this);
-    if (n >= 15) Ach.unlock('wave_15', this);
-    if (n >= 20) Ach.unlock('wave_20', this);
-    if (n >= 25) Ach.unlock('wave_25', this);
-    if (n >= 30) Ach.unlock('wave_30', this);
-    if (n >= 40) Ach.unlock('wave_40', this);
-    if (n >= 50) Ach.unlock('wave_50', this);
-    // 质变武器抵达 20 波精通 + 四通累计;15 波用于 path_all 记录
-    if (n >= 20) {
-      const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : null;
-      if (pk) Ach.unlock('path_' + pk, this);
+    // 波次/质变/无弹成就:旗舰连战不按真实波次语义解锁
+    if (this.mode !== 'boss') {
+      if (n >= 5) Ach.unlock('wave_5', this);
+      if (n >= 10) Ach.unlock('wave_10', this);
+      if (n >= 15) Ach.unlock('wave_15', this);
+      if (n >= 20) Ach.unlock('wave_20', this);
+      if (n >= 25) Ach.unlock('wave_25', this);
+      if (n >= 30) Ach.unlock('wave_30', this);
+      if (n >= 40) Ach.unlock('wave_40', this);
+      if (n >= 50) Ach.unlock('wave_50', this);
+      // 质变武器抵达 20 波精通 + 四通累计;15 波用于 path_all 记录
+      if (n >= 20) {
+        const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : null;
+        if (pk) Ach.unlock('path_' + pk, this);
+      }
+      if (n >= 15) {
+        const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : null;
+        if (pk) this._recordPathClear(pk);
+      }
+      // 不使用炸弹通关第 15 波
+      if (n > 15 && (this.runBombsUsed || 0) === 0) Ach.unlock('nobomb_wave15', this);
     }
-    if (n >= 15) {
-      const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : null;
-      if (pk) this._recordPathClear(pk);
-    }
-    // 不使用炸弹通关第 15 波
-    if (n > 15 && (this.runBombsUsed || 0) === 0) Ach.unlock('nobomb_wave15', this);
     // 连续无伤波次里程碑
     if (this.perfectStreak >= 6) Ach.unlock('perfect_6', this);
     this.waveDamageTaken = 0;
-    if (n % 5 === 0) {
+    if (n % 5 === 0 || this.mode === 'boss') {
       this.waveQuota = 1; // 目标:击毁旗舰
-      const bname = BOSS_VARIANTS[bossVariant(n)].name;
+      // 连战模式:第 k 阶段按虚拟波号 5k 构造旗舰(难度递增,变体自然轮换)
+      const vw = this.mode === 'boss' ? n * 5 : n;
+      const bname = BOSS_VARIANTS[bossVariant(vw)].name;
       this.banner = { text: '⚠ WARNING ⚠', sub: '目标:击毁' + bname, life: 2.2, max: 2.2, red: true };
       AudioSys.alarm();
       this.spawnQueue.push({ boss: true, t: 2.0 });
@@ -891,14 +905,14 @@ class Game {
       }
       this.banner.sub += ' · ⚠ 精英机随队';
     }
-    // 事件波:陨石带(第3/8/13…波,掩体兼威胁)与补给空投(第4/9/14…波)
-    if (n % 5 === 3) {
+    // 事件波:陨石带(第3/8/13…波,掩体兼威胁)与补给空投(第4/9/14…波);连战模式无杂兵事件
+    if (this.mode !== 'boss' && n % 5 === 3) {
       this.banner.sub += ' · ☄ 陨石带';
       const rocks = 4 + Math.floor(n / 3);
       for (let i = 0; i < rocks; i++)
         this.spawnQueue.push({ asteroid: true, t: rand(0.5, 6), x: rand(40, W - 40), r: rand(14, 26) });
     }
-    if (n % 5 === 4) {
+    if (this.mode !== 'boss' && n % 5 === 4) {
       this.banner.sub += ' · ▽ 补给空投';
       for (let i = 0; i < 3; i++)
         this.spawnQueue.push({ supply: true, t: rand(1, 5), x: rand(50, W - 50) });
@@ -917,7 +931,7 @@ class Game {
     for (let i = this.spawnQueue.length - 1; i >= 0; i--) {
       const s = this.spawnQueue[i];
       if (s.t <= this.waveTime) {
-        if (s.boss) this.boss = new Boss(this.wave);
+        if (s.boss) this.boss = new Boss(this.mode === 'boss' ? this.wave * 5 : this.wave);
         else if (s.asteroid) this.asteroids.push(new Asteroid(s.x, -30, s.r));
         else if (s.supply) this.supplies.push(new SupplyDrop(s.x, SUPPLY_LOOT[irand(0, SUPPLY_LOOT.length - 1)]));
         else {
@@ -1409,6 +1423,9 @@ class Game {
     const pts = Math.round(b.score * this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1));
     this.score += pts;
     this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
+    // 连战模式:击毁旗舰回复 15% 生命,支撑连续作战
+    if (this.mode === 'boss' && this.player.alive)
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + Math.round(this.player.maxHp * 0.15));
     for (let i = 0; i < 10; i++)
       this._explode(b.x + rand(-b.r, b.r), b.y + rand(-b.r * 0.6, b.r * 0.6), 14, '#ff8c42', 1.1);
     this._explode(b.x, b.y, 30, '#ffd166', 1.6);
@@ -1594,9 +1611,11 @@ class Game {
 
   /* ---------------- 子弹发射 ---------------- */
   /* 敌方弹幕伤害:随波次与威胁等级增长(后期弹幕更疼)。
-   * 基础 22,每波 +0.7(封顶 +18),威胁每级 +2;橙色狙击弹额外 +15%。 */
+   * 基础 22,每波 +0.7(封顶 +18),威胁每级 +2;橙色狙击弹额外 +15%。
+   * 连战模式按虚拟波号(阶段 ×5)成长,与旗舰强度同步。 */
   enemyDmg(kind) {
-    const base = 22 + Math.min(18, (this.wave - 1) * 0.7) + this.threatLevel() * 2;
+    const w = this.mode === 'boss' ? this.wave * 5 : this.wave;
+    const base = 22 + Math.min(18, (w - 1) * 0.7) + this.threatLevel() * 2;
     return Math.round(base * (kind === 'orange' ? 1.15 : 1));
   }
 
@@ -1767,7 +1786,7 @@ class Game {
     ctx.textAlign = 'right';
     ctx.fillStyle = '#ffd166';
     ctx.font = 'bold 16px Consolas, monospace';
-    ctx.fillText('WAVE ' + this.wave, W - 14, 14);
+    ctx.fillText((this.mode === 'boss' ? 'STAGE ' : 'WAVE ') + this.wave, W - 14, 14);
     // 关卡目标进度
     const quotaMet = this.waveKills >= this.waveQuota;
     ctx.font = 'bold 12px Consolas, monospace';
@@ -1790,10 +1809,11 @@ class Game {
     }
     // 挑战模式标识
     if (this.mode !== 'normal') {
-      const tagName = this.mode === 'weekly' ? '周挑战' : '每日挑战';
+      const tagName = this.mode === 'weekly' ? '周挑战' : this.mode === 'boss' ? '旗舰连战' : '每日挑战';
+      const best = this.mode === 'boss' ? this._bossBest() : this._challengeBest();
       ctx.fillStyle = '#ffd166';
       ctx.font = 'bold 11px Consolas, monospace';
-      ctx.fillText(tagName + ' · 纪录 ' + this._challengeBest(), W - 14, 54);
+      ctx.fillText(tagName + ' · 纪录 ' + best, W - 14, 54);
     }
     // 无尽模式:威胁等级与波次词缀
     const threat = this.threatLevel();
@@ -1992,7 +2012,15 @@ class Game {
     if (this.mode === 'weekly' && this.score >= 30000) Ach.unlock('weekly_30000', this);
     if (this.score >= 50000) Ach.unlock('score_50k', this);
     if (this.score >= 150000) Ach.unlock('score_150k', this);
-    if (this.mode !== 'normal') {
+    if (this.mode === 'boss') {
+      // 连战:永久最佳纪录
+      const best = this._bossBest();
+      if (this.score > best) {
+        this.newRecord = true;
+        this._saveBossBest(this.score);
+        AudioSys.record();
+      }
+    } else if (this.mode !== 'normal') {
       // 挑战模式:独立纪录
       const best = this._challengeBest();
       if (this.score > best) {
@@ -2029,12 +2057,22 @@ class Game {
     Shop.lastEarn = Math.floor(this.score / 1600) + (this.runBossKills || 0) * 6 + (this.runEliteKills || 0) * 1;
     if (this.relics.r_grail) Shop.lastEarn *= 2;
     Shop.addCrystal(Shop.lastEarn);
-    // 挑战材料「战术芯片」:仅每日/周挑战产出,按得分/波次给予;周挑战翻倍
+    // 挑战材料「战术芯片」:连战与每日/周挑战产出;按期限领一次
     Shop.lastChips = 0;
-    if (this.mode !== 'normal') {
+    Shop.lastChipsCapped = false;
+    if (this.mode === 'boss') {
+      // 连战:按抵达阶段给芯片(8~24),每日限领一次
+      if (this._canBossClaim()) {
+        Shop.lastChips = clamp(6 + this.wave * 2, 8, 24);
+        Shop.addChips(Shop.lastChips);
+        this._markBossClaimed();
+      } else {
+        Shop.lastChips = 0;
+        Shop.lastChipsCapped = true;
+      }
+    } else if (this.mode !== 'normal') {
       // 挑战芯片:每日/每周仅可领取一次,数额按表现浮动并钳制在目标区间
       // (每日 10~15,每周 40~60);重复挑战同一日/周不再发放(仍可刷分/纪录)
-      Shop.lastChipsCapped = false;
       if (this._canClaimChips()) {
         if (this.mode === 'weekly') {
           const perf = Math.floor(this.score / 6000) + Math.floor(this.wave / 3) + (this.runBossKills || 0) * 2;
