@@ -218,6 +218,4 @@ ISO 周号修正;星晶高频进账延迟落盘;文档与商城文案全面回�
 
 ## 后续可扩展
 
-- 更多词缀与羁绊、更多进化路线、传奇稀有度质变卡
-- 游戏手柄支持(Gamepad API)、云端排行榜
-- 移植为 Electron 桌面应用或接入 WebGPU 渲染
+见 [`ROADMAP.md`](ROADMAP.md)(Phase 1 内容填充 → Phase 2 模式扩展 → Phase 3 大内容版本)。
