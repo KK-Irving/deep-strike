@@ -427,6 +427,24 @@ class Player {
         mk(0, -12, Math.cos(a) * 520, Math.sin(a) * 520,
           Object.assign({ color: '#ffe9a8', r: 2.6, pierce: spPierce, split, dmg: spDmg }, fade));
       }
+    } else if (m.boomer) {
+      // 回旋刃:掷出减速→折返,去回双重切割;并列弹道生成并排多枚
+      const dmg = 8 + 3 * (m.boomer - 1) + 2 * this.dmgBonus + (this.weapon - 1);
+      const n = 1 + (m.multi || 0);
+      for (let i = 0; i < n; i++) {
+        const off = n === 1 ? 0 : (i / (n - 1) - 0.5) * 30;
+        P.push({
+          x: this.x + off, y: this.y - 12,
+          vx: off * 5, vy: -640,
+          r: 5 + (game.evo.boomer ? 1 : 0),
+          dmg: Math.round(dmg * (game.evo.boomer ? 1.3 : 1)),
+          color: '#8ff5e0', dead: false,
+          pierce: 99, split: 0,
+          boom: true, ret: false,
+          boomT: 0.7 - (game.evo.boomer ? 0.1 : 0),
+          spin: crand(0, TAU), age: 0
+        });
+      }
     } else if (!m.laser) {
       switch (this.weapon) {
         case 1: mk(0, -14, 0, -540); break;

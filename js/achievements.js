@@ -63,6 +63,7 @@ const ACHIEVEMENTS = [
   { id: 'path_spread',cat: '质变', name: '弹幕织网者', desc: '以散射炮单局抵达第 20 波', reward: 200 },
   { id: 'path_rail',  cat: '质变', name: '磁轨狙神',   desc: '以轨道炮单局抵达第 20 波', reward: 200 },
   { id: 'path_tesla', cat: '质变', name: '雷霆化身',   desc: '以电弧发生器单局抵达第 20 波', reward: 200 },
+  { id: 'path_boomer',cat: '质变', name: '回旋舞者',   desc: '以回旋刃单局抵达第 20 波', reward: 200 },
   { id: 'path_all',   cat: '质变', name: '万法归一',   desc: '累计用四种质变武器各通关一次第 15 波', reward: 500 },
   { id: 'tesla_chain8',cat: '质变', name: '连锁风暴',   desc: '单次链式闪电命中 8 个目标', reward: 250 },
   // ---- 精英 ----

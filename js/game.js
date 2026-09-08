@@ -387,6 +387,12 @@ class Game {
       if (E.railgun) railMul *= 0.65;
       interval *= railMul;
     }
+    // 回旋刃:双程伤害故投掷偏慢;疾风投掷/龙卷之核缩短间隔
+    if (m.boomer) {
+      interval *= 1.7;
+      if (this.bonds.includes('boomerch')) interval *= 0.75;
+      if (E.boomer) interval *= 0.85;
+    }
     p.fireInterval = Math.max(0.045, interval);
     p.speed = (sh.speed || 330) * Math.pow(1.15, m.speed || 0);
     p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 70;
@@ -883,11 +889,11 @@ class Game {
       if (n >= 50) Ach.unlock('wave_50', this);
       // 质变武器抵达 20 波精通 + 四通累计;15 波用于 path_all 记录
       if (n >= 20) {
-        const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : null;
+        const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : this.mods.boomer ? 'boomer' : null;
         if (pk) Ach.unlock('path_' + pk, this);
       }
       if (n >= 15) {
-        const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : null;
+        const pk = this.mods.laser ? 'laser' : this.mods.spread ? 'spread' : this.mods.railgun ? 'railgun' : this.mods.tesla ? 'tesla' : this.mods.boomer ? 'boomer' : null;
         if (pk) this._recordPathClear(pk);
       }
       // 不使用炸弹通关第 15 波
@@ -1005,6 +1011,24 @@ class Game {
         b.life -= dt;
         if (b.life <= 0) { this.playerBullets.splice(i, 1); continue; }
       }
+      // 回旋刃:去程减速,时机到折返追手,回到手中消失(不受出界清除)
+      if (b.boom) {
+        b.age += dt;
+        b.spin += dt * 22;
+        if (!b.ret) {
+          const dec = Math.exp(-1.9 * dt);
+          b.vx *= dec; b.vy *= dec;
+          b.boomT -= dt;
+          if (b.boomT <= 0) { b.ret = true; b.lastHit = null; }
+        } else {
+          const dx = this.player.x - b.x, dy = (this.player.y - 6) - b.y;
+          const d = Math.hypot(dx, dy) || 1;
+          const sp = 640, f = Math.min(1, 10 * dt);
+          b.vx += (dx / d * sp - b.vx) * f;
+          b.vy += (dy / d * sp - b.vy) * f;
+          if (d < 20 && b.age > 0.2) b.dead = true;
+        }
+      }
       if (b.homing) {
         b.life -= dt;
         if (b.life <= 0) { this.playerBullets.splice(i, 1); continue; }
@@ -1029,7 +1053,7 @@ class Game {
         }
       }
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (b.dead || b.y < -20 || b.x < -20 || b.x > W + 20 || b.y > H + 20) this.playerBullets.splice(i, 1);
+      if (b.dead || (!b.boom && (b.y < -20 || b.x < -20 || b.x > W + 20 || b.y > H + 20))) this.playerBullets.splice(i, 1);
     }
     for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
       const b = this.enemyBullets[i];
@@ -1250,7 +1274,9 @@ class Game {
   /* 单发子弹命中结算:暴击 / 贯穿 / 裂变 */
   _hitTarget(b, e) {
     let dmg = b.dmg;
-    const cc = 0.2 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0);
+    let cc = 0.2 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0);
+    // 虚空之刃:回旋刃暴击率 ×1.5
+    if (b.boom && this.bonds.includes('voidedge')) cc *= 1.5;
     const guaranteed = (b.homing && this.bonds.includes('hunt'))
       || (b.rail && this.bonds.includes('railcrit'));
     const crit = guaranteed || (cc > 0 && RNG() < cc);
@@ -1758,6 +1784,19 @@ class Game {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const b of this.playerBullets) {
+      if (b.boom) {
+        // 回旋刃:旋转双刃造型
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.spin || 0);
+        ctx.fillStyle = 'rgba(143,245,224,0.35)';
+        ctx.fillRect(-b.r - 3, -2, (b.r + 3) * 2, 4);
+        ctx.fillRect(-2, -b.r - 3, 4, (b.r + 3) * 2);
+        ctx.fillStyle = b.color;
+        ctx.beginPath(); ctx.arc(0, 0, b.r * 0.55, 0, TAU); ctx.fill();
+        ctx.restore();
+        continue;
+      }
       ctx.fillStyle = 'rgba(120,220,255,0.35)';
       ctx.fillRect(b.x - 3.5, b.y - 13, 7, 18);
       ctx.fillStyle = b.color;

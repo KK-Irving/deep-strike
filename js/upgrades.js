@@ -42,6 +42,7 @@ const UPGRADES = [
   { id: 'spread',   icon: '🎇', name: '散射炮',     max: 2, rar: 2, desc: '质变:主炮替换为宽扇散射,近程爆发(弹丸会衰减)', path: true },
   { id: 'railgun',  icon: '🌩', name: '轨道炮',     max: 2, rar: 2, desc: '质变:蓄力发射高速贯穿磁轨弹,单发高伤(与暴击/贯穿强联动)', path: true },
   { id: 'tesla',    icon: '⚡', name: '电弧发生器', max: 2, rar: 2, desc: '质变:主炮替换为链式闪电,自动在敌群间跳跃(与并列/裂变强联动)', path: true },
+  { id: 'boomer',   icon: '↻',  name: '回旋刃',     max: 2, rar: 2, desc: '质变:掷出双程回旋刃,去回双重切割(可并排多枚)', path: true },
   { id: 'slotplus', icon: '🧬', name: '基因扩展',   max: 2, rar: 2, desc: '隐藏卡:强化槽位 +1', hidden: true }
 ];
 
@@ -67,7 +68,10 @@ const BONDS = [
   { id: 'teslachain',name:'雷网',     req: ['tesla', 'multi'],      desc: '闪电额外多一条独立链' },
   { id: 'teslafork', name: '分叉雷电', req: ['tesla', 'split'],      desc: '闪电每次跳跃分叉命中两个目标' },
   { id: 'laserlens', name: '聚焦透镜', req: ['laser', 'pierce'],     desc: '激光宽度翻倍,灼烧穿透护盾' },
-  { id: 'scatterstorm',name:'散射风暴',req: ['spread', 'rate'],      desc: '散射额外并发一轮,射速越高越密' }
+  { id: 'scatterstorm',name:'散射风暴',req: ['spread', 'rate'],      desc: '散射额外并发一轮,射速越高越密' },
+  // 回旋刃专属羁绊
+  { id: 'boomerch',  name: '疾风投掷', req: ['boomer', 'rate'],      desc: '回旋刃投掷间隔额外 -25%' },
+  { id: 'voidedge',  name: '虚空之刃', req: ['boomer', 'crit'],      desc: '回旋刃暴击率 ×1.5' }
 ];
 
 const UPGRADE_MAP = {};
@@ -90,7 +94,8 @@ const EVOLUTIONS = [
   { id: 'e_maelstrom', base: 'spread',   icon: '💫', name: '万弹齐发', desc: '散射弹丸 +6,且射程不再衰减' },
   { id: 'e_freeze',    base: 'time',     icon: '⏱', name: '时间冻结', desc: '每波开始时,敌方弹幕静止 2.5 秒' },
   { id: 'e_railstorm', base: 'railgun',  icon: '🌠', name: '磁暴风', desc: '轨道炮蓄力更快、弹体贯穿无限,命中引发链式爆轰' },
-  { id: 'e_thunderlord',base: 'tesla',   icon: '🌩', name: '雷霆领主', desc: '闪电跳跃目标 +3,每跳附加麻痹减速' }
+  { id: 'e_thunderlord',base: 'tesla',   icon: '🌩', name: '雷霆领主', desc: '闪电跳跃目标 +3,每跳附加麻痹减速' },
+  { id: 'e_vortex',    base: 'boomer',   icon: '🌪', name: '龙卷之核', desc: '回旋刃伤害 +30%,体积增大,投掷与折返更快' }
 ];
 
 /* 加权抽卡:从未满级的卡片中按稀有度权重抽取 3 张(互不重复)

@@ -105,6 +105,10 @@ function startServer() {
     // 新增质变武器:轨道炮 / 电弧
     out.rail_base = measure((g) => { g.mods = { railgun: 1 }; });
     out.rail_cards = measure((g) => { g.mods = { railgun: 2, dmg: 3, pierce: 2, crit: 2, multi: 1 }; });
+    // 第五质变路线:回旋刃
+    out.boom_base = measure((g) => { g.mods = { boomer: 1 }; });
+    out.boom_cards = measure((g) => { g.mods = { boomer: 2, dmg: 3, crit: 2, multi: 1 }; });
+    out.boom_evo = measure((g) => { g.mods = { boomer: 2, dmg: 3, crit: 2, multi: 1 }; g.evo = { boomer: true }; });
     out.tesla_base = measure((g) => { g.mods = { tesla: 1 }; });
     out.tesla_cards = measure((g) => { g.mods = { tesla: 2, dmg: 3, multi: 2, split: 1 }; });
     g.state = 'menu';
@@ -121,6 +125,7 @@ function startServer() {
   console.log('散射       base=' + r(result.spread_base) + '  +卡=' + r(result.spread_cards) + '  +evo=' + r(result.spread_evo));
   console.log('轨道炮     base=' + r(result.rail_base) + '  +卡=' + r(result.rail_cards));
   console.log('电弧       base=' + r(result.tesla_base) + '  +卡=' + r(result.tesla_cards));
+  console.log('回旋刃     base=' + r(result.boom_base) + '  +卡=' + r(result.boom_cards) + '  +evo=' + r(result.boom_evo));
 
   let bad = 0;
   const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
@@ -139,7 +144,7 @@ function startServer() {
   // 平衡(feature #5):四种质变武器 + 卡 均应可用,且强弱差距收敛,避免"只有几种有用"
   const paths = {
     laser: result.laser_cards, spread: result.spread_cards,
-    railgun: result.rail_cards, tesla: result.tesla_cards
+    railgun: result.rail_cards, tesla: result.tesla_cards, boomer: result.boom_cards
   };
   const vals = Object.values(paths);
   const maxP = Math.max.apply(null, vals);
