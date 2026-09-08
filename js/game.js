@@ -27,6 +27,16 @@ const WAVE_MODS = [
   { id: 'bounty',  icon: '💎', name: '赏金', desc: '经验 +50%,掉落翻倍' }
 ];
 
+/* 周挑战全局变异:按周种子派生,本周所有玩家一致 */
+const WEEK_MUTATORS = [
+  { id: 'rage',    icon: '🔥', name: '狂暴周', desc: '全部敌机火力节奏 +25%' },
+  { id: 'bulwark', icon: '⚙', name: '钢铁周', desc: '全部敌机生命 +25%' },
+  { id: 'gale',    icon: '💨', name: '疾风周', desc: '全部敌机速度 +15%' },
+  { id: 'greed',   icon: '💎', name: '贪婪周', desc: '星晶获取 ×1.5' },
+  { id: 'surge',   icon: '🔷', name: '经验风暴', desc: '经验获取 +50%' },
+  { id: 'hunt',    icon: '🎯', name: '猎杀周', desc: '精英机出现率与双词缀率大增' }
+];
+
 class Game {
   constructor(canvas) {
     this.canvas = canvas;
@@ -189,6 +199,8 @@ class Game {
     // 种子基准保留,供 startWave 按波派生与 _drawChoices 按抽卡序号派生
     this._seedBase = this._challengeSeed();
     RNG = this.isChallenge() ? mulberry32(this._seedBase) : Math.random;
+    // 周挑战全局变异(由周种子决定)
+    this._mut = this._weekMutator();
     this._reset();
     this.state = 'playing';
     AudioSys.init();
@@ -201,7 +213,7 @@ class Game {
     this._showState();
     this.startWave(1);
     if (this.mode === 'daily') this.banner = { text: '每日挑战', sub: this._challengeKey() + ' · 固定关卡,冲击纪录', life: 2.4, max: 2.4, gold: true };
-    if (this.mode === 'weekly') this.banner = { text: '周挑战', sub: this._challengeKey() + ' · 威胁+1,词缀更凶,冲击纪录', life: 2.4, max: 2.4, gold: true };
+    if (this.mode === 'weekly') this.banner = { text: '周挑战', sub: this._challengeKey() + (this._mut ? ' · ' + this._mut.icon + ' ' + this._mut.name + ':' + this._mut.desc : '') + ' · 威胁+1,冲击纪录', life: 3.0, max: 3.0, gold: true };
     if (this.mode === 'boss') this.banner = { text: '旗舰连战', sub: '连续击毁不断强化的旗舰 · 每阶段升级+遗物 · 每日芯片限领', life: 2.6, max: 2.6, gold: true };
   }
 
@@ -226,6 +238,14 @@ class Game {
   }
   /* 是否种子挑战模式(每日/周)——旗舰连战与普通模式使用真随机 */
   isChallenge() { return this.mode === 'daily' || this.mode === 'weekly'; }
+  /* 周挑战全局变异:按周种子派生(加盐避免与出怪序列同流),本周固定且人人一致 */
+  _weekMutator() {
+    if (this.mode !== 'weekly') return null;
+    const k = 'mut:' + this._weekKey();
+    let h = 2166136261;
+    for (let i = 0; i < k.length; i++) { h ^= k.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return WEEK_MUTATORS[(h >>> 0) % WEEK_MUTATORS.length];
+  }
   /* 挑战芯片领取闸门:按当前真实日期/周判断本期是否已领取 */
   _claimStoreKey() {
     return this.mode === 'weekly' ? 'deepstrike.weeklyClaim' : 'deepstrike.dailyClaim';
@@ -347,7 +367,8 @@ class Game {
     p.fireInterval = Math.max(0.045, interval);
     p.speed = (sh.speed || 330) * Math.pow(1.15, m.speed || 0);
     p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 70;
-    this.xpMult = 1 + 0.25 * (m.xpchip || 0) + 0.04 * boostLevel('xp10'); // 砍:每级 +4%(满级 +40%)
+    // 经验调校 + 经验风暴周变异
+    this.xpMult = (1 + 0.25 * (m.xpchip || 0) + 0.04 * boostLevel('xp10')) * (this._mut && this._mut.id === 'surge' ? 1.5 : 1); // 砍:每级 +4%(满级 +40%)
     this.comboWindow = 2 + 1.5 * (m.combo || 0);
     p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
@@ -812,6 +833,12 @@ class Game {
       spdMul: (this.waveMod && this.waveMod.id === 'swift' ? 1.2 : 1) * (1 + Math.min(0.25, n * 0.008)),
       fireMul: Math.max(0.4, Math.pow(0.94, threat)) * waveFire * (this.waveMod && this.waveMod.id === 'barrage' ? 0.6 : 1)
     };
+    // 周变异:作用于本波全体敌机
+    if (this._mut) {
+      if (this._mut.id === 'rage') this._env.fireMul *= 0.8;
+      if (this._mut.id === 'bulwark') this._env.hpMul *= 1.25;
+      if (this._mut.id === 'gale') this._env.spdMul *= 1.15;
+    }
     // 里程碑:每 10 波投放补给(炸弹+1 与 25% 生命修复)
     const milestone = n > 10 && (n - 1) % 10 === 0;
     if (milestone) {
@@ -889,10 +916,11 @@ class Game {
     const hordeMul = this.waveMod && this.waveMod.id === 'horde' ? 1.4 : 1;
     this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65 * hordeMul);
     this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机';
-    // 精英机:第 3 波起概率随队,第 7 波起可能双精英,第 10 波起概率出现双词缀精英
-    if (n >= 3 && RNG() < 0.65) {
+    // 精英机:第 3 波起概率随队,第 7 波起可能双精英,第 10 波起概率出现双词缀精英;猎杀周大增
+    const huntWeek = this._mut && this._mut.id === 'hunt';
+    if (n >= 3 && RNG() < (huntWeek ? 0.9 : 0.65)) {
       const affixes = Object.keys(ELITE_CFG);
-      const count = n >= 7 && RNG() < 0.35 ? 2 : 1;
+      const count = n >= 7 && RNG() < (huntWeek ? 0.55 : 0.35) ? 2 : 1;
       for (let i = 0; i < count; i++) {
         const idx = irand(0, this.spawnQueue.length - 1);
         const a1 = affixes[irand(0, affixes.length - 1)];
@@ -1841,6 +1869,13 @@ class Game {
       ctx.textAlign = 'left';
       ctx.fillText('✦ ' + bt.join(' · '), 14, 68);
     }
+    // 周挑战全局变异
+    if (this._mut) {
+      ctx.fillStyle = '#c86bff';
+      ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(this._mut.icon + ' 周变异·' + this._mut.name + ' · ' + this._mut.desc, 14, 82);
+    }
     // 生命条(数值化生命)
     {
       const bw = 104, bx = 14, by = H - 27;
@@ -2053,8 +2088,9 @@ class Game {
     d.finalWave.textContent = this.wave;
     d.finalHi.textContent = this.mode !== 'normal' ? this._challengeBest() : this.hi;
     this._refreshMenuHi();
-    // 星晶结算:得分/1000 + 旗舰 10 + 精英 2
+    // 星晶结算:得分/1600 + 旗舰×6 + 精英×1;贪婪周 ×1.5
     Shop.lastEarn = Math.floor(this.score / 1600) + (this.runBossKills || 0) * 6 + (this.runEliteKills || 0) * 1;
+    if (this._mut && this._mut.id === 'greed') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (this.relics.r_grail) Shop.lastEarn *= 2;
     Shop.addCrystal(Shop.lastEarn);
     // 挑战材料「战术芯片」:连战与每日/周挑战产出;按期限领一次
