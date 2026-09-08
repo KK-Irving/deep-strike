@@ -103,7 +103,10 @@ function initSprites() {
       path: (g) => { g.moveTo(0, 13); g.lineTo(10, -10); g.lineTo(0, -3); g.lineTo(-10, -10); } },
     // 母舰:宽扁的六边形战舰,携带机库舱格,周期释放无人机
     carrier: { color: '#8fd0ff', fill: '#0c2438', half: 40, baseR: 26, dotR: 5, dotY: 0,
-      path: (g) => { g.moveTo(-24, -8); g.lineTo(24, -8); g.lineTo(28, 4); g.lineTo(14, 12); g.lineTo(-14, 12); g.lineTo(-28, 4); } }
+      path: (g) => { g.moveTo(-24, -8); g.lineTo(24, -8); g.lineTo(28, 4); g.lineTo(14, 12); g.lineTo(-14, 12); g.lineTo(-28, 4); } },
+    // 干扰机:碟形天线机体,悬停释放电磁脉冲干扰玩家
+    jammer: { color: '#b0ff5a', fill: '#223a10', half: 24, baseR: 13, dotR: 4, dotY: 0,
+      path: (g) => { g.moveTo(-11, -4); g.lineTo(0, -12); g.lineTo(11, -4); g.lineTo(11, 6); g.lineTo(0, 13); g.lineTo(-11, 6); } }
   };
   for (const [type, d] of Object.entries(enemyDefs)) {
     SPRITES.enemy[type] = {
@@ -286,6 +289,7 @@ class Player {
     this.undyingUsed = false;
     this.weapon = 1; this.bombs = 2;
     this.shield = false; this.invuln = 2.2;
+    this.chillT = 0;
     this.fireCd = 0; this.alive = true;
     this.beamOn = false;
     this.engine = 0; this.showHitbox = false;
@@ -307,10 +311,13 @@ class Player {
       this.y += (game.touch.y - this.y) * f;
     } else if (dx || dy) {
       const len = Math.hypot(dx, dy);
-      const sp = this.speed * (k.slow ? 0.42 : 1);
+      // 凝滞词缀:受击后移动迟缓
+      const chill = this.chillT > 0 ? 0.6 : 1;
+      const sp = this.speed * (k.slow ? 0.42 : 1) * chill;
       this.x += dx / len * sp * dt;
       this.y += dy / len * sp * dt;
     }
+    this.chillT = Math.max(0, this.chillT - dt);
     this.x = clamp(this.x, 16, W - 16);
     this.y = clamp(this.y, 60, H - 22);
     this.showHitbox = !!k.slow;
@@ -328,8 +335,10 @@ class Player {
     this.fireCd -= dt;
     if ((k.fire || game.autoFire) && this.fireCd <= 0) {
       this._fire(game);
-      // 狂热:射击间隔 ×0.667(质变主炮同样受益,激光走 beamTick 增伤)
-      this.fireCd = this.fireInterval * ((game.buffs && game.buffs.frenzy > 0) ? 0.667 : 1);
+      // 狂热:射击间隔 ×0.667;干扰机脉冲:间隔 ×1.8(激光走 beamTick 增伤)
+      this.fireCd = this.fireInterval
+        * ((game.buffs && game.buffs.frenzy > 0) ? 0.667 : 1)
+        * ((game.buffs && game.buffs.jam > 0) ? 1.8 : 1);
     }
     // 追踪导弹:周期自动发射
     if (game.mods.homing) {
@@ -713,7 +722,9 @@ const ELITE_CFG = {
   splitter:  { name: '分裂', color: '#51e08a', desc: '死亡分裂' },
   berserk:   { name: '狂暴', color: '#ff6a3c', desc: '火力狂暴' },
   phantom:   { name: '幽影', color: '#b8c6ff', desc: '周期相位免疫' },
-  vengeance: { name: '复仇', color: '#ffd166', desc: '死亡弹幕反扑' }
+  vengeance: { name: '复仇', color: '#ffd166', desc: '死亡弹幕反扑' },
+  vampiric:  { name: '吸血', color: '#ff77a9', desc: '接触吸取生命' },
+  chill:     { name: '凝滞', color: '#b8e8ff', desc: '你受击后迟缓' }
 };
 
 class Enemy {
@@ -764,6 +775,12 @@ class Enemy {
       this.spawnCd = rand(2.2, 3.2); this.fireCd = rand(1.6, 2.4);
       this.launchPulse = 0;
       this.color = '#8fd0ff'; this.fill = '#0c2438';
+    } else if (type === 'jammer') {
+      // 干扰机:悬停后周期释放电磁脉冲,范围内玩家射速降低、磁吸失效
+      this.r = 13; this.hp = Math.max(4, Math.round(4 * hpM)); this.score = 350;
+      this.vy = 55 * spM; this.stopY = rand(90, 170); this.stopped = false;
+      this.pulseCd = rand(2.2, 3.2);
+      this.color = '#b0ff5a'; this.fill = '#223a10';
     } else { // sniper
       this.r = 13; this.hp = Math.max(2, Math.round(3 * hpM)); this.score = 250;
       this.vy = 170 * spM; this.stopY = rand(90, 210); this.stopped = false;
@@ -911,6 +928,26 @@ class Enemy {
           for (let i = -2; i <= 2; i++)
             game.enemyShot(this.x, this.y + this.r, Math.PI / 2 + i * 0.28, 130 + game.effWave() * 4, 'orange');
           AudioSys.enemyShoot();
+        }
+      }
+    } else if (this.type === 'jammer') {
+      // 干扰机:入场悬停,周期脉冲干扰(半径 190)
+      if (!this.stopped) {
+        this.y += this.vy * edt;
+        if (this.y >= this.stopY) this.stopped = true;
+      } else {
+        this.x = clamp(this.baseX + Math.sin(this.t * 0.6) * 34, 24, W - 24);
+        this.pulseCd -= edt;
+        if (canFire && this.pulseCd <= 0) {
+          this.pulseCd = 3.2 * this.fireMul;
+          const pp = game.player;
+          const pdx = pp.x - this.x, pdy = pp.y - this.y;
+          game.rings.push(new Ring(this.x, this.y, '#b0ff5a', 190, 0.5));
+          if (pp.alive && pdx * pdx + pdy * pdy < 190 * 190) {
+            game.buffs.jam = 2.6;
+            game._addFloat(new FloatText(pp.x, pp.y - 28, '受到干扰!', '#b0ff5a', 12));
+          }
+          AudioSys.rift();
         }
       }
     } else { // sniper
@@ -1228,8 +1265,10 @@ class PowerUp {
     // 引力场:进入吸取范围后飞向玩家(磁力风暴强制全吸)
     const p = game.player;
     if (p.alive) {
+      // 受干扰时磁吸半径大幅缩短
+      const mr = (game.buffs && game.buffs.jam > 0) ? 50 : p.magnetR;
       const dx = p.x - this.x, dy = p.y - this.y;
-      if (this.vac || dx * dx + dy * dy < p.magnetR * p.magnetR) {
+      if (this.vac || dx * dx + dy * dy < mr * mr) {
         const f = Math.min(1, dt * 6);
         this.x += dx * f;
         this.y += dy * f;
@@ -1271,7 +1310,7 @@ class XPOrb {
     const dx = p.x - this.x, dy = p.y - this.y;
     const d = Math.hypot(dx, dy) || 1;
     // 磁吸范围内立即吸取;掉落 5 秒后自动飞向玩家兜底,保证经验不浪费;磁力风暴强制全吸
-    if (p.alive && (this.vac || d < p.magnetR || this.age > 5)) {
+    if (p.alive && (this.vac || d < ((game.buffs && game.buffs.jam > 0) ? 50 : p.magnetR) || this.age > 5)) {
       const sp = clamp(240 + (p.magnetR - d) * 2.4, 220, 560);
       const f = Math.min(1, 9 * dt);
       this.vx += (dx / d * sp - this.vx) * f;
@@ -1513,8 +1552,9 @@ class SupplyDrop {
     const p = game.player;
     // 引力场:进入吸取范围后飞向玩家(磁力风暴强制全吸)
     if (p.alive) {
+      const mr = (game.buffs && game.buffs.jam > 0) ? 50 : p.magnetR;
       const dx2 = p.x - this.x, dy2 = p.y - this.y;
-      if (this.vac || dx2 * dx2 + dy2 * dy2 < p.magnetR * p.magnetR) {
+      if (this.vac || dx2 * dx2 + dy2 * dy2 < mr * mr) {
         const f = Math.min(1, dt * 6);
         this.x += dx2 * f;
         this.y += dy2 * f;

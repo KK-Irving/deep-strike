@@ -160,8 +160,8 @@ class Game {
     this.xp = 0; this.level = 1; this.xpNext = 12; this.pendingLevels = 0;
     this.xpMult = 1; this.comboWindow = 2;
     this.bombMeter = 0;
-    // 限时增益(道具):x2 双倍得分 / frenzy 狂热射速 / frost 寒霜减速(单位秒)
-    this.buffs = { x2: 0, frenzy: 0, frost: 0 };
+    // 限时增益(道具):x2 双倍得分 / frenzy 狂热射速 / frost 寒霜减速 / jam 受干扰(单位秒)
+    this.buffs = { x2: 0, frenzy: 0, frost: 0, jam: 0 };
     this.wingmen = []; this.rifts = []; this.riftCd = 0;
     this.asteroids = []; this.supplies = [];
     this.runKills = 0; this.runEliteKills = 0; this.runBossKills = 0; this.runEvoCount = 0;
@@ -846,9 +846,10 @@ class Game {
       else if (n >= 4 && roll < 0.33) type = 'bomber';
       else if (n >= 5 && roll < 0.40) type = 'shielder';
       else if (n >= 8 && roll < 0.48) type = 'mender';
+      else if (n >= 7 && roll < 0.54) type = 'jammer';
       else if (n >= 2 && roll < 0.70) type = 'waver';
       else if (n >= 4 && roll < 0.84) type = 'sniper';
-      let cost = type === 'carrier' ? 5 : (type === 'tank' || type === 'mender' ? 3 : (type === 'shielder' ? 4 : (type === 'drone' ? 1 : 2)));
+      let cost = type === 'carrier' ? 5 : (type === 'tank' || type === 'mender' || type === 'jammer' ? 3 : (type === 'shielder' ? 4 : (type === 'drone' ? 1 : 2)));
       if (cost > budget) { type = 'drone'; cost = 1; }
       if (type === 'drone') {
         const cnt = Math.min(budget, irand(2, 4));
@@ -1011,8 +1012,9 @@ class Game {
             : this.wave >= 4 && roll < 0.24 ? 'bomber'
             : this.wave >= 5 && roll < 0.32 ? 'shielder'
             : this.wave >= 8 && roll < 0.41 ? 'mender'
-            : this.wave >= 2 && roll < 0.63 ? 'waver'
-            : this.wave >= 4 && roll < 0.79 ? 'sniper' : 'drone';
+            : this.wave >= 7 && roll < 0.48 ? 'jammer'
+            : this.wave >= 2 && roll < 0.66 ? 'waver'
+            : this.wave >= 4 && roll < 0.81 ? 'sniper' : 'drone';
           this.enemies.push(new Enemy(type, rand(60, W - 60), this.wave, null, this._env));
         }
       } else if (this.waveClearT < 0) {
@@ -1117,6 +1119,11 @@ class Game {
           const rr = e.r + p.r;
           if (dx * dx + dy * dy < rr * rr) {
             e.damage(this.relics.r_thorn_crown ? 6 : 3, this);
+            // 吸血词缀:接触玩家时大量回复自身生命
+            if (e.elite && e.elite.includes('vampiric') && !e.dead) {
+              e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.2);
+              this._addFloat(new FloatText(e.x, e.y - e.r - 18, '汲取!', '#ff77a9', 11));
+            }
             this._playerHit(contactDmg);
             break;
           }
@@ -1342,7 +1349,7 @@ class Game {
     AudioSys.explode(e.r >= 18);
     this.shake(Math.min(9, 1.5 + e.r * 0.18), 0.22);
     // 掉落经验晶体(精英 ×4)
-    const xpTable = { drone: 2, waver: 3, sniper: 4, tank: 8, bomber: 3, shielder: 10, mender: 6 };
+    const xpTable = { drone: 2, waver: 3, sniper: 4, tank: 8, bomber: 3, shielder: 10, mender: 6, jammer: 4 };
     let xp = (xpTable[e.type] || 2) * (e.elite ? 4 : 1) * (this.waveMod && this.waveMod.id === 'bounty' ? 1.5 : 1);
     while (xp > 0) {
       const v = Math.min(4, xp);
@@ -1468,6 +1475,8 @@ class Game {
   _playerHit(dmg = 25) {
     const p = this.player;
     if (p.invuln > 0 || !p.alive) return;
+    // 凝滞词缀:场上存在凝滞精英时,受击后移动迟缓(护盾破碎同样触发)
+    if (this.enemies.some(e => e.elite && e.elite.includes('chill') && !e.dead)) p.chillT = 2;
     if (p.shield) {
       p.shield = false;
       p.invuln = 1.2 + (this.relics.r_cloak ? 0.7 : 0);
@@ -1789,8 +1798,10 @@ class Game {
     if (this.buffs.x2 > 0) bt.push('×2 ' + Math.ceil(this.buffs.x2) + 's');
     if (this.buffs.frenzy > 0) bt.push('狂热 ' + Math.ceil(this.buffs.frenzy) + 's');
     if (this.buffs.frost > 0) bt.push('寒霜 ' + Math.ceil(this.buffs.frost) + 's');
+    if (this.buffs.jam > 0) bt.push('受干扰 ' + Math.ceil(this.buffs.jam) + 's');
     if (bt.length) {
-      ctx.fillStyle = '#c86bff';
+      const jamOnly = this.buffs.jam > 0 && bt.length === 1;
+      ctx.fillStyle = jamOnly ? '#b0ff5a' : '#c86bff';
       ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText('✦ ' + bt.join(' · '), 14, 68);
