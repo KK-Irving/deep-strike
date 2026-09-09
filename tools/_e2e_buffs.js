@@ -1,33 +1,15 @@
 'use strict';
 /* v1.2.0 限时增益道具验证:×2 / 狂热 / 寒霜 / 磁力风暴 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('限时增益');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -82,8 +64,7 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('x2 击杀得分(期望200): ' + r.x2Pts);
@@ -92,14 +73,12 @@ function startServer() {
   console.log('磁力风暴 全部标记吸取: ' + r.magVac + ' · 全部被吸取: ' + r.magCollected);
   console.log('增益倒计时衰减: ' + r.decay);
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.x2Pts === 200, '×2 期间击杀得分翻倍');
   check(r.frenzyCd > 0.9 && r.frenzyCd < 1.1, '狂热使射击间隔 ×0.667');
   check(r.frostRatio > 0.3 && r.frostRatio < 0.6, '寒霜使敌机移动减速至 45%');
   check(r.magVac && r.magCollected, '磁力风暴全场吸取晶体与道具');
   check(r.decay, '限时增益随时间衰减');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n限时增益验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

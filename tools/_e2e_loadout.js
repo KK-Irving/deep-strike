@@ -1,33 +1,15 @@
 'use strict';
 /* v1.3.3 出击准备验证:购买扣芯片/重复拦截/开局生效(炸弹/强化选择/遗物五选一)/一次性消耗 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('出击准备');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -69,8 +51,7 @@ function startServer() {
   });
 
   await page.close();
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('三项购买: ' + [r.b1, r.b2, r.b3].join('/') + ' · 芯片扣除正确: ' + r.chipsCost + ' · 重复拦截: ' + r.dupBlocked);
@@ -80,8 +61,7 @@ function startServer() {
   console.log('第二次开局无增益: ' + r.secondRun);
   console.log('商城区块渲染: ' + r.panelRendered);
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.b1 && r.b2 && r.b3 && r.chipsCost && r.dupBlocked, '购买/扣费/重复拦截正常');
   check(r.bombApplied && r.levelupOpened && r.loadoutCleared, '开局生效:炸弹+1、强化弹窗、增益清空');
@@ -89,6 +69,5 @@ function startServer() {
   check(r.relicFive, '情报网络使遗物五选一');
   check(r.secondRun, '一次性:第二次开局不再生效');
   check(r.panelRendered, '商城出击准备区块正常渲染');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n出击准备验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

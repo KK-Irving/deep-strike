@@ -1,33 +1,15 @@
 'use strict';
 /* v1.4.3 敌机图鉴验证:分类型计数/首次收录星晶/旗舰收录/全收录成就/档案页渲染 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('敌机图鉴');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -72,8 +54,7 @@ function startServer() {
   });
 
   await page.close();
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('首次收录 计数/星晶: ' + r.firstCount + '/' + r.firstReward);
@@ -83,8 +64,7 @@ function startServer() {
   console.log('档案页渲染: ' + r.panel);
   console.log('击杀链路上报: ' + r.killHook);
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.firstCount && r.firstReward, '首次收录计数与星晶奖励');
   check(r.accCount && r.noDoubleReward, '重复击坠累加且不重复发奖');
@@ -92,6 +72,5 @@ function startServer() {
   check(r.codexAll, '全收录解锁博物学家成就');
   check(r.panel, '档案页图鉴面板正常渲染');
   check(r.killHook, 'killEnemy 自动上报图鉴');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n敌机图鉴验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

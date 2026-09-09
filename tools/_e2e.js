@@ -3,44 +3,26 @@
  * - 无 JS 运行时错误
  * - 商城稀有皮肤/机体不显示 undefined,而是"未解锁"
  * - 开箱结果弹层可弹出
- * 用系统 Chrome(executablePath)避免依赖下载的 chromium。 */
-const http = require('http');
+ * 浏览器由 tools/_harness.js 解析(本机 Chrome / Edge / Playwright 自带 Chromium)。 */
+const H = require('./_harness');
+const t = H.suite('商城与截图');
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
   const outDir = path.join(__dirname, '_shots');
   fs.mkdirSync(outDir, { recursive: true });
 
-  const exe = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
 
   const errors = [];      // 真正的 JS 异常
   const consoleErrs = []; // 控制台 error(含资源 404 噪音)
   const notFound = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   page.on('console', (m) => { if (m.type() === 'error') consoleErrs.push(m.text()); });
   page.on('requestfailed', (r) => notFound.push('requestfailed: ' + r.url()));
   page.on('response', (r) => { if (r.status() === 404) notFound.push('404: ' + r.url()); });
@@ -93,8 +75,7 @@ function startServer() {
   await page.waitForTimeout(600);
   await page.screenshot({ path: path.join(outDir, '04-ingame-nebula.png') });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
 
   console.log('base url was ' + base);
   console.log('skinGrid 含 undefined: ' + /undefined/i.test(skinHtml));
@@ -108,12 +89,11 @@ function startServer() {
   console.log('404/失败请求: ' + notFound.length);
   notFound.forEach((e) => console.log('  ' + e));
 
-  let bad = 0;
-  const check = (c, m) => { if (c) { console.log('ok: ' + m); } else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(!hasUndefined, '商城不含 undefined 文案');
   check(hasLocked, '稀有款显示「未解锁」');
   check(boxVisible, '开箱结果弹层正常弹出');
   check(errors.length === 0, '无 JS 运行时异常');
   console.log('\nE2E 截图目录: ' + outDir);
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

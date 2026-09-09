@@ -10,12 +10,19 @@
    - `README.md` 的「当前版本」与「版本迭代」列表
 3. **突破性/改造性更新**可提升中间数位并把末位归零(如 v1.1.1 → v1.2.0,架构重写可 v2.0.0)。
 4. 每次迭代 commit 后打同名 tag:`git tag vX.Y.Z`。
-5. 提交前先验证:JS 语法检查 + `node tools/_e2e*.js`(需本地 Chrome,headless)无回归;
+5. 提交前先验证:JS 语法检查 + `npm test`(全量 e2e,需本地 Chrome,headless)无回归;
    纯文案/文档改动可只做语法检查。
 
 ## 测试
 
-- e2e 脚本位于 `tools/_e2e*.js`,基于 Playwright + 本机 Chrome,直接 `node tools/_e2e_xxx.js` 运行。
+- 基座 `tools/_harness.js`:统一静态服务(no-store)、Chrome 解析
+  (`CHROME_PATH` → 常见安装路径 → PATH → Playwright 自带 Chromium)与断言输出。
+- 套件 `tools/_e2e*.js`,基于 Playwright + 本机 Chrome;**一键全量** `npm test`
+  (= `node tools/_e2e_all.js`),23 个套件顺序执行,任一失败即退出码 1。
+  - `npm test -- --only=combat,shop2` 只跑匹配套件;`--jobs=N` 并发;`--timeout=秒`;`--quiet`;`--list`
+  - 单跑某套件:`node tools/_e2e_xxx.js`;输出统一为逐条 `ok/FAIL` + `PASS/FAIL 套件名 — n/m`
+    + 可解析的 `[e2e] suite=... result=PASS|FAIL` 汇总行。
+  - 运行日志落在 `tools/_logs/`(已 gitignore),失败时运行器自动打印尾部。
 - 涉及玩法/随机性/商城/成就的改动,至少跑 `_e2e_combat`、`_e2e_economy`、`_e2e_shop2` 相关项。
 
 ## 项目速览

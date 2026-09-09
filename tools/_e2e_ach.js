@@ -6,32 +6,14 @@
  *  4) skin/ship 在指定层级发放
  *  5) 游戏内驱动:击坠→kills 线升级;结算→最优值统计入线
  *  6) 面板分级展示(线/级/进度) */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('成就分级制');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+  const browser = await H.launch();
   const errors = [];
 
   // 预置旧版存档(时间戳格式)验证迁移
@@ -54,7 +36,7 @@ function startServer() {
   if (!mig.kills || !mig.bestwave || !mig.bosskills || !mig.unknownGone || !mig.allNumeric) errors.push('pageerror: 迁移结果异常 ' + JSON.stringify(mig));
 
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
@@ -110,13 +92,11 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
   console.log('迁移: ' + JSON.stringify(mig));
-  console.log(JSON.stringify(r));
-  let bad = 0;
-  for (const k of Object.keys(r)) if (r[k] !== true) { console.error('FAIL: ' + k); bad++; }
-  checkCount(bad);
-  function checkCount(b) { console.log(b ? ('\nFAILED: ' + b) : '\n成就分级制验证完成'); process.exitCode = b ? 1 : 0; }
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.info('原始结果: ' + JSON.stringify(r));
+  for (const k of Object.keys(r)) t.check(r[k] === true, k);
+  t.check(errors.length === 0, '无 JS 运行时异常');
+  t.finish();
+})().catch((e) => t.crash(e));

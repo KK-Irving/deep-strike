@@ -5,36 +5,17 @@
  *  3) 出怪配额随波次增长(w14 明显多于 w3,均为非 BOSS 波);
  *  4) 新增「母舰 carrier」:血厚且 update 会周期释放无人机;
  *  5) 全程无 JS 异常。 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('敌机强度');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const exe = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
@@ -69,8 +50,7 @@ function startServer() {
     return { dmgW1, dmgW1o, dmgW20, dmgW20o, dmgW60, spawnW3, spawnW14, before, after, spawnedDrones, carrierHp };
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('弹幕伤害 w1=' + result.dmgW1 + ' w20=' + result.dmgW20 + ' w60=' + result.dmgW60
@@ -78,8 +58,7 @@ function startServer() {
   console.log('出怪配额 w3=' + result.spawnW3 + ' w14=' + result.spawnW14);
   console.log('母舰释放:before=' + result.before + ' after=' + result.after + ' 无人机=' + result.spawnedDrones + ' 母舰血=' + result.carrierHp);
 
-  let bad = 0;
-  const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(result.dmgW20 > result.dmgW1, '弹幕伤害随波次增长(w20>w1)');
   check(result.dmgW60 >= result.dmgW20, '弹幕伤害持续增长/封顶(w60>=w20)');
@@ -88,6 +67,5 @@ function startServer() {
   check(result.spawnW14 > result.spawnW3, '出怪配额随波次增长(w14>w3)');
   check(result.carrierHp >= 16, '母舰血量厚(>=16)');
   check(result.spawnedDrones >= 2, '母舰周期释放无人机(>=2)');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n敌机强度/丰富度验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

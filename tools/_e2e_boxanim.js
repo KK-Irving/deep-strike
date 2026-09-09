@@ -6,36 +6,17 @@
  *  4) 点击跳过可立即揭晓;
  *  5) 全程无 JS 异常。
  * 用可控结果:直接调用 Shop.showBoxResults 传入构造结果,规避随机性。 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('开箱动画');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const exe = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
@@ -101,16 +82,14 @@ function startServer() {
     };
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('early  = ' + JSON.stringify(early));
   console.log('done   = ' + JSON.stringify(done));
   console.log('skipped= ' + JSON.stringify(skipped));
 
-  let bad = 0;
-  const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(early.animShown, '开箱初始:动画舞台显示');
   check(early.listCount === 0, '开箱初始:结果列表尚未填充');
@@ -122,6 +101,5 @@ function startServer() {
   check(done.hasEpicRow, '动画结束:含绚丽(epic)行');
   check(done.btnVisible, '动画结束:确定按钮恢复可见');
   check(skipped.animHidden && skipped.listCount === 1 && skipped.hasMythic, '跳过动画:立即揭晓传奇结果');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n开箱动画验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

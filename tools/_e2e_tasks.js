@@ -1,30 +1,12 @@
 'use strict';
 /* v1.2.3 每日任务验证:日期种子一致 / 进度累计 / 完成发芯片且不重复 / 次日刷新 / 菜单面板 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('每日任务');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
 
   // 两个独立页面加载同一日期 → 任务集应一致(种子确定性)
   async function loadTasks() {
@@ -39,7 +21,7 @@ function startServer() {
 
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -80,8 +62,7 @@ function startServer() {
   });
 
   await page.close();
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('双开任务集一致: ' + (ta === tb));
@@ -91,8 +72,7 @@ function startServer() {
   console.log('菜单面板渲染: ' + r.panel);
   console.log('局内击杀上报链路: ' + r.killBump);
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(ta === tb && ta.length > 0, '同一日期所有页面任务集一致');
   check(r.doneOnce && r.noDouble, '完成即发芯片且不重复发放');
@@ -100,6 +80,5 @@ function startServer() {
   check(r.rolled && r.tasksCount, '跨日自动刷新且固定 3 条');
   check(r.panel, '主菜单任务面板正常渲染');
   check(r.killBump, '局内击杀驱动任务进度');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n每日任务验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

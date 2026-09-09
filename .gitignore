@@ -6,3 +6,6 @@ package-lock.json
 
 # E2E 截图产物
 tools/_shots/
+
+# E2E 运行日志(全量运行器输出)
+tools/_logs/

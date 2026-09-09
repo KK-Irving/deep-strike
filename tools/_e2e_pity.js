@@ -1,33 +1,15 @@
 'use strict';
 /* v1.2.2 密匣保底(pity)验证:40 抽必出绚丽 / 10 抽必出稀有 / 计数重置 / 荣耀秘匣不受影响 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('密匣保底');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -75,8 +57,7 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('39 抽兜底出绚丽: ' + r.epicPity + ' · 双计数重置: ' + r.epicReset);
@@ -85,8 +66,7 @@ function startServer() {
   console.log('荣耀秘匣不消耗保底: ' + r.gloryKeepsPity);
   console.log('200 抽内绚丽最大间隔: ' + r.maxGap + '(阈值 40)');
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.epicPity && r.epicReset, '40 抽保底必出绚丽并重置双计数');
   check(r.rarePity && r.rareReset, '10 抽保底必出稀有+并重置稀有计数');
@@ -94,6 +74,5 @@ function startServer() {
   check(r.lowInc, 'junk/common 命中累加双计数');
   check(r.gloryKeepsPity, '荣耀秘匣不消耗/不重置保底');
   check(r.gapOk, '长时间连续开箱绚丽间隔不超过 40 抽');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n密匣保底验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

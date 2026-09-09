@@ -1,33 +1,15 @@
 'use strict';
 /* v1.2.1 干扰机 + 精英词缀(吸血/凝滞)验证 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('干扰机与词缀');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -91,8 +73,7 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('干扰触发: ' + r.jamTriggered + ' · 间隔比(期望≈1): ' + r.jamCdRatio);
@@ -100,8 +81,7 @@ function startServer() {
   console.log('凝滞触发: ' + r.chillTriggered + ' · 迟缓速度比(期望≈0.6): ' + r.chillRatio);
   console.log('吸血接触回复: ' + r.vampHealed + (r.vampHealReal != null ? ' (+' + r.vampHealReal + ')' : ' (一击致死路径)'));
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.jamTriggered, '干扰机脉冲使玩家受干扰');
   check(r.jamCdRatio > 0.9 && r.jamCdRatio < 1.1, '受干扰射击间隔 ×1.8');
@@ -109,6 +89,5 @@ function startServer() {
   check(r.chillTriggered, '凝滞精英在场时受击触发迟缓');
   check(r.chillRatio > 0.5 && r.chillRatio < 0.7, '迟缓时移动速度 60%');
   check(r.vampHealed, '吸血词缀接触玩家回复自身');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n干扰机与词缀验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

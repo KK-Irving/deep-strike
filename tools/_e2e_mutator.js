@@ -1,30 +1,12 @@
 'use strict';
 /* v1.3.1 每周变异词缀验证:周种子派生一致 / 各变异生效 / 非周挑战无变异 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('每周变异');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
 
   // 两个独立页面:本周变异应一致
   async function loadMut() {
@@ -42,7 +24,7 @@ function startServer() {
 
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -75,22 +57,19 @@ function startServer() {
   });
 
   await page.close();
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('本周变异(双开一致): ' + ma + ' / ' + mb);
   console.log('普通无变异: ' + r.normalNone + ' · 周挑战有变异: ' + r.weeklyHas + ' · 横幅含变异: ' + r.inBanner);
   console.log('狂暴火力: ' + r.rage + ' · 钢铁生命: ' + r.bulwark + ' · 疾风速度: ' + r.gale + ' · 经验风暴: ' + r.surge + ' · 贪婪星晶×1.5: ' + r.greed);
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(ma !== null && ma === mb, '同一周所有页面变异一致');
   check(r.normalNone, '普通/连战模式无变异');
   check(r.weeklyHas && r.inBanner, '周挑战变异合法且横幅播报');
   check(r.rage && r.bulwark && r.gale && r.surge, '环境类变异数值正确');
   check(r.greed, '贪婪周星晶结算 ×1.5');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n每周变异验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

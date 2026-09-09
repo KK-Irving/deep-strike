@@ -1,35 +1,17 @@
 'use strict';
 /* v1.3.2 高难模式验证:开关持久化 / 威胁+2 / 弹幕伤害上调 / 星晶×1.5 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('高难模式');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
 
   // 持久化:页面 A 打开高难 → 页面 B(新上下文)读到的应是各自存储,这里验证同页持久化 + 重载
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -76,8 +58,7 @@ function startServer() {
   });
 
   await page.close();
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('开关持久化: ' + r.on);
@@ -86,14 +67,12 @@ function startServer() {
   console.log('星晶 10→15: ' + r.crystal);
   console.log('按钮文案刷新: ' + r.btnLabel);
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.on, '开关状态写入 localStorage');
   check(r.threat && r.threatWeekly, '威胁 +2(周挑战叠加为 +3)');
   check(r.dmg, '高难弹幕伤害上调');
   check(r.crystal, '高难星晶结算 ×1.5');
   check(r.btnLabel, '主菜单按钮文案随状态刷新');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n高难模式验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

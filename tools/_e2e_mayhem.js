@@ -5,36 +5,17 @@
  *  3) 符文效果逐一接线验证(射速/伤害/生命/僚机/炸弹/受击/结算等)
  *  4) 模式福利(经验 +50%)、独立纪录、专属成就,且不侵占每日/周挑战芯片限领
  * 通过 window.game 直接驱动,密闭环境(清出怪/停自fire)避免时序竞争。 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('海克斯大乱斗');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const exe = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
@@ -228,7 +209,10 @@ function startServer() {
   r.bomb = await page.evaluate(() => {
     const g = window.game;
     const out = {};
-    const mk = () => ({ x: 200, y: 300, r: 14, dead: false, taken: 0, damage(n2) { this.taken += n2; } });
+    // 训练靶补 update/draw:主循环 rAF 可能在同一帧遍历 enemies,
+    // 缺方法会抛 "arr[i].update is not a function"(间歇性)
+    const mk = () => ({ x: 200, y: 300, r: 14, dead: false, taken: 0,
+      damage(n2) { this.taken += n2; }, update() {}, draw() {} });
     const tryB = () => {
       g.state = 'playing'; g.player.alive = true; g.player.bombs = 3; g.bombActive = false; g.bombT = 0;
       g.enemies = [mk()]; g.enemyBullets = []; g.boss = null; g.asteroids = [];
@@ -253,7 +237,7 @@ function startServer() {
     const orig = g._explode.bind(g);
     let cnt = 0;
     g._explode = (...a) => { cnt++; return orig(...a); };
-    const dummy = { x: 100, y: 200, r: 14, dead: true, elite: null, type: 'drone', damage() {} };
+    const dummy = { x: 100, y: 200, r: 14, dead: true, elite: null, type: 'drone', damage() {}, update() {}, draw() {} };
     g.enemies = [];
     for (let i = 0; i < 100; i++) g.killEnemy(dummy);
     g._explode = orig;
@@ -298,8 +282,7 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
 
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e2) => console.log('  ' + e2)); }
   console.log('菜单: ' + JSON.stringify(r.menu));
@@ -313,8 +296,7 @@ function startServer() {
   console.log('雪球: ' + JSON.stringify(r.snow));
   console.log('结算: ' + JSON.stringify(r.settle));
 
-  let bad = 0;
-  const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.menu.btn && r.menu.hiHasMayhem, '菜单入口与纪录行就绪');
   check(r.menu.achLines === 34, '成就 34 条线(分级制)');
@@ -340,6 +322,5 @@ function startServer() {
   check(s.chipsUntouched, '不侵占每日/周挑战芯片限领');
   check(s.ach, '成就「海克斯狂徒」解锁');
   check(s.summary, '构筑摘要展示符文 chips');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n海克斯大乱斗验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

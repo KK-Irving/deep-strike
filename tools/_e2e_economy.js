@@ -5,36 +5,17 @@
  *  3) 每周挑战芯片:同一周仅可领取一次,数额落在 40~60;二次结算发放 0;
  *  4) 普通模式不产出芯片。
  * 直接驱动 window.game 的结算路径(_gameover),读取 Shop.lastEarn / lastChips。 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('经济再平衡');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const exe = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
@@ -83,16 +64,14 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('星晶 新公式=' + result.crystalNew + ' 旧公式=' + result.crystalOld + ' 普通模式芯片=' + result.normalChips);
   console.log('每日 首次=' + result.daily1 + ' 二次=' + result.daily2 + '(capped=' + result.daily2capped + ') 低战绩=' + result.dailyLow);
   console.log('每周 首次=' + result.weekly1 + ' 二次=' + result.weekly2 + '(capped=' + result.weekly2capped + ') 高战绩=' + result.weeklyHigh);
 
-  let bad = 0;
-  const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(result.crystalNew < result.crystalOld, '星晶获取已下调(新 < 旧公式)');
   check(result.normalChips === 0, '普通模式不产出芯片');
@@ -102,6 +81,5 @@ function startServer() {
   check(result.weekly1 >= 40 && result.weekly1 <= 60, '每周芯片首次落在 40~60');
   check(result.weekly2 === 0 && result.weekly2capped, '每周芯片二次为 0(本周已领取)');
   check(result.weeklyHigh >= 40 && result.weeklyHigh <= 60, '每周高战绩封顶在 40~60 区间');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n经济再平衡验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

@@ -1,33 +1,15 @@
 'use strict';
 /* v1.3.0 旗舰连战模式验证:虚拟波号/变体轮换/每阶段升级+遗物/无杂兵事件/纪录与芯片限领/成就门控 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('旗舰连战');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -81,8 +63,7 @@ function startServer() {
   });
 
   await page.close();
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('模式/阶段/配额/纯旗舰队列: ' + [r.mode, r.stage, r.quota, r.noQueue].join(' / '));
@@ -91,8 +72,7 @@ function startServer() {
   console.log('连战不解锁波次成就: ' + r.noWaveAch + ' · 普通模式正常解锁: ' + r.normalWaveAch);
   console.log('纪录写入: ' + r.record + ' · 芯片区间: ' + r.chipsInRange + ' · 当日限领: ' + r.chipCapped + ' · 纪录保留: ' + r.bestKept);
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.mode === 'boss' && r.stage === 1 && r.quota === 1 && r.noQueue, '连战启动:仅旗舰无杂兵');
   check(r.boss1, '第 1 阶段旗舰按虚拟波号 5 构造(flag)');
@@ -101,6 +81,5 @@ function startServer() {
   check(r.noWaveAch && r.normalWaveAch, '连战不解锁波次成就,普通模式不受影响');
   check(r.record && r.bestKept, '连战最佳纪录正确写入');
   check(r.chipsInRange && r.chipCapped, '芯片按阶段结算且每日限领一次');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n旗舰连战验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

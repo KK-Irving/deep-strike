@@ -4,35 +4,17 @@
  *  2) 掉落:非连战模式击败旗舰按 5%~10%(随波次)概率掉落未知圣遗物;情报网络首艘必掉;连战保留必得三选一
  *  3) 拾取:随机授予未拥有遗物 + 闪光动画(三环/粒子/横幅);已集齐转化 1000 分
  *  4) 新遗物效果:引力核心/战意旗帜/贤者之书/寒霜宝石/命运骰子/不死鸟羽 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('圣遗物');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
@@ -79,6 +61,9 @@ function startServer() {
     g._applyPower('relic');
     out.allOwned = g.score === 1000;
     // 4) 新遗物效果
+    // 先清空遗物并重算,取真正的「无遗物」基线:上面 _applyPower('relic') 随机授予了一件遗物,
+    // 若抽到 r_sage/r_magnet,基线会被污染,导致 sage/magnet 断言约 1/16 概率随机失败。
+    g.relics = {}; g._recalc();
     const baseMagnet = g.player.magnetR, baseXp = g.xpMult;
     g.relics = { r_magnet: true }; g._recalc();
     out.magnet = Math.abs(g.player.magnetR - baseMagnet * 1.6) < 1e-9;
@@ -120,12 +105,10 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e2) => console.log('  ' + e2)); }
-  console.log(JSON.stringify(r));
-  let bad = 0;
-  for (const k of Object.keys(r)) if (r[k] !== true) { console.error('FAIL: ' + k); bad++; }
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n圣遗物系统验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.info('原始结果: ' + JSON.stringify(r));
+  for (const k of Object.keys(r)) t.check(r[k] === true, k);
+  t.check(errors.length === 0, '无 JS 运行时异常');
+  t.finish();
+})().catch((e) => t.crash(e));

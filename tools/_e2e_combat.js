@@ -5,36 +5,17 @@
  *  1) 激光/散射会随卡片增强(加卡后 DPS 明显上升)
  *  2) 质变武器 + 适配卡 的输出不弱于默认主炮 + 同等卡
  * 通过 window.game 暴露的对象直接驱动,避免依赖真实敌机 AI。 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('质变武器协同');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const exe = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
@@ -47,9 +28,14 @@ function startServer() {
         damage(n) { this.taken += n; },
         update() {}, draw() {} };
     }
-    // 测一种构筑的 10 秒总输出(固定 dt 步进,禁用敌人/BOSS 干扰;时长加大以降低暴击/闪电随机波动)
-    function measure(setup) {
+    // 测一种构筑的 10 秒总输出(固定 dt 步进,禁用敌人/BOSS 干扰)。
+    // normal 模式 RNG = Math.random,暴击/裂变/电弧洗牌会带来 ±20% 波动,
+    // 使「最强/最弱 <=3.5」在阈值附近随机翻车;这里用固定种子各跑一遍取均值,
+    // 既消除随机性,又仍走真实命中结算路径。
+    const SEEDS = [0x9E3779B1, 0x1234ABCD, 0x5F356495];
+    function measureOnce(setup, seed) {
       g.start();               // 进入 playing,重置构筑
+      RNG = mulberry32(seed);  // 固定全局随机流(entities.js 的 let RNG)
       g.mods = {}; g.evo = {}; g.bonds = [];
       g.boss = null;
       setup(g);                // 施加卡片
@@ -88,6 +74,10 @@ function startServer() {
       const total = dummies.reduce((s, e) => s + e.taken, 0);
       return total;
     }
+    function measure(setup) {
+      const vals = SEEDS.map((s) => measureOnce(setup, s));
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
 
     const out = {};
     // 默认主炮:基础 vs +3dmg +2pierce
@@ -115,8 +105,7 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
 
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
   const r = (n) => Math.round(n);
@@ -127,8 +116,7 @@ function startServer() {
   console.log('电弧       base=' + r(result.tesla_base) + '  +卡=' + r(result.tesla_cards));
   console.log('回旋刃     base=' + r(result.boom_base) + '  +卡=' + r(result.boom_cards) + '  +evo=' + r(result.boom_evo));
 
-  let bad = 0;
-  const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(result.laser_cards > result.laser_base * 1.5, '激光随卡片显著变强(>1.5x)');
   check(result.spread_cards > result.spread_base * 1.5, '散射随卡片显著变强(>1.5x)');
@@ -158,6 +146,5 @@ function startServer() {
   check(maxP / minP <= 3.5, '质变武器强弱差距收敛(最强/最弱 <=3.5x)');
   // 电弧不再是明显垫底的异常项(>= 最弱线的 0.9)
   check(result.tesla_cards >= minP * 0.9, '电弧不再是垫底异常项');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n战斗协同验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

@@ -4,36 +4,17 @@
  *  2) 装备 tier3 绚丽皮肤(prism/celestial/singularity/phoenix)与绚丽机体(seraph)时,
  *     activeFx() 非空,且连续两帧 Player.draw 的绘制指令数明显更多(存在逐帧动画);
  *  3) 新增绚丽皮肤/机体存在于开箱掉落池(epic/mythic pool 非空且含新条目)。 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('绚丽动效');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const exe = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.addInitScript(() => {
     localStorage.setItem('deepstrike.crystal', '999999');
     localStorage.setItem('deepstrike.chips', '9999');
@@ -122,8 +103,7 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   const j = (x) => JSON.stringify(x);
@@ -141,8 +121,7 @@ function startServer() {
   console.log('新机体 drawOps titanX=' + result.ops.titanX + ' voidreaver=' + result.ops.voidreaver + ' bloomlord=' + result.ops.bloomlord);
   console.log('prism 动画帧差: t1=' + result.prismT1 + ' t2=' + result.prismT2);
 
-  let bad = 0;
-  const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(result.fx.proto === null, '普通皮肤 activeFx 为 null(无动效)');
   check(result.fx.nebula === null, 'tier2 皮肤 activeFx 为 null(无逐帧动效)');
@@ -166,6 +145,5 @@ function startServer() {
   const animVals = Object.values(result.anims);
   const allSet = new Set(animVals);
   check(animVals.every(Boolean) && allSet.size === animVals.length, '八项绚丽动效各不相同(风格不重复)');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n绚丽动效验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

@@ -5,35 +5,17 @@
  *  3) 5 级制数值重平衡抽样验证(射速/推进/磁吸/经验/连击/护盾/时滞/生命/装甲/汲取/僚机/裂隙/不屈/反击/歼灭)
  *  4) 进化质变抽样(彗星引擎/奇点磁场/万炮齐发/双子侧翼/龙鳞尾炮/幽灵中队/泰坦装甲/守护天使/净化类)
  *  5) 满级成就(maxed_3)在 5 级制下照常解锁 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('5 级制与进化');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
@@ -146,15 +128,11 @@ function startServer() {
     return out;
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
 
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e2) => console.log('  ' + e2)); }
-  console.log(JSON.stringify(r, null, 1));
-  let bad = 0;
-  for (const k of Object.keys(r)) {
-    if (r[k] !== true) { console.error('FAIL: ' + k); bad++; }
-  }
-  checkCount(bad);
-  function checkCount(b) { console.log(b ? ('\nFAILED: ' + b) : '\n5 级制与全员进化验证完成'); process.exitCode = b ? 1 : 0; }
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.info('原始结果: ' + JSON.stringify(r));
+  for (const k of Object.keys(r)) t.check(r[k] === true, k);
+  t.check(errors.length === 0, '无 JS 运行时异常');
+  t.finish();
+})().catch((e) => t.crash(e));

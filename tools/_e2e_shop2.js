@@ -3,36 +3,17 @@
  *  1) 荣耀秘匣(ex_glory, 520 芯片)必得绚丽皮肤或机体(epic/mythic),100%;芯片正确扣除;
  *  2) 永久强化全部为 10 级上限;每级数值已下调(hp +10、xp +4%、bomb 每2级+1、shield 每级+1.2%减伤);
  *     价格逐级递增且总价显著提高。 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const H = require('./_harness');
+const t = H.suite('商城扩展');
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const exe = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  H.watchErrors(page, errors);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
@@ -75,8 +56,7 @@ function startServer() {
     return { glory: !!glory, gloryChips: glory && glory.chips, tiers, nonGlory, realItems, spent, costOk, boostInfo };
   });
 
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('荣耀秘匣: 存在=' + result.glory + ' 芯片价=' + result.gloryChips);
@@ -84,8 +64,7 @@ function startServer() {
   console.log('单次扣费正确=' + result.costOk);
   result.boostInfo.forEach(b => console.log('强化 ' + b.id + ': max=' + b.max + ' 递增=' + b.ascending + ' 首级=' + b.first + ' 满级=' + b.last + ' 总价=' + b.total));
 
-  let bad = 0;
-  const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(result.glory && result.gloryChips === 520, '荣耀秘匣存在且为 520 芯片');
   check(result.nonGlory === 0, '荣耀秘匣 40 连开全部为绚丽(epic/mythic)');
@@ -95,6 +74,5 @@ function startServer() {
   check(result.boostInfo.every(b => b.max === 10), '所有永久强化上限为 10 级');
   check(result.boostInfo.every(b => b.ascending), '每个强化价格逐级递增');
   check(result.boostInfo.every(b => b.last > b.first * 5), '满级价格显著高于首级(>5x,总投入拉高)');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n商城扩展验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));

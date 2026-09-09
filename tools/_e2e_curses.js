@@ -1,33 +1,18 @@
 'use strict';
 /* v1.4.2 诅咒风险卡验证:玻璃大炮/脆刃/贪婪契约 数值与结算、低权重入池、红色描边、成就 */
-const http = require('http');
+const H = require('./_harness');
+const t = H.suite('诅咒风险卡');
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
-
-const ROOT = path.join(__dirname, '..');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p === '/') p = '/index.html';
-      const fp = path.join(ROOT, p);
-      if (!fp.startsWith(ROOT) || !fs.existsSync(fp)) { res.statusCode = 404; res.end('404'); return; }
-      res.setHeader('Content-Type', MIME[path.extname(fp)] || 'application/octet-stream');
-      fs.createReadStream(fp).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve(server));
-  });
-}
+const ROOT = H.ROOT;
 
 (async () => {
-  const server = await startServer();
+  const server = await H.startServer();
   const port = server.address().port;
-  const browser = await chromium.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true });
+  const browser = await H.launch();
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  H.watchErrors(page, errors);
   await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'networkidle' });
 
   const r = await page.evaluate(() => {
@@ -87,8 +72,7 @@ function startServer() {
   const cssOk = fs.readFileSync(path.join(ROOT, 'css/style.css'), 'utf8').indexOf('.card.curse') >= 0;
 
   await page.close();
-  await browser.close();
-  server.close();
+  await H.shutdown(browser, server);
   if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
 
   console.log('玻璃大炮 伤害×2: ' + r.glassMul + ' · 生命×0.6: ' + r.glassHp);
@@ -97,8 +81,7 @@ function startServer() {
   console.log('诅咒卡入池: ' + r.inPool + ' · 红色描边样式: ' + cssOk);
   console.log('与狼共舞成就: ' + r.ach);
 
-  let bad = 0;
-  const check = (cc, m) => { if (cc) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
+  const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.glassMul && r.glassHp, '玻璃大炮:伤害 ×2 / 生命上限 ×0.6');
   check(r.brittleTaken, '脆刃:受到伤害 ×1.5');
@@ -106,6 +89,5 @@ function startServer() {
   check(r.inPool, '诅咒卡以低权重进入卡池');
   check(cssOk, '诅咒卡红色描边样式就绪');
   check(r.ach, '与狼共舞成就正常解锁');
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n诅咒风险卡验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
+  t.finish();
+})().catch((e) => t.crash(e));
