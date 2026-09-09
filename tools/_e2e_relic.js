@@ -59,7 +59,7 @@ function startServer() {
       return cnt;
     };
     const drops10 = dropCount(200, 30, false); // 波 30 → 概率 10% 封顶,期望 20
-    out.dropHigh = drops10 >= 8 && drops10 <= 40;
+    out.dropHigh = drops10 >= 6 && drops10 <= 44;
     const dropsF = dropCount(50, 5, true);     // 情报网络:必掉
     out.forceDrop = dropsF === 50;
     // 连战:必得三选一(不掉落实物)

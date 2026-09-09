@@ -408,7 +408,7 @@ class Player {
       // 电弧发生器:发射一颗"引雷弹",命中即触发链式闪电(在 game 层结算跳跃)
       const chains = 1 + (m.tesla - 1) + multiN + (game.bonds.includes('teslachain') ? 1 : 0);
       // 平衡:提高电弧触发弹基础伤害(2→3 且吃满 dmg 加成),配合链式增强使多目标输出达标
-      const teslaDmg = (3 + Math.round(1.3 * this.dmgBonus) + (game.evo.tesla ? 3 : 0)) * this.dmgMul;
+      const teslaDmg = (4 + Math.round(1.3 * this.dmgBonus) + (game.evo.tesla ? 3 : 0)) * this.dmgMul;
       for (let c = 0; c < chains; c++) {
         const ox = chains === 1 ? 0 : (c / (chains - 1) - 0.5) * 22;
         mk(ox, -12, ox * 6, -900, { color: '#aef0ff', r: 3.2, pierce: 0, split: 0, dmg: teslaDmg, tesla: true });

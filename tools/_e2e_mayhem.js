@@ -272,10 +272,10 @@ function startServer() {
     g.spawnQueue = []; g.waveQuota = 999999; g.autoFire = false; g.keys.fire = false;
     // 贤者之石:基准 1 分 → ×1.5(模式) ×2(石头) = 3
     g.augments = { a_stone: 3 };
-    g.score = 1600; g.wave = 6; g.runBossKills = 0; g.runEliteKills = 0;
+    g.score = 16000; g.wave = 6; g.runBossKills = 0; g.runEliteKills = 0;
     g._gameover();
-    out.stone = Shop.lastEarn === 4; // 1 ×1.5(模式)→2 ×2(贤者之石)→4
-    out.recordSaved = +localStorage.getItem('deepstrike.mayhemHi') >= 1600;
+    out.stone = Shop.lastEarn === 18; // 6 ×1.5(模式)=9 ×2(贤者之石)=18
+    out.recordSaved = +localStorage.getItem('deepstrike.mayhemHi') >= 16000;
     out.chipsUntouched = localStorage.getItem('deepstrike.chipClaim') === chipsKeyBefore;
     // 纪录保持:更低分不覆盖
     g.start('mayhem');
@@ -283,7 +283,7 @@ function startServer() {
     g.augments = {};
     g.score = 500; g.wave = 2; g.runBossKills = 0; g.runEliteKills = 0;
     g._gameover();
-    out.recordKept = +localStorage.getItem('deepstrike.mayhemHi') >= 1600;
+    out.recordKept = +localStorage.getItem('deepstrike.mayhemHi') >= 16000;
     // 成就:mayhem_30k
     g.start('mayhem');
     if (g.state === 'levelup') g.chooseAugment(0);

@@ -67,7 +67,7 @@ function startServer() {
     game.mode = 'normal'; game.score = 16000; game.runBossKills = 0; game.runEliteKills = 0;
     game.relics = {}; game.state = 'playing';
     game._gameover();
-    out.pactCrystal = Shop.lastEarn === 15; // 10 × 1.5
+    out.pactCrystal = Shop.lastEarn === 9; // 6 × 1.5
     // 5) 诅咒卡入池(低权重,300 次抽卡至少出现一次)
     let seen = false;
     for (let i = 0; i < 300 && !seen; i++) {

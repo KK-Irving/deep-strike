@@ -13,12 +13,18 @@
  *   trail  拖尾粒子密度倍率 */
 const SKINS = [
   { id: 'proto',    name: '原型机·青',   price: 0,    tier: 0, hull: '#0f4b66', stroke: '#7ef3ff', cockpit: '#d9fbff', flame: ['rgba(120,230,255,0.9)', 'rgba(0,120,255,0)'], desc: '默认涂装' },
-  { id: 'frost',    name: '霜语',         price: 360,  tier: 0, hull: '#123a52', stroke: '#c8ecff', cockpit: '#eaf7ff', flame: ['rgba(200,236,255,0.9)', 'rgba(80,160,255,0)'] },
-  { id: 'ember',    name: '烈焰',         price: 480,  tier: 0, hull: '#4a1810', stroke: '#ff9a3c', cockpit: '#ffd9a8', flame: ['rgba(255,170,90,0.9)', 'rgba(255,60,0,0)'] },
-  { id: 'violet',   name: '幽紫',         price: 640,  tier: 1, hull: '#2a1240', stroke: '#c86bff', cockpit: '#eadfff', flame: ['rgba(200,107,255,0.9)', 'rgba(90,0,180,0)'], fx: { glow: 1.3, dual: '#7ef3ff' } },
-  { id: 'gold',     name: '黄金装甲',     price: 1000, tier: 2, hull: '#4a3a10', stroke: '#ffd166', cockpit: '#fff3c8', flame: ['rgba(255,220,120,0.9)', 'rgba(255,140,0,0)'], fx: { glow: 1.6, dual: '#fff2b0', sheen: '#fff6cf', trail: 1.4 } },
-  { id: 'aurora',   name: '极光',         price: 1200, tier: 2, hull: '#0a2f3a', stroke: '#5ffbf1', cockpit: '#dffffb', flame: ['rgba(95,251,241,0.9)', 'rgba(120,80,255,0)'], desc: '流转极光涂装', fx: { glow: 1.7, dual: '#a98bff', sheen: '#c8fff4', trail: 1.5 } },
-  { id: 'nebula',   name: '星海',         price: 1500, tier: 2, hull: '#1a1040', stroke: '#a98bff', cockpit: '#efe6ff', flame: ['rgba(169,139,255,0.9)', 'rgba(255,90,200,0)'], desc: '深空星云涂装', fx: { glow: 1.8, dual: '#ff8fd8', sheen: '#e6d6ff', trail: 1.6 } },
+  { id: 'frost',    name: '霜语',         price: 680,  tier: 0, hull: '#123a52', stroke: '#c8ecff', cockpit: '#eaf7ff', flame: ['rgba(200,236,255,0.9)', 'rgba(80,160,255,0)'] },
+  { id: 'ember',    name: '烈焰',         price: 880,  tier: 0, hull: '#4a1810', stroke: '#ff9a3c', cockpit: '#ffd9a8', flame: ['rgba(255,170,90,0.9)', 'rgba(255,60,0,0)'] },
+  { id: 'violet',   name: '幽紫',         price: 1280,  tier: 1, hull: '#2a1240', stroke: '#c86bff', cockpit: '#eadfff', flame: ['rgba(200,107,255,0.9)', 'rgba(90,0,180,0)'], fx: { glow: 1.3, dual: '#7ef3ff' } },
+  { id: 'gold',     name: '黄金装甲',     price: 2200, tier: 2, hull: '#4a3a10', stroke: '#ffd166', cockpit: '#fff3c8', flame: ['rgba(255,220,120,0.9)', 'rgba(255,140,0,0)'], fx: { glow: 1.6, dual: '#fff2b0', sheen: '#fff6cf', trail: 1.4 } },
+  { id: 'aurora',   name: '极光',         price: 2600, tier: 2, hull: '#0a2f3a', stroke: '#5ffbf1', cockpit: '#dffffb', flame: ['rgba(95,251,241,0.9)', 'rgba(120,80,255,0)'], desc: '流转极光涂装', fx: { glow: 1.7, dual: '#a98bff', sheen: '#c8fff4', trail: 1.5 } },
+  { id: 'nebula',   name: '星海',         price: 3200, tier: 2, hull: '#1a1040', stroke: '#a98bff', cockpit: '#efe6ff', flame: ['rgba(169,139,255,0.9)', 'rgba(255,90,200,0)'], desc: '深空星云涂装', fx: { glow: 1.8, dual: '#ff8fd8', sheen: '#e6d6ff', trail: 1.6 } },
+  { id: 'emerald',  name: '翠影',         price: 800,  tier: 0, hull: '#0a3320', stroke: '#5aff9a', cockpit: '#dcffe9', flame: ['rgba(120,255,170,0.9)', 'rgba(0,180,90,0)'] },
+  { id: 'rose',     name: '绯樱',         price: 1500, tier: 1, hull: '#3d1024', stroke: '#ff8fc0', cockpit: '#ffe0ee', flame: ['rgba(255,150,190,0.9)', 'rgba(200,40,110,0)'], fx: { glow: 1.4, dual: '#ffd166' } },
+  { id: 'magma',    name: '熔核',         price: 1800, tier: 1, hull: '#3a1408', stroke: '#ffb03c', cockpit: '#ffe6c8', flame: ['rgba(255,170,80,0.95)', 'rgba(220,40,0,0)'], fx: { glow: 1.5, dual: '#ff5470' } },
+  { id: 'azure',    name: '湛蓝',         price: 3600, tier: 2, hull: '#0a1e3d', stroke: '#5ab0ff', cockpit: '#dcf0ff', flame: ['rgba(110,190,255,0.9)', 'rgba(30,90,220,0)'], fx: { glow: 1.6, dual: '#aef0ff', sheen: '#e0f2ff', trail: 1.4 } },
+  { id: 'thunder',  name: '紫电',         price: 4200, tier: 2, hull: '#1d1040', stroke: '#b08cff', cockpit: '#ece2ff', flame: ['rgba(180,150,255,0.9)', 'rgba(110,40,230,0)'], fx: { glow: 1.7, dual: '#7ef3ff', sheen: '#f0e8ff', trail: 1.5 } },
+  { id: 'obsidian', name: '黑曜',         price: 4800, tier: 2, hull: '#101014', stroke: '#8a8fa8', cockpit: '#d8dce8', flame: ['rgba(160,170,200,0.85)', 'rgba(60,70,100,0)'], fx: { glow: 1.7, dual: '#ffd166', sheen: '#e8e8f4', trail: 1.4 } },
   { id: 'crimson',  name: '猩红之刃',     ach: 'combo_60', tier: 1, hull: '#40101d', stroke: '#ff4d6d', cockpit: '#ffd6de', flame: ['rgba(255,110,130,0.9)', 'rgba(180,0,40,0)'], fx: { glow: 1.4, dual: '#ffd166' } },
   { id: 'abyss',    name: '深渊指挥官',   ach: 'wave_20',  tier: 2, hull: '#06282a', stroke: '#2be8c8', cockpit: '#c8fff4', flame: ['rgba(80,230,200,0.9)', 'rgba(0,120,140,0)'], fx: { glow: 1.6, dual: '#7effe0', sheen: '#c8fff4', trail: 1.4 } },
   { id: 'evoProto', name: '进化原型机',   ach: 'evo_3',    tier: 1, hull: '#12240a', stroke: '#9dff5a', cockpit: '#e8ffd6', flame: ['rgba(157,255,90,0.9)', 'rgba(40,140,0,0)'], fx: { glow: 1.4, dual: '#e8ffd6' } },
@@ -32,10 +38,13 @@ const SKINS = [
 /* 出击机体:造型/数值/专属特性;ach 指定成就解锁 */
 const SHIPS = [
   { id: 'vanguard',  name: '突击机',     price: 0,   desc: '均衡型:全属性标准',            hp: 100, speed: 330, fire: 0.12,  dmgBonus: 0 },
-  { id: 'juggernaut',name: '重装堡垒',   price: 1500, desc: '重装型:血厚甲硬,机动迟缓',      hp: 140, speed: 295, fire: 0.135, dmgBonus: 0, perkArmor: 0.10 },
-  { id: 'phantom',   name: '幽灵',       price: 950, desc: '掠袭型:极速机动,机体脆弱',      hp: 75,  speed: 375, fire: 0.10,  dmgBonus: 0, perkMagnet: 60 },
-  { id: 'lancer',    name: '锐锋狙击',   price: 1900, desc: '狙击型:高伤慢射,精准强袭',      hp: 90,  speed: 320, fire: 0.16,  dmgBonus: 2 },
-  { id: 'scatter',   name: '散华',       price: 2200, desc: '散射型:高频弱弹,弹幕覆盖',      hp: 95,  speed: 340, fire: 0.09,  dmgBonus: 0, perkSide: 1, perkMagnet: 30 },
+  { id: 'juggernaut',name: '重装堡垒',   price: 2800, desc: '重装型:血厚甲硬,机动迟缓',      hp: 140, speed: 295, fire: 0.135, dmgBonus: 0, perkArmor: 0.10 },
+  { id: 'phantom',   name: '幽灵',       price: 1800, desc: '掠袭型:极速机动,机体脆弱',      hp: 75,  speed: 375, fire: 0.10,  dmgBonus: 0, perkMagnet: 60 },
+  { id: 'lancer',    name: '锐锋狙击',   price: 3600, desc: '狙击型:高伤慢射,精准强袭',      hp: 90,  speed: 320, fire: 0.16,  dmgBonus: 2 },
+  { id: 'scatter',   name: '散华',       price: 4200, desc: '散射型:高频弱弹,弹幕覆盖',      hp: 95,  speed: 340, fire: 0.09,  dmgBonus: 0, perkSide: 1, perkMagnet: 30 },
+  { id: 'aegis',     name: '守望',       price: 3200, desc: '护卫型:中坚装甲,宽磁吸',   hp: 125, speed: 320, fire: 0.125, dmgBonus: 0, perkArmor: 0.06, perkMagnet: 40 },
+  { id: 'wasp',      name: '黄蜂',       price: 3800, desc: '蜂刺型:极速高频,轻装袭扰', hp: 85,  speed: 390, fire: 0.095, dmgBonus: 1, perkMagnet: 30 },
+  { id: 'nova',      name: '新星',       price: 4600, desc: '明星型:高伤火力特化',      hp: 100, speed: 350, fire: 0.11,  dmgBonus: 3 },
   { id: 'tempest',   name: '风暴棱镜',   ach: 'wave_25', desc: '特化型:开局自带侧翼弹',     hp: 90,  speed: 350, fire: 0.11,  dmgBonus: 0, perkSide: 1 },
   { id: 'titanX',    name: '泰坦·X',     rare: true, desc: '★绚丽机体:全能强袭 · 电磁风暴环绕,仅密匣/兑换获得', hp: 130, speed: 355, fire: 0.10, dmgBonus: 2, perkArmor: 0.08, perkSide: 1, fx: { glow: 2.4, dual: '#8fe4ff', sheen: '#ffffff', trail: 2.1, anim: 'storm', shipTier: 3 } },
   { id: 'seraph',    name: '炽天使',     rare: true, desc: '★绚丽机体:环绕圣光,高机动高伤 · 超新星脉冲,仅密匣/兑换获得', hp: 120, speed: 365, fire: 0.095, dmgBonus: 2, perkArmor: 0.06, perkMagnet: 50, perkSide: 1, fx: { glow: 2.3, dual: '#fff6cf', sheen: '#ffffff', trail: 2.0, anim: 'nova', shipTier: 3 } },
@@ -54,6 +63,9 @@ const SHIP_SHAPES = {
   titanX:    (g) => { g.moveTo(0, -18); g.lineTo(10, -5); g.lineTo(14, 9); g.lineTo(5, 7); g.lineTo(0, 13); g.lineTo(-5, 7); g.lineTo(-14, 9); g.lineTo(-10, -5); g.closePath(); },
   seraph:    (g) => { g.moveTo(0, -19); g.lineTo(7, -6); g.lineTo(16, 2); g.lineTo(9, 8); g.lineTo(4, 7); g.lineTo(0, 13); g.lineTo(-4, 7); g.lineTo(-9, 8); g.lineTo(-16, 2); g.lineTo(-7, -6); g.closePath(); },
   voidreaver:(g) => { g.moveTo(0, -20); g.lineTo(5, -8); g.lineTo(13, -2); g.lineTo(8, 6); g.lineTo(11, 13); g.lineTo(0, 9); g.lineTo(-11, 13); g.lineTo(-8, 6); g.lineTo(-13, -2); g.lineTo(-5, -8); g.closePath(); },
+  aegis:      (g) => { g.moveTo(0, -15); g.lineTo(10, -8); g.lineTo(16, 2); g.lineTo(10, 10); g.lineTo(4, 7); g.lineTo(0, 13); g.lineTo(-4, 7); g.lineTo(-10, 10); g.lineTo(-16, 2); g.lineTo(-10, -8); g.closePath(); },
+  wasp:       (g) => { g.moveTo(0, -21); g.lineTo(4, -4); g.lineTo(11, 8); g.lineTo(3, 6); g.lineTo(0, 12); g.lineTo(-3, 6); g.lineTo(-11, 8); g.lineTo(-4, -4); g.closePath(); },
+  nova:       (g) => { g.moveTo(0, -18); g.lineTo(6, -8); g.lineTo(15, -2); g.lineTo(8, 4); g.lineTo(12, 12); g.lineTo(3, 8); g.lineTo(0, 14); g.lineTo(-3, 8); g.lineTo(-12, 12); g.lineTo(-8, 4); g.lineTo(-15, -2); g.lineTo(-6, -8); g.closePath(); },
   bloomlord: (g) => { g.moveTo(0, -16); g.lineTo(8, -8); g.lineTo(15, 4); g.lineTo(8, 6); g.lineTo(6, 13); g.lineTo(0, 9); g.lineTo(-6, 13); g.lineTo(-8, 6); g.lineTo(-15, 4); g.lineTo(-8, -8); g.closePath(); }
 };
 
@@ -65,13 +77,17 @@ const SHIP_SHAPES = {
  * prices[i] = 购买第 (i+1) 级所需星晶;max = prices.length = 10。 */
 const BOOSTS = [
   { id: 'bomb1',  icon: '💣', name: '初始炸弹',   desc: '每 2 级 +1 初始炸弹(满级 +5)',
-    prices: [300, 500, 800, 1150, 1550, 2000, 2500, 3100, 3800, 4600], per: '每2级 +1 炸弹' },
+    prices: [500, 820, 1250, 1780, 2400, 3150, 4000, 5000, 6200, 7600], per: '每2级 +1 炸弹' },
   { id: 'hp25',   icon: '❤️', name: '装甲扩容',   desc: '初始生命上限 +10/级(满级 +100)',
-    prices: [280, 460, 700, 1000, 1360, 1780, 2260, 2800, 3400, 4100], per: '+10 HP' },
+    prices: [460, 750, 1120, 1580, 2140, 2800, 3580, 4500, 5560, 6800], per: '+10 HP' },
   { id: 'xp10',   icon: '🔷', name: '经验调校',   desc: '经验获取 +4%/级(满级 +40%)',
-    prices: [350, 560, 840, 1180, 1580, 2040, 2560, 3140, 3780, 4480], per: '+4% 经验' },
+    prices: [560, 900, 1340, 1890, 2540, 3300, 4200, 5250, 6480, 7900], per: '+4% 经验' },
   { id: 'shield', icon: '◇',  name: '出发护盾',   desc: 'Lv1 出击1层盾 · 每级额外减伤,满级更硬',
-    prices: [500, 780, 1120, 1520, 1980, 2500, 3080, 3720, 4420, 5180], per: '护盾+减伤' }
+    prices: [800, 1250, 1800, 2480, 3300, 4250, 5350, 6600, 8050, 9700], per: '护盾+减伤' },
+  { id: 'magnet0', icon: '🌀', name: '引力谐振',   desc: '初始磁吸范围 +18/级(满级 +180)',
+    prices: [380, 620, 940, 1330, 1800, 2350, 3000, 3750, 4620, 5600], per: '+18 磁吸' },
+  { id: 'cap0',   icon: '📦', name: '弹药扩容',   desc: '每 2 级炸弹上限 +1(满级 +5)',
+    prices: [600, 960, 1400, 1950, 2600, 3380, 4300, 5380, 6640, 8100], per: '每2级 +1 上限' }
 ];
 /* 读取某强化的当前等级(兼容旧布尔存档) */
 function boostLevel(id) {
@@ -84,7 +100,9 @@ function boostLevel(id) {
 const LOADOUTS = [
   { id: 'bomb2',  icon: '💣', name: '出击弹药', desc: '下次出击炸弹 +1', price: 15 },
   { id: 'lv3',    icon: '⬆', name: '紧急改装', desc: '下次出击立即获得 2 次强化选择', price: 25 },
-  { id: 'relic5', icon: '👑', name: '情报网络', desc: '下次出击首艘旗舰必掉圣遗物(连战中为五选一)', price: 40 }
+  { id: 'relic5', icon: '👑', name: '情报网络', desc: '下次出击首艘旗舰必掉圣遗物(连战中为五选一)', price: 40 },
+  { id: 'heal0',  icon: '🛠', name: '战地维修', desc: '下次出击开局生命回满', price: 30 },
+  { id: 'aegis0', icon: '◇',  name: '紧急护盾', desc: '下次出击开局展开一层护盾', price: 45 }
 ];
 
 const Shop = {
@@ -382,9 +400,9 @@ const Shop = {
    * 廉价匣走标准掉落表;高级匣抬高稀有+以上概率
    * ============================================================ */
   EXCHANGE: [
-    { id: 'ex_basic', name: '标准密匣', chips: 12, boost: 0,   desc: '绚丽概率 2.5%~4%' },
-    { id: 'ex_fine',  name: '精制密匣', chips: 30, boost: 1,   desc: '绚丽概率 5%~7.5%' },
-    { id: 'ex_lux',   name: '奢华密匣', chips: 60, boost: 2,   desc: '绚丽概率 10%~15%' },
+    { id: 'ex_basic', name: '标准密匣', chips: 15, boost: 0,   desc: '绚丽概率 2.5%~4%' },
+    { id: 'ex_fine',  name: '精制密匣', chips: 38, boost: 1,   desc: '绚丽概率 5%~7.5%' },
+    { id: 'ex_lux',   name: '奢华密匣', chips: 75, boost: 2,   desc: '绚丽概率 10%~15%' },
     { id: 'ex_glory', name: '荣耀秘匣', chips: 520, glory: true, desc: '★ 必得绚丽皮肤或机体(100%)' }
   ],
   /* 必得绚丽:在所有绚丽皮肤(epic)与绚丽机体(mythic)中随机,已拥有则高额星晶补偿 */

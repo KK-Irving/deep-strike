@@ -55,7 +55,7 @@ function startServer() {
     const d0 = (() => { const h = game.hard; game.hard = false; const v = game.enemyDmg('pink'); game.hard = h; return v; })();
     const d1 = game.enemyDmg('pink');
     out.dmg = d1 > d0;
-    // 4) 星晶结算 ×1.5(16000 分 → 基础 10 → 高难 15)
+    // 4) 星晶结算 ×1.5(16000 分 → 基础 6 → 高难 9)
     const run = () => {
       game.mode = 'normal'; game.state = 'playing'; game.score = 16000;
       game.runBossKills = 0; game.runEliteKills = 0; game.relics = {};
@@ -64,7 +64,7 @@ function startServer() {
     };
     game.hard = false; const e0 = run();
     game.hard = true; const e1 = run();
-    out.crystal = e0 === 10 && e1 === 15;
+    out.crystal = e0 === 6 && e1 === 9;
     // 5) 菜单按钮文案刷新(回到主菜单后)
     game.toMenu();
     game.toggleHard();

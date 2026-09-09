@@ -1,6 +1,6 @@
 'use strict';
 /* 经济再平衡验证:
- *  1) 星晶获取下调:相同战绩下,结算星晶按新公式(score/1600 + boss*6 + elite*1)计,明显低于旧公式(score/1000 + boss*10 + elite*2);
+ *  1) 星晶获取下调:相同战绩下,结算星晶按新公式(score/2600 + boss*5 + elite*1)计,明显低于旧公式(score/1000 + boss*10 + elite*2);
  *  2) 每日挑战芯片:同一日仅可领取一次,数额落在 10~15;二次结算发放 0;
  *  3) 每周挑战芯片:同一周仅可领取一次,数额落在 40~60;二次结算发放 0;
  *  4) 普通模式不产出芯片。
@@ -54,7 +54,7 @@ function startServer() {
     }
 
     const out = {};
-    // 星晶:score 32000, boss 3, elite 10 → 新公式 = 20 + 18 + 10 = 48;旧公式 = 32 + 30 + 20 = 82
+    // 星晶:score 32000, boss 3, elite 10 → 新公式 = 12 + 15 + 10 = 37;旧公式 = 32 + 30 + 20 = 82
     const crys = settle('normal', 32000, 12, 3, 10);
     out.crystalNew = crys.earn;
     out.crystalOld = Math.floor(32000 / 1000) + 3 * 10 + 10 * 2;

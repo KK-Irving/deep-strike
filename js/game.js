@@ -300,7 +300,9 @@ class Game {
     if (load.bomb2) this.player.bombs = Math.min(5, this.player.bombs + 1);
     if (load.lv3) this.pendingLevels += 2;
     if (load.relic5) { this._relicFive = true; this._forceRelicDrop = true; } // 情报网络:首艘旗舰必掉 + 连战五选一
-    if (load.bomb2 || load.lv3 || load.relic5)
+    if (load.heal0) this.player.hp = this.player.maxHp;
+    if (load.aegis0) this.player.shield = true;
+    if (load.bomb2 || load.lv3 || load.relic5 || load.heal0 || load.aegis0)
       this._addFloat(new FloatText(this.player.x, this.player.y - 40, '出击准备生效', '#ffd166', 13));
     this._showState();
     this.startWave(1);
@@ -478,7 +480,7 @@ class Game {
     if (A.a_urf) interval *= 0.65;
     p.fireInterval = Math.max(0.045, interval);
     p.speed = (sh.speed || 330) * Math.pow(1.10, m.speed || 0) * (A.a_engine ? 1.2 : 1) * (E.speed ? 1.25 : 1);
-    p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 45;
+    p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 45 + 18 * boostLevel('magnet0');
     if (E.magnet) p.magnetR *= 1.8;
     if (this.relics.r_magnet) p.magnetR *= 1.6;
     // 经验调校 + 经验风暴周变异
@@ -2000,7 +2002,7 @@ class Game {
 
   /* ---------------- 炸弹 ---------------- */
   /* 炸弹携带上限:龙魂遗物 +2、「弹药库」海克斯强化 +2 */
-  bombCap() { return (this.relics.r_dragon ? 7 : 5) + ((this.augments && this.augments.a_ammo) ? 2 : 0); }
+  bombCap() { return (this.relics.r_dragon ? 7 : 5) + ((this.augments && this.augments.a_ammo) ? 2 : 0) + Math.floor(boostLevel('cap0') / 2); }
 
   tryBomb() {
     if (this.state !== 'playing' || !this.player.alive) return;
@@ -2533,7 +2535,7 @@ class Game {
     d.finalHi.textContent = this.mode === 'mayhem' ? this._mayhemBest() : (this.mode !== 'normal' ? this._challengeBest() : this.hi);
     this._refreshMenuHi();
     // 星晶结算:得分/1600 + 旗舰×6 + 精英×1;贪婪周 ×1.5;高难 ×1.5
-    Shop.lastEarn = Math.floor(this.score / 1600) + (this.runBossKills || 0) * 6 + (this.runEliteKills || 0) * 1;
+    Shop.lastEarn = Math.floor(this.score / 2600) + (this.runBossKills || 0) * 5 + (this.runEliteKills || 0) * 1;
     if (this._mut && this._mut.id === 'greed') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (this.mods.pact) Shop.lastEarn = Math.round(Shop.lastEarn * (1 + 0.1 * this.mods.pact));
     if (this.hard) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);

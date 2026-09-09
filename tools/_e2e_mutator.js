@@ -69,7 +69,7 @@ function startServer() {
     game._mut = WEEK_MUTATORS.find(x => x.id === 'greed');
     game.mode = 'normal'; game.score = 16000; game.runBossKills = 0; game.runEliteKills = 0; game.relics = {};
     game.state = 'playing'; game._gameover();
-    out.greed = Shop.lastEarn === 15; // floor(16000/1600)=10 → ×1.5
+    out.greed = Shop.lastEarn === 9; // floor(16000/2600)=6 → ×1.5
     game._mut = null;
     return out;
   });
