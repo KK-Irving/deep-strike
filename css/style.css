@@ -423,3 +423,15 @@ h2 {
 .best-item i { font-style: normal; font-size: 10.5px; color: #ffd166; font-family: Consolas, monospace; }
 .best-item.off { opacity: 0.5; }
 .best-item.off b { color: rgba(207, 232, 255, 0.5); }
+
+/* ---- 海克斯大乱斗:强化符文卡 ---- */
+.card.aug.tier0 { border-color: rgba(192, 200, 216, 0.65); }
+.card.aug.tier0:hover { border-color: #c0c8d8; box-shadow: 0 10px 30px rgba(192, 200, 216, 0.3); }
+.card.aug.tier1 { border-color: rgba(255, 209, 102, 0.7); box-shadow: 0 0 14px rgba(255, 209, 102, 0.22) inset; }
+.card.aug.tier1:hover { border-color: #ffd166; box-shadow: 0 10px 30px rgba(255, 209, 102, 0.4); }
+.card.aug.tier2 { border-color: rgba(255, 106, 213, 0.7); box-shadow: 0 0 18px rgba(255, 106, 213, 0.3) inset; animation: augPrism 1.6s ease-in-out infinite; }
+.card.aug.tier2:hover { border-color: #ff6ad5; box-shadow: 0 10px 30px rgba(255, 106, 213, 0.45); }
+@keyframes augPrism { 50% { box-shadow: 0 0 26px rgba(255, 106, 213, 0.55); } }
+.chip.aug.t0 { color: #c0c8d8; border-color: rgba(192, 200, 216, 0.5); }
+.chip.aug.t1 { color: #ffd166; border-color: rgba(255, 209, 102, 0.5); }
+.chip.aug.t2 { color: #ff6ad5; border-color: rgba(255, 106, 213, 0.5); }

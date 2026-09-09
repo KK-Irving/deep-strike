@@ -48,6 +48,12 @@
     if (e.code === 'KeyR' && (game.state === 'paused' || game.state === 'gameover')) game.start(game.mode);
     // 升级选卡快捷键(遗物模式下选择遗物;满槽替换模式下选择要丢弃的模块)
     if (game.state === 'levelup') {
+      // 海克斯大乱斗:强化三选一
+      if (game._augMode) {
+        const ai = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
+        if (ai >= 0) game.chooseAugment(ai % 3);
+        return;
+      }
       if (game._relicMode) {
         // 情报网络增益下遗物五选一,支持 1~5
         const relicKeys = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'];
@@ -72,6 +78,7 @@
       if (e.code === 'KeyD') game.start('daily');
       if (e.code === 'KeyW') game.start('weekly');
       if (e.code === 'KeyB') game.start('boss');
+      if (e.code === 'KeyL') game.start('mayhem');
       if (e.code === 'KeyG') game.showMenuPanel('shop');
       if (e.code === 'KeyH') game.showMenuPanel('help');
       if (e.code === 'KeyT') game.showMenuPanel('stats');
@@ -98,6 +105,7 @@
   $('btnDaily').addEventListener('click', () => { AudioSys.init(); game.start('daily'); });
   $('btnWeekly').addEventListener('click', () => { AudioSys.init(); game.start('weekly'); });
   $('btnBoss').addEventListener('click', () => { AudioSys.init(); game.start('boss'); });
+  $('btnMayhem').addEventListener('click', () => { AudioSys.init(); game.start('mayhem'); });
   $('btnRestart').addEventListener('click', () => { AudioSys.init(); game.start(); });
   $('btnResume').addEventListener('click', () => game.togglePause());
   $('btnRestart2').addEventListener('click', () => { AudioSys.init(); game.start(game.mode); });

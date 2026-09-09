@@ -289,7 +289,7 @@ class Player {
     this.undyingUsed = false;
     this.weapon = 1; this.bombs = 2;
     this.shield = false; this.invuln = 2.2;
-    this.chillT = 0;
+    this.chillT = 0; this._phaseT = 0; // 相位疾行:受击后短暂加速
     this.fireCd = 0; this.alive = true;
     this.beamOn = false;
     this.engine = 0; this.showHitbox = false;
@@ -313,11 +313,12 @@ class Player {
       const len = Math.hypot(dx, dy);
       // 凝滞词缀:受击后移动迟缓
       const chill = this.chillT > 0 ? 0.6 : 1;
-      const sp = this.speed * (k.slow ? 0.42 : 1) * chill;
+      const sp = this.speed * (k.slow ? 0.42 : 1) * chill * (this._phaseT > 0 ? 1.5 : 1);
       this.x += dx / len * sp * dt;
       this.y += dy / len * sp * dt;
     }
     this.chillT = Math.max(0, this.chillT - dt);
+    this._phaseT = Math.max(0, this._phaseT - dt);
     this.x = clamp(this.x, 16, W - 16);
     this.y = clamp(this.y, 60, H - 22);
     this.showHitbox = !!k.slow;

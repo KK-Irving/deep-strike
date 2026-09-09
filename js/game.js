@@ -21,6 +21,37 @@ const BESTIARY_INFO = {
   boss_dread:   { name: '要塞旗舰', reward: 50 }
 };
 
+/* 海克斯大乱斗:强化符文(致敬 LoL 海克斯大乱斗/斗魂竞技场),白银/黄金/棱彩三档
+ * 第 1/4/7/10 波开局三选一,共 4 轮;品阶随轮次提升。大乱斗为娱乐模式,使用真随机。 */
+const AUGMENTS = [
+  // 白银:小幅数值强化
+  { id: 'a_engine',    tier: 0, icon: '🚀', name: '引擎过载',   desc: '移动速度 +20%' },
+  { id: 'a_overclock', tier: 0, icon: '⚙',  name: '超频射击',   desc: '射击间隔 -15%' },
+  { id: 'a_might',     tier: 0, icon: '💪', name: '巨力弹头',   desc: '所有伤害 +2' },
+  { id: 'a_medic',     tier: 0, icon: '🩹', name: '医疗无人机', desc: '每秒回复 1.5 生命' },
+  { id: 'a_scav',      tier: 0, icon: '🧲', name: '拾荒者',     desc: '经验获取 +40%' },
+  { id: 'a_leech',     tier: 0, icon: '🩸', name: '吸血弹头',   desc: '击坠敌机回复 1 生命' },
+  // 黄金:构筑级强化
+  { id: 'a_glass',     tier: 1, icon: '💥', name: '玻璃大炮',   desc: '所有伤害 +50%,生命上限 -25%' },
+  { id: 'a_snow',      tier: 1, icon: '⛄', name: '雪球风暴',   desc: '击坠时 20% 概率引发范围爆震' },
+  { id: 'a_comet',     tier: 1, icon: '☄',  name: '天降彗星',   desc: '每 9 秒一颗彗星轰击随机敌机' },
+  { id: 'a_ammo',      tier: 1, icon: '📦', name: '弹药库',     desc: '炸弹上限 +2,每 25 秒自动补一枚' },
+  { id: 'a_coil',      tier: 1, icon: '🌀', name: '磁暴线圈',   desc: '每 5 秒清除自身周围 110px 敌弹' },
+  { id: 'a_phase',     tier: 1, icon: '👻', name: '相位疾行',   desc: '受击后 +0.6 秒无敌并短暂加速' },
+  // 棱彩:改变玩法规则的质变强化
+  { id: 'a_urf',       tier: 2, icon: '♾️', name: '无限火力',   desc: '射击间隔 -35%,伤害 -20%' },
+  { id: 'a_ghost',     tier: 2, icon: '🛡', name: '弹幕幽灵',   desc: '受到的所有伤害 -40%' },
+  { id: 'a_nuke',      tier: 2, icon: '☢',  name: '战术核弹',   desc: '炸弹伤害 ×4,冲击半径 ×1.6' },
+  { id: 'a_army',      tier: 2, icon: '🛰', name: '分身军团',   desc: '+2 架幻影僚机(不占槽位)' },
+  { id: 'a_chrono',    tier: 2, icon: '⏱', name: '时间领主',   desc: '敌方弹幕永久减速 30%' },
+  { id: 'a_stone',     tier: 2, icon: '🔶', name: '贤者之石',   desc: '星晶获取 ×2' }
+];
+const AUG_TIER = [
+  { name: '白银强化', color: '#c0c8d8' },
+  { name: '黄金强化', color: '#ffd166' },
+  { name: '棱彩强化', color: '#ff6ad5' }
+];
+
 /* 遗物:旗舰击毁后掉落的被动神器(唯一,不占卡槽) */
 const RELICS = [
   { id: 'r_thorn_crown', icon: '👑', name: '荆棘王冠', desc: '接触伤害 ×2,撞击敌机更疼' },
@@ -82,6 +113,7 @@ class Game {
       menuHelp: document.getElementById('menuHelp'),
       menuStats: document.getElementById('menuStats'),
       menuHi: document.getElementById('menuHi'),
+      lvTitle: document.getElementById('lvTitle'),
       finalScore: document.getElementById('finalScore'),
       finalWave: document.getElementById('finalWave'),
       finalHi: document.getElementById('finalHi'),
@@ -232,6 +264,7 @@ class Game {
     this._pendingSwap = null; this._swapList = null;
     this.evo = {}; this.bulletFreezeT = 0;
     this.relics = {}; this.pendingRelic = false; this._relicMode = false; this._relicChoices = [];
+    this.augments = {}; this._cometT = 0; this._coilT = 0; this._ammoT = 0; // 海克斯大乱斗:符文与计时器
     this.levelupCooldown = 0;
     this.waveMod = null; this._env = { hpMul: 1, spdMul: 1, fireMul: 1 };
     this._recalc();
@@ -269,6 +302,7 @@ class Game {
     if (this.mode === 'daily') this.banner = { text: '每日挑战', sub: this._challengeKey() + ' · 固定关卡,冲击纪录', life: 2.4, max: 2.4, gold: true };
     if (this.mode === 'weekly') this.banner = { text: '周挑战', sub: this._challengeKey() + (this._mut ? ' · ' + this._mut.icon + ' ' + this._mut.name + ':' + this._mut.desc : '') + ' · 威胁+1,冲击纪录', life: 3.0, max: 3.0, gold: true };
     if (this.mode === 'boss') this.banner = { text: '旗舰连战', sub: '连续击毁不断强化的旗舰 · 每阶段升级+遗物 · 每日芯片限领', life: 2.6, max: 2.6, gold: true };
+    if (this.mode === 'mayhem') this.banner = { text: '海克斯大乱斗', sub: '经验/星晶 +50% · 出怪更凶 · 四轮海克斯强化三选一', life: 2.8, max: 2.8, gold: true };
   }
 
   /* ---- 每日挑战 ---- */
@@ -337,9 +371,12 @@ class Game {
   _saveBossBest(s) { try { localStorage.setItem('deepstrike.bossHi', String(s)); } catch (e) { /* 忽略 */ } }
   _canBossClaim() { try { return localStorage.getItem('deepstrike.bossClaim') !== this._dailyKey(); } catch (e) { return true; } }
   _markBossClaimed() { try { localStorage.setItem('deepstrike.bossClaim', this._dailyKey()); } catch (e) { /* 忽略 */ } }
+  /* 海克斯大乱斗:永久最佳纪录 */
+  _mayhemBest() { try { return +localStorage.getItem('deepstrike.mayhemHi') || 0; } catch (e) { return 0; } }
+  _saveMayhemBest(s) { try { localStorage.setItem('deepstrike.mayhemHi', String(s)); } catch (e) { /* 忽略 */ } }
   _refreshMenuHi() {
     this._dom.menuHi.textContent = '最高纪录 ' + this.hi + ' · 每日 ' + this._modeBest('daily')
-      + ' · 周挑战 ' + this._modeBest('weekly') + ' · 连战 ' + this._bossBest();
+      + ' · 周挑战 ' + this._modeBest('weekly') + ' · 连战 ' + this._bossBest() + ' · 大乱斗 ' + this._mayhemBest();
   }
 
   /* 记录某质变武器已通关第 15 波;四种集齐解锁「万法归一」 */
@@ -410,8 +447,9 @@ class Game {
     const m = this.mods, p = this.player;
     const E = this.evo || {};   // 进化状态
     const sh = this.shipDef || {};
-    p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0) + (sh.dmgBonus || 0);
-    p.dmgMul = m.glass ? 2 : 1; // 玻璃大炮:全局伤害倍率
+    const A = this.augments || {};   // 海克斯大乱斗:已获符文
+    p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0) + (sh.dmgBonus || 0) + (A.a_might ? 2 : 0); // 「巨力弹头」
+    p.dmgMul = (m.glass ? 2 : 1) * (A.a_glass ? 1.5 : 1) * (A.a_urf ? 0.8 : 1); // 玻璃大炮卡 /「玻璃大炮」「无限火力」符文
     let interval = (p.fireBase || 0.12) * Math.pow(0.85, m.rate || 0);
     if (E.rate) interval *= 0.75;
     if (this.bonds.includes('overdrive')) interval *= 0.85;
@@ -428,11 +466,15 @@ class Game {
       if (this.bonds.includes('boomerch')) interval *= 0.75;
       if (E.boomer) interval *= 0.85;
     }
+    // 海克斯强化:「超频射击」-15% /「无限火力」-35%
+    if (A.a_overclock) interval *= 0.85;
+    if (A.a_urf) interval *= 0.65;
     p.fireInterval = Math.max(0.045, interval);
-    p.speed = (sh.speed || 330) * Math.pow(1.15, m.speed || 0);
+    p.speed = (sh.speed || 330) * Math.pow(1.15, m.speed || 0) * (A.a_engine ? 1.2 : 1);
     p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 70;
     // 经验调校 + 经验风暴周变异
-    this.xpMult = (1 + 0.25 * (m.xpchip || 0) + 0.04 * boostLevel('xp10')) * (this._mut && this._mut.id === 'surge' ? 1.5 : 1); // 砍:每级 +4%(满级 +40%)
+    this.xpMult = (1 + 0.25 * (m.xpchip || 0) + 0.04 * boostLevel('xp10')) * (this._mut && this._mut.id === 'surge' ? 1.5 : 1)
+      * (A.a_scav ? 1.4 : 1) * (this.mode === 'mayhem' ? 1.5 : 1); // 「拾荒者」符文;大乱斗节奏福利 +50%
     this.comboWindow = 2 + 1.5 * (m.combo || 0);
     p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
@@ -440,18 +482,20 @@ class Game {
     this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
     if (this.relics.r_voidwatch) this.bulletSlow = Math.max(0.3, this.bulletSlow * 0.9);
     if (m.pact) this.bulletSlow = Math.min(1.25, this.bulletSlow * 1.15); // 贪婪契约:敌弹加速
+    if (A.a_chrono) this.bulletSlow *= 0.7; // 「时间领主」:敌弹永久减速 30%
     // 卡槽系统:基础 5 槽,隐藏卡扩展
     this.maxSlots = 5 + (m.slotplus || 0);
     // 生命值系统:上限 = 机体基础 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
     p.maxHp = Math.round(((sh.hp || 100) + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
-      + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0)) * (m.glass ? 0.6 : 1));
+      + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0)) * (m.glass ? 0.6 : 1) * (A.a_glass ? 0.75 : 1));
     p.armorPct = Math.min(0.5, 0.15 * (m.armor || 0) + (sh.perkArmor || 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 护盾:每级 +1.2% 减伤(满级 +12%)
-    p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1);
-    p.leechPer = 0.7 * (m.leech || 0);
+    p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1) + (A.a_medic ? 1.5 : 0);
+    p.leechPer = 0.7 * (m.leech || 0) + (A.a_leech ? 1 : 0);
     p.hp = Math.min(p.hp, p.maxHp);
     // 幻影僚机:数量同步
-    while (this.wingmen.length < (m.wingman || 0)) this.wingmen.push(new Wingman(this.wingmen.length));
-    while (this.wingmen.length > (m.wingman || 0)) this.wingmen.pop();
+    const wingTarget = (m.wingman || 0) + (A.a_army ? 2 : 0); // 「分身军团」:+2 不占槽位
+    while (this.wingmen.length < wingTarget) this.wingmen.push(new Wingman(this.wingmen.length));
+    while (this.wingmen.length > wingTarget) this.wingmen.pop();
     if (m.shieldgen && !p.shield && p.shieldCd <= 0) p.shieldCd = p.shieldInterval;
   }
 
@@ -605,6 +649,7 @@ class Game {
   }
 
   _renderCards() {
+    this._dom.lvTitle.textContent = '⬆ 战机升级';
     const row = this._dom.cardRow;
     row.innerHTML = '';
     const owned = this._ownedIds().length;
@@ -684,6 +729,7 @@ class Game {
   }
 
   _renderRelics() {
+    this._dom.lvTitle.textContent = '⬆ 远古遗物';
     const row = this._dom.cardRow;
     row.innerHTML = '';
     this._dom.lvSub.innerHTML = '旗舰遗落了远古造物 · <b style="color:#ffd166">选择一件遗物</b>(按 1 / 2 / 3)';
@@ -704,6 +750,75 @@ class Game {
       if (this.relics[r0.id]) html += '<span class="chip evo"><i>' + r0.icon + '</i>' + r0.name + '</span>';
     }
     this._dom.ownRow.innerHTML = html || '<span class="chip">尚无遗物</span>';
+  }
+
+  /* ---------------- 海克斯大乱斗:强化三选一 ---------------- */
+  /* 每轮按权重抽取品阶:轮次越靠后,黄金/棱彩占比越高(致敬 LoL 海克斯大乱斗) */
+  _drawAugments(round) {
+    const W8 = [{ s: 70, g: 30, p: 0 }, { s: 40, g: 45, p: 15 }, { s: 20, g: 50, p: 30 }, { s: 10, g: 35, p: 55 }][Math.max(0, Math.min(3, round - 1))];
+    const owned = this.augments || {};
+    const pool = AUGMENTS.filter(a => !owned[a.id]);
+    const picks = [];
+    for (let n = 0; n < 3 && pool.length; n++) {
+      const roll = Math.random() * (W8.s + W8.g + W8.p);
+      const tier = roll < W8.s ? 0 : roll < W8.s + W8.g ? 1 : 2;
+      let cands = pool.filter(a => a.tier === tier);
+      if (!cands.length) cands = pool;
+      const pick = cands[Math.floor(Math.random() * cands.length)];
+      picks.push(pick);
+      pool.splice(pool.indexOf(pick), 1);
+    }
+    return picks;
+  }
+  _openAugmentChoice(round) {
+    if (this.state !== 'playing' || this.mode !== 'mayhem') return;
+    const picks = this._drawAugments(round);
+    if (!picks.length) return;
+    this._augMode = true;
+    this._augRound = round;
+    this._augChoices = picks;
+    this.state = 'levelup';
+    AudioSys.levelup();
+    this._renderAugments();
+    this._showState();
+  }
+  chooseAugment(i) {
+    if (!this._augMode || this.state !== 'levelup') return;
+    const a = this._augChoices[i];
+    if (!a) return;
+    this.augments[a.id] = a.tier + 1; // +1:白银(0 档)也须为真值,判定处一律按存在性判断
+    AudioSys.bond();
+    this.banner = { text: AUG_TIER[a.tier].name + ' · ' + a.name, sub: a.desc, life: 2.6, max: 2.6, gold: true };
+    this._augMode = false;
+    this._augChoices = [];
+    this._recalc();
+    this.state = 'playing';
+    this._showState();
+  }
+  _renderAugments() {
+    this._dom.lvTitle.textContent = '⬆ 海克斯强化';
+    const row = this._dom.cardRow;
+    row.innerHTML = '';
+    this._dom.lvSub.innerHTML = '海克斯强化(第 ' + this._augRound + ' / 4 轮) · <b style="color:#ffd166">选择一项</b>(按 1 / 2 / 3)';
+    this._augChoices.forEach((a, i) => {
+      const t = AUG_TIER[a.tier];
+      const el = document.createElement('button');
+      el.className = 'card aug tier' + a.tier;
+      el.innerHTML =
+        '<div class="card-rar" style="color:' + t.color + '">◆ ' + t.name + '</div>' +
+        '<div class="card-icon">' + a.icon + '</div>' +
+        '<div class="card-name">' + a.name + '</div>' +
+        '<div class="card-desc">' + a.desc + '</div>' +
+        '<div class="card-lv">按 ' + (i + 1) + '</div>';
+      el.addEventListener('click', () => this.chooseAugment(i));
+      row.appendChild(el);
+    });
+    let html = '';
+    for (const id in this.augments) {
+      const a = AUGMENTS.find(x => x.id === id);
+      if (a) html += '<span class="chip aug t' + a.tier + '">◆ ' + a.name + '</span>';
+    }
+    this._dom.ownRow.innerHTML = html || '<span class="chip">首轮强化</span>';
   }
 
   /* 取消替换:回到三选一界面 */
@@ -899,7 +1014,7 @@ class Game {
     const threat = this.threatLevel();
     // 波次词缀:第 6 波起 40% 概率(BOSS 波与连战模式除外)
     this.waveMod = null;
-    if (this.mode !== 'boss' && n >= 6 && n % 5 !== 0 && RNG() < (this.mode === 'weekly' ? 0.7 : 0.4)) {
+    if (this.mode !== 'boss' && n >= 6 && n % 5 !== 0 && RNG() < (this.mode === 'weekly' ? 0.7 : this.mode === 'mayhem' ? 0.6 : 0.4)) {
       this.waveMod = WAVE_MODS[irand(0, WAVE_MODS.length - 1)];
     }
     // 环境参数:威胁与词缀共同作用于本波敌机
@@ -919,7 +1034,7 @@ class Game {
     // 里程碑:每 10 波投放补给(炸弹+1 与 25% 生命修复)
     const milestone = n > 10 && (n - 1) % 10 === 0;
     if (milestone) {
-      const bombCap = this.relics.r_dragon ? 7 : 5;
+      const bombCap = this.bombCap();
       if (this.player.bombs < bombCap) this.player.bombs++;
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + Math.round(this.player.maxHp * 0.25));
     }
@@ -950,6 +1065,9 @@ class Game {
     // 连续无伤波次里程碑
     if (this.perfectStreak >= 6) Ach.unlock('perfect_6', this);
     this.waveDamageTaken = 0;
+    // 海克斯大乱斗:第 1/4/7/10 波开局提供强化三选一(共 4 轮,BOSS 波亦可先选)
+    if (this.mode === 'mayhem' && (n === 1 || n === 4 || n === 7 || n === 10))
+      this._openAugmentChoice((n + 2) / 3);
     if (n % 5 === 0 || this.mode === 'boss') {
       this.waveQuota = 1; // 目标:击毁旗舰
       // 连战模式:第 k 阶段按虚拟波号 5k 构造旗舰(难度递增,变体自然轮换)
@@ -993,7 +1111,7 @@ class Game {
     }
     // 关卡目标:必须击坠足够数量的敌机才能过关,躲避无法通关
     const hordeMul = this.waveMod && this.waveMod.id === 'horde' ? 1.4 : 1;
-    this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65 * hordeMul);
+    this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65 * hordeMul * (this.mode === 'mayhem' ? 1.3 : 1)); // 大乱斗:出怪 +30%
     this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机';
     // 精英机:第 3 波起概率随队,第 7 波起可能双精英,第 10 波起概率出现双词缀精英;猎杀周大增
     const huntWeek = this._mut && this._mut.id === 'hunt';
@@ -1129,6 +1247,58 @@ class Game {
         this.riftCd = 8.5;
         this.rifts.push(new Rift(rand(70, W - 70), rand(130, 320), this));
         AudioSys.rift();
+      }
+    }
+    // 海克斯强化周期效果:天降彗星 / 磁暴线圈 / 弹药库
+    const A2 = this.augments || {};
+    if (A2.a_comet) {
+      this._cometT -= dt;
+      if (this._cometT <= 0) {
+        this._cometT = 9;
+        const live = this.enemies.filter(e => !e.dead && e.y > 0);
+        const t = live.length ? live[Math.floor(RNG() * live.length)] : (this.boss && this.boss.state === 'fight' ? this.boss : null);
+        if (t) {
+          const tx = t.x, ty = t.y;
+          this._explode(tx, ty, 24, '#9fdcff', 1.3);
+          for (const e of this.enemies) {
+            if (e.dead) continue;
+            const ddx = e.x - tx, ddy = e.y - ty;
+            if (ddx * ddx + ddy * ddy < 80 * 80) e.damage(60, this, true);
+          }
+          if (this.boss && this.boss.state === 'fight' && Math.hypot(this.boss.x - tx, this.boss.y - ty) < 80 + this.boss.r) this.boss.damage(60, this, true);
+          if (this.boss && this.boss.pods)
+            for (const pod of this.boss.pods)
+              if (!pod.dead && Math.hypot(pod.x - tx, pod.y - ty) < 100) this.boss.hitPod(pod, 30, this);
+          this.shake(8, 0.3);
+          AudioSys.bomb();
+        }
+      }
+    }
+    if (A2.a_coil) {
+      this._coilT -= dt;
+      if (this._coilT <= 0) {
+        this._coilT = 5;
+        let cleared = 0;
+        for (const b of this.enemyBullets) {
+          const ddx = b.x - this.player.x, ddy = b.y - this.player.y;
+          if (ddx * ddx + ddy * ddy < 110 * 110) { b.dead = true; cleared++; }
+        }
+        if (cleared) {
+          this.enemyBullets = this.enemyBullets.filter(b => !b.dead);
+          this._sparks(this.player.x, this.player.y, '#aef0ff', 10);
+          this.rings.push(new Ring(this.player.x, this.player.y, '#aef0ff', 110, 0.4));
+          AudioSys.web();
+        }
+      }
+    }
+    if (A2.a_ammo) {
+      this._ammoT -= dt;
+      if (this._ammoT <= 0) {
+        this._ammoT = 25;
+        if (this.player.bombs < this.bombCap()) {
+          this.player.bombs++;
+          this._addFloat(new FloatText(this.player.x, this.player.y - 40, '弹药库 +1', '#51e08a', 12));
+        }
       }
     }
     if (this.boss) {
@@ -1451,6 +1621,15 @@ class Game {
     this.combo++;
     this.comboT = this.comboWindow;
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+    // 雪球风暴:击坠时概率引发范围爆震
+    if (this.augments && this.augments.a_snow && RNG() < 0.2) {
+      this._explode(e.x, e.y, 12, '#cfe8ff', 0.8);
+      for (const o of this.enemies) {
+        if (o === e || o.dead) continue;
+        const ddx = o.x - e.x, ddy = o.y - e.y;
+        if (ddx * ddx + ddy * ddy < 60 * 60) o.damage(10, this, true);
+      }
+    }
     // 击杀汲取
     if (this.player.leechPer > 0 && this.player.alive)
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.leechPer);
@@ -1528,7 +1707,7 @@ class Game {
       const need = this.mods.bombkill === 1 ? 25 : 15;
       if (this.bombMeter >= need) {
         this.bombMeter = 0;
-        if (this.player.bombs < (this.relics.r_dragon ? 7 : 5)) {
+        if (this.player.bombs < this.bombCap()) {
           this.player.bombs++;
           this._addFloat(new FloatText(this.player.x, this.player.y - 30, '歼灭装填 炸弹+1', '#51e08a', 12));
         }
@@ -1636,7 +1815,7 @@ class Game {
       p.shield = true;
       this._addFloat(new FloatText(p.x, p.y - 24, '护盾展开!', '#4db8ff'));
     } else if (type === 'bomb') {
-      if (p.bombs < (this.relics.r_dragon ? 7 : 5)) {
+      if (p.bombs < this.bombCap()) {
         p.bombs++;
         this._addFloat(new FloatText(p.x, p.y - 24, '炸弹 +1', '#51e08a'));
       } else {
@@ -1676,6 +1855,9 @@ class Game {
     if (p.invuln > 0 || !p.alive) return;
     // 凝滞词缀:场上存在凝滞精英时,受击后移动迟缓(护盾破碎同样触发)
     if (this.enemies.some(e => e.elite && e.elite.includes('chill') && !e.dead)) p.chillT = 2;
+    // 「弹幕幽灵」:受到的所有伤害 -40%;「相位疾行」:受击后额外无敌与短暂加速
+    if (this.augments && this.augments.a_ghost) dmg *= 0.6;
+    if (this.augments && this.augments.a_phase) { p.invuln += 0.6; p._phaseT = 2; }
     if (p.shield) {
       p.shield = false;
       p.invuln = 1.2 + (this.relics.r_cloak ? 0.7 : 0);
@@ -1752,6 +1934,9 @@ class Game {
   }
 
   /* ---------------- 炸弹 ---------------- */
+  /* 炸弹携带上限:龙魂遗物 +2、「弹药库」海克斯强化 +2 */
+  bombCap() { return (this.relics.r_dragon ? 7 : 5) + ((this.augments && this.augments.a_ammo) ? 2 : 0); }
+
   tryBomb() {
     if (this.state !== 'playing' || !this.player.alive) return;
     const p = this.player;
@@ -1769,7 +1954,8 @@ class Game {
     p.invuln = Math.max(p.invuln, 1.2); // 炸弹瞬间无敌,可作保命键
     for (const b of this.enemyBullets) this._sparks(b.x, b.y, '#9fe8ff', 3);
     this.enemyBullets.length = 0;
-    const bombDmg = this.relics.r_dragon ? 23 : 8;
+    const nuke = this.augments && this.augments.a_nuke;
+    const bombDmg = (this.relics.r_dragon ? 23 : 8) * (nuke ? 4 : 1);
     for (const e of this.enemies) e.damage(bombDmg, this);
     for (const a of this.asteroids) a.damage(6, this);
     if (this.boss) {
@@ -1778,7 +1964,7 @@ class Game {
         for (const pod of this.boss.pods)
           if (!pod.dead) this.boss.hitPod(pod, this.relics.r_dragon ? 12 : 5, this);
     }
-    this.rings.push(new Ring(p.x, p.y, '#aef3ff', 300, 0.7));
+    this.rings.push(new Ring(p.x, p.y, '#aef3ff', nuke ? 480 : 300, 0.7));
   }
 
   /* ---------------- 子弹发射 ---------------- */
@@ -1994,8 +2180,8 @@ class Game {
     }
     // 挑战模式标识
     if (this.mode !== 'normal') {
-      const tagName = this.mode === 'weekly' ? '周挑战' : this.mode === 'boss' ? '旗舰连战' : '每日挑战';
-      const best = this.mode === 'boss' ? this._bossBest() : this._challengeBest();
+      const tagName = this.mode === 'weekly' ? '周挑战' : this.mode === 'boss' ? '旗舰连战' : this.mode === 'mayhem' ? '海克斯大乱斗' : '每日挑战';
+      const best = this.mode === 'boss' ? this._bossBest() : this.mode === 'mayhem' ? this._mayhemBest() : this._challengeBest();
       ctx.fillStyle = '#ffd166';
       ctx.font = 'bold 11px Consolas, monospace';
       ctx.fillText(tagName + ' · 纪录 ' + best, W - 14, 54);
@@ -2166,6 +2352,20 @@ class Game {
       ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
       ctx.fillText('羁绊 ' + this.bonds.map(id => BONDS.find(b => b.id === id).name).join(' · '), 14, H - 44);
     }
+    // 海克斯强化图标(按品阶着色)
+    const ownedAugs = Object.keys(this.augments || {});
+    if (ownedAugs.length) {
+      ctx.textAlign = 'left';
+      ctx.font = '12px "Segoe UI", sans-serif';
+      let ax = 14;
+      for (const id of ownedAugs) {
+        const a = AUGMENTS.find(x => x.id === id);
+        if (!a) continue;
+        ctx.fillStyle = AUG_TIER[a.tier].color;
+        ctx.fillText('◆' + a.icon, ax, H - 74);
+        ax += 26;
+      }
+    }
     // 遗物图标
     const ownedRelics = RELICS.filter(r0 => this.relics[r0.id]);
     if (ownedRelics.length) {
@@ -2196,6 +2396,12 @@ class Game {
     for (const b of BONDS) {
       if (this.bonds.includes(b.id)) html += '<span class="chip bond">羁绊·' + b.name + '</span>';
     }
+    if (this.augments) {
+      for (const id in this.augments) {
+        const a = AUGMENTS.find(x => x.id === id);
+        if (a) html += '<span class="chip aug t' + a.tier + '">◆ ' + a.name + '</span>';
+      }
+    }
     if (!html) html = '<span class="chip">本局尚未获得强化</span>';
     return html;
   }
@@ -2211,7 +2417,16 @@ class Game {
     if (this.mode === 'weekly' && this.score >= 30000) Ach.unlock('weekly_30000', this);
     if (this.score >= 50000) Ach.unlock('score_50k', this);
     if (this.score >= 150000) Ach.unlock('score_150k', this);
-    if (this.mode === 'boss') {
+    if (this.mode === 'mayhem') {
+      // 大乱斗:永久最佳纪录 + 专属成就
+      if (this.score >= 30000) Ach.unlock('mayhem_30k', this);
+      const best = this._mayhemBest();
+      if (this.score > best) {
+        this.newRecord = true;
+        this._saveMayhemBest(this.score);
+        AudioSys.record();
+      }
+    } else if (this.mode === 'boss') {
       // 连战:永久最佳纪录
       const best = this._bossBest();
       if (this.score > best) {
@@ -2250,13 +2465,15 @@ class Game {
     const d = this._dom;
     d.finalScore.textContent = this.score;
     d.finalWave.textContent = this.wave;
-    d.finalHi.textContent = this.mode !== 'normal' ? this._challengeBest() : this.hi;
+    d.finalHi.textContent = this.mode === 'mayhem' ? this._mayhemBest() : (this.mode !== 'normal' ? this._challengeBest() : this.hi);
     this._refreshMenuHi();
     // 星晶结算:得分/1600 + 旗舰×6 + 精英×1;贪婪周 ×1.5;高难 ×1.5
     Shop.lastEarn = Math.floor(this.score / 1600) + (this.runBossKills || 0) * 6 + (this.runEliteKills || 0) * 1;
     if (this._mut && this._mut.id === 'greed') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (this.mods.pact) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (this.hard) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
+    if (this.mode === 'mayhem') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5); // 大乱斗节奏福利
+    if (this.augments && this.augments.a_stone) Shop.lastEarn = Math.round(Shop.lastEarn * 2); // 「贤者之石」
     if (this.relics.r_grail) Shop.lastEarn *= 2;
     Shop.addCrystal(Shop.lastEarn);
     // 挑战材料「战术芯片」:连战与每日/周挑战产出;按期限领一次
@@ -2272,7 +2489,7 @@ class Game {
         Shop.lastChips = 0;
         Shop.lastChipsCapped = true;
       }
-    } else if (this.mode !== 'normal') {
+    } else if (this.mode === 'daily' || this.mode === 'weekly') {
       // 挑战芯片:每日/每周仅可领取一次,数额按表现浮动并钳制在目标区间
       // (每日 10~15,每周 40~60);重复挑战同一日/周不再发放(仍可刷分/纪录)
       if (this._canClaimChips()) {
@@ -2296,7 +2513,7 @@ class Game {
     d.overCrystals.textContent = '★ +' + Shop.lastEarn + '(星晶 ' + Shop.crystal + ')'
       + (Shop.lastChips ? ' · ◈ +' + Shop.lastChips + '(芯片 ' + Shop.chips + ')' : '');
     // 芯片已领取提示:本期(今日/本周)奖励已领,追加说明
-    if (Shop.lastChipsCapped && this.mode !== 'normal') {
+    if (Shop.lastChipsCapped && (this.mode === 'daily' || this.mode === 'weekly')) {
       const period = this.mode === 'weekly' ? '本周' : '今日';
       d.overCrystals.textContent += ' · ' + period + '芯片奖励已领取';
     }

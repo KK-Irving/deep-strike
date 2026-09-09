@@ -82,6 +82,7 @@ const ACHIEVEMENTS = [
   { id: 'daily_5000',   cat: '挑战', name: '每日精英', desc: '每日挑战单局得分 ≥ 5000', reward: 150 },
   { id: 'daily_20000',  cat: '挑战', name: '每日霸主', desc: '每日挑战单局得分 ≥ 20000', reward: 300 },
   { id: 'weekly_30000', cat: '挑战', name: '周榜之巅', desc: '周挑战单局得分 ≥ 30000', reward: 400 },
+  { id: 'mayhem_30k',   cat: '挑战', name: '海克斯狂徒', desc: '海克斯大乱斗单局得分 ≥ 30000', reward: 300 },
   { id: 'level_10',     cat: '挑战', name: '极速成长', desc: '单局达到 10 级', reward: 50 },
   { id: 'level_25',     cat: '挑战', name: '登峰造极', desc: '单局达到 25 级', reward: 300 },
   { id: 'nobomb_wave15',cat: '挑战', name: '弹尽粮绝', desc: '不使用炸弹通关第 15 波', reward: 350 },
