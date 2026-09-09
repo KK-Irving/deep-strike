@@ -272,7 +272,7 @@ h2 {
 
 /* ---------- 每日任务面板 ---------- */
 .task-panel {
-  margin-top: 16px; width: min(320px, 86vw); text-align: left;
+  margin-top: 16px; width: min(320px, 86vw); text-align: left; max-height: 240px; overflow-y: auto;
   border: 1px solid rgba(126, 243, 255, 0.2); border-radius: 10px;
   padding: 10px 14px; background: rgba(10, 20, 45, 0.5);
 }

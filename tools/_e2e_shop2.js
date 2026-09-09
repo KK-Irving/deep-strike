@@ -44,6 +44,9 @@ function startServer() {
     Shop.owned = { proto: true }; Shop.ownedShip = { vanguard: true };
     Shop.chips = 100000;
     const tiers = {}; let nonGlory = 0; let realItems = 0;
+    // 隔离任务系统:开匣会推进每日/每周任务并返还芯片,干扰扣费断言
+    const realBump = DailyTasks.bump.bind(DailyTasks);
+    DailyTasks.bump = () => {};
     const before = Shop.chips;
     for (let i = 0; i < 40; i++) {
       const r = Shop.exchange('ex_glory', 1);
@@ -55,10 +58,11 @@ function startServer() {
     }
     const spent = before - Shop.chips;
 
-    // 单次扣费正确性
+    // 单次扣费正确性(同样隔离任务返还)
     Shop.chips = 600;
     const one = Shop.exchange('ex_glory', 1);
     const costOk = one.ok && Shop.chips === 600 - 520;
+    DailyTasks.bump = realBump;
 
     // 永久强化:全部 10 级,价格递增
     const boostInfo = BOOSTS.map(b => ({

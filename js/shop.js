@@ -181,6 +181,7 @@ const Shop = {
    * 局内精英击坠会高频调用,走延迟落盘合并写入,避免每次全量序列化 localStorage */
   addCrystal(n, game) {
     this.crystal += n;
+    if (n > 0 && typeof DailyTasks !== 'undefined') DailyTasks.bump('crystal', n, game); // 每周任务:累计星晶
     if (this.crystal >= 500) Ach.unlock('rich_500', game);
     if (this.crystal >= 1000) Ach.unlock('rich_1000', game);
     if (this.crystal >= 5000) Ach.unlock('rich_5000', game);
