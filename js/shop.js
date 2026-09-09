@@ -375,7 +375,8 @@ const Shop = {
     if (pick.t === 'skin') this.owned[pick.item.id] = true;
     else this.ownedShip[pick.item.id] = true;
     // 绚丽/传奇实物到手:天选之人
-    if ((tier === 'epic' || tier === 'mythic') && typeof Ach !== 'undefined') Ach.unlock('rare_pull');
+    if ((tier === 'epic' || tier === 'mythic') && window.game && window.game.stats)
+      window.game.stats.rarePulls = (window.game.stats.rarePulls || 0) + 1;
     return { tier, kind: pick.t, id: pick.item.id, name: pick.item.name };
   },
   /* 批量开箱:先扣费,再逐个开;返回结果数组 */
@@ -424,7 +425,8 @@ const Shop = {
     }
     if (pick.t === 'skin') this.owned[pick.item.id] = true;
     else this.ownedShip[pick.item.id] = true;
-    if (typeof Ach !== 'undefined') Ach.unlock('rare_pull');
+    if (window.game && window.game.stats)
+      window.game.stats.rarePulls = (window.game.stats.rarePulls || 0) + 1;
     return { tier: pick.tier, kind: pick.t, id: pick.item.id, name: pick.item.name };
   },
   /* boost 档位改写掉落概率 + 保底(pity):

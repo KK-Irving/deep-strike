@@ -63,10 +63,10 @@ function startServer() {
     for (let i = 0; i < 500 && (!game.boss || game.boss.state !== 'fight'); i++) game.update(1 / 60);
     out.boss2 = game.boss && game.boss.wave === 10 && game.boss.variant === 'storm';
     // 5) 连战不触发波次语义成就
-    out.noWaveAch = !Ach.unlocked['wave_5'];
+    out.noWaveAch = (Ach.levelOf('bestwave') || 0) === 0;
     game.start('normal'); // 普通模式第 5 波应解锁
     game.startWave(5);
-    out.normalWaveAch = !!Ach.unlocked['wave_5'];
+    out.normalWaveAch = (Ach.levelOf('bestwave') || 0) >= 1;
     // 6) 结算:纪录 + 芯片限领
     game.mode = 'boss'; game.wave = 6; game.score = 12000; game.state = 'playing';
     game._gameover();

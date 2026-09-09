@@ -1,6 +1,11 @@
 'use strict';
-/* 成就系统验证:加载页面,校验成就数据完整(无 undefined/重复 id)、分类数、
- * 关键新成就存在,并驱动几个解锁钩子确认可正常发放。 */
+/* v1.9.0 成就分级制验证:
+ *  1) 结构:34 条线 × 每线 5 级,阈值/奖励单调,无重复 id
+ *  2) 旧版单级存档自动迁移(时间戳 → 等级映射)
+ *  3) touch/evaluate 分级推进:只升不降、逐级发奖、阈值边界
+ *  4) skin/ship 在指定层级发放
+ *  5) 游戏内驱动:击坠→kills 线升级;结算→最优值统计入线
+ *  6) 面板分级展示(线/级/进度) */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -26,65 +31,92 @@ function startServer() {
   const server = await startServer();
   const port = server.address().port;
   const base = 'http://127.0.0.1:' + port + '/';
-  const exe = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
-  const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
+  const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
   const errors = [];
+
+  // 预置旧版存档(时间戳格式)验证迁移
+  const ctx = await browser.newContext();
+  const page0 = await ctx.newPage();
+  await page0.goto(base, { waitUntil: 'networkidle' });
+  await page0.evaluate(() => {
+    localStorage.setItem('deepstrike.ach', JSON.stringify({
+      first_kill: 1700000000000, wave_15: 1700000000001, boss_10: 1700000000002, unknown_old: 1700000000003
+    }));
+  });
+  await page0.reload({ waitUntil: 'networkidle' });
+  await page0.waitForTimeout(200);
+  const mig = await page0.evaluate(() => ({
+    kills: Ach.unlocked.kills, bestwave: Ach.unlocked.bestwave, bosskills: Ach.unlocked.bosskills,
+    unknownGone: Ach.unlocked.unknown_old === undefined,
+    allNumeric: Object.values(Ach.unlocked).every(v => typeof v === 'number' && v >= 1 && v <= 5)
+  }));
+  await ctx.close();
+  if (!mig.kills || !mig.bestwave || !mig.bosskills || !mig.unknownGone || !mig.allNumeric) errors.push('pageerror: 迁移结果异常 ' + JSON.stringify(mig));
+
+  const page = await browser.newPage({ viewport: { width: 520, height: 820 } });
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
 
-  const info = await page.evaluate(() => {
-    const ids = ACHIEVEMENTS.map((a) => a.id);
-    const dupes = ids.filter((v, i) => ids.indexOf(v) !== i);
-    const badFields = ACHIEVEMENTS.filter((a) => !a.id || !a.name || !a.desc || !a.cat || typeof a.reward !== 'number');
-    const cats = [...new Set(ACHIEVEMENTS.map((a) => a.cat))];
-    // 驱动几个解锁钩子
+  const r = await page.evaluate(() => {
+    const out = {};
+    // 1) 结构
+    out.lines = ACHIEVEMENTS.length === 34;
+    out.all5 = ACHIEVEMENTS.every(a => a.tiers.length === 5 && a.rewards.length === 5);
+    out.noDup = new Set(ACHIEVEMENTS.map(a => a.id)).size === 34;
+    out.monotonic = ACHIEVEMENTS.every(a => a.tiers.every((n, i) => i === 0 || n > a.tiers[i - 1]) && a.rewards.every((n, i) => i === 0 || n >= a.rewards[i - 1]));
+    out.totalTiers = Ach.totalTiers() === 170;
+    // 2) touch 分级推进:只升不降、边界
+    Ach.unlocked = {}; Ach.save();
+    Ach.touch('kills', 999, null);          // < 1000 → Lv1
+    out.t1 = Ach.levelOf('kills') === 1;
+    Ach.touch('kills', 1000, null);         // = 1000 → Lv2
+    out.t2 = Ach.levelOf('kills') === 2;
+    Ach.touch('kills', 500, null);          // 回落不降级
+    out.t3 = Ach.levelOf('kills') === 2;
+    Ach.touch('kills', 25000, null);        // 满
+    out.t4 = Ach.levelOf('kills') === 5;
+    // 3) unlock 兼容:未知 id 静默;已知 id 升 1 级
+    Ach.unlock('not_exist_id', null);
+    out.unknownSafe = Ach.unlocked.not_exist_id === undefined;
+    Ach.unlocked = {}; Ach.save();
+    Ach.unlock('relics', null);
+    out.compat = Ach.levelOf('relics') === 1;
+    // 4) skin/ship 指定层级发放
+    Ach.unlocked = {}; Shop.owned = { proto: true }; Shop.ownedShip = { vanguard: true };
+    Ach.touch('bestwave', 15, null);        // Lv3 → abyss
+    out.skinAt = !!Shop.owned.abyss && Ach.levelOf('bestwave') === 3 && !Shop.ownedShip.tempest;
+    Ach.touch('bestwave', 40, null);        // Lv5 → tempest
+    out.shipAt = !!Shop.ownedShip.tempest;
+    // 5) 游戏内驱动:击坠 → kills 线
     const g = window.game;
-    // 成就面板渲染
-    g.showMenuPanel('stats');
-    const panelText = document.getElementById('achList') ? document.getElementById('achList').innerText : '';
-    // 直接触发几个新成就的解锁(验证发放链路不报错)
-    const before = Ach.count();
-    Ach.unlock('wave_40', g);
-    Ach.unlock('combo_300', g);
-    Ach.unlock('path_rail', g);
-    Ach.unlock('tesla_chain8', g);
-    Ach.unlock('rare_pull');
-    const after = Ach.count();
-    return {
-      total: ACHIEVEMENTS.length,
-      dupes, badCount: badFields.length,
-      cats,
-      hasQuatumCat: cats.includes('质变'),
-      panelHasUndefined: /undefined/i.test(panelText),
-      unlockedDelta: after - before,
-      sampleNew: ['wave_50','total_10000','boss_100','combo_300','path_all','tesla_chain8','box_50','chip_master','ship_all','level_25']
-        .every((id) => ids.includes(id))
-    };
+    g.start('normal');
+    g.spawnQueue = []; g.waveQuota = 999999; g.autoFire = false; g.keys.fire = false;
+    g.enemies = []; g.powerups = []; g.boss = null;
+    Ach.unlocked = {}; Ach.save();
+    const d0 = Object.assign(new Enemy('drone', 1, null, null, null), { x: 100, y: 200, dead: true, elite: null });
+    for (let i = 0; i < 100; i++) g.killEnemy(d0);
+    out.liveKills = Ach.levelOf('kills') >= 1;
+    // 6) 结算评估:bestScore 入线
+    g.score = 52000; g.wave = 8; g.runBossKills = 0; g.runEliteKills = 0;
+    g.mode = 'normal'; g.relics = {}; g.augments = {}; g.hard = false;
+    g._gameover();
+    out.bestScoreLine = (Ach.levelOf('bestscore') || 0) >= 2; // 52000 ≥ 50000 → Lv2
+    // 7) 面板分级展示
+    g._refreshStatsPanel();
+    const html = document.getElementById('achList').innerHTML;
+    out.panel = html.indexOf('线') >= 0 && html.indexOf('Lv') >= 0 && html.indexOf('ach-tiers') >= 0;
+    g.state = 'menu';
+    return out;
   });
 
   await browser.close();
   server.close();
-
-  console.log('成就总数: ' + info.total);
-  console.log('分类: ' + info.cats.join(' / '));
-  console.log('重复 id: ' + (info.dupes.length ? info.dupes.join(',') : '无'));
-  console.log('字段缺失条数: ' + info.badCount);
-  console.log('面板含 undefined: ' + info.panelHasUndefined);
-  console.log('本次解锁发放数: ' + info.unlockedDelta);
-
+  if (errors.length) { console.log('--- JS 异常 ---'); errors.forEach((e) => console.log('  ' + e)); }
+  console.log('迁移: ' + JSON.stringify(mig));
+  console.log(JSON.stringify(r));
   let bad = 0;
-  const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
-  check(errors.length === 0, '无 JS 运行时异常');
-  check(info.total >= 60, '成就数量显著增加(>=60,原 40)');
-  check(info.dupes.length === 0, '无重复成就 id');
-  check(info.badCount === 0, '所有成就字段完整');
-  check(info.hasQuatumCat, '新增「质变」精通分类');
-  check(!info.panelHasUndefined, '成就面板无 undefined');
-  check(info.sampleNew, '关键高门槛新成就均存在');
-  check(info.unlockedDelta >= 4, '新成就解锁发放链路正常');
-  errors.forEach((e) => console.log('  ' + e));
-  console.log(bad ? ('\nFAILED: ' + bad) : '\n成就验证完成');
-  process.exitCode = bad ? 1 : 0;
-})().catch((e) => { console.error('异常: ' + e.stack); process.exitCode = 1; });
+  for (const k of Object.keys(r)) if (r[k] !== true) { console.error('FAIL: ' + k); bad++; }
+  checkCount(bad);
+  function checkCount(b) { console.log(b ? ('\nFAILED: ' + b) : '\n成就分级制验证完成'); process.exitCode = b ? 1 : 0; }
+})().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });

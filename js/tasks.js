@@ -88,6 +88,8 @@ const DailyTasks = {
       t.p = def && def.acm ? t.p + v : Math.max(t.p, v);
       if (t.p >= t.n) {
         t.done = true;
+        if (typeof window !== 'undefined' && window.game && window.game.stats)
+          window.game.stats.tasksDone = (window.game.stats.tasksDone || 0) + 1; // 任务大师计数
         Shop.addChips(t.reward);
         if (game && game.state === 'playing') {
           game.banner = { text: bannerText, sub: t.text + ' · ◈ +' + t.reward, life: 2.4, max: 2.4, gold: true };

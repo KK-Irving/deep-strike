@@ -169,6 +169,54 @@ class Game {
   saveStats() {
     try { localStorage.setItem('deepstrike.stats', JSON.stringify(this.stats)); } catch (e) { /* 忽略 */ }
   }
+  /* 成就评估快照:汇总本局统计 / 商城计数 / 各模式纪录 */
+  _achEvaluate() {
+    if (typeof Ach === 'undefined' || !Ach.evaluate) return;
+    const s = this.stats;
+    const vk = s.variantKills || {};
+    const kinds = ['flag', 'storm', 'tyrant', 'dread'].filter(k => (vk[k] || 0) > 0).length;
+    const all2 = ['flag', 'storm', 'tyrant', 'dread'].every(k => (vk[k] || 0) >= 2);
+    let pathClears = 0;
+    try { pathClears = Object.keys(JSON.parse(localStorage.getItem('deepstrike.pathClears')) || {}).length; } catch (e) { /* 忽略 */ }
+    Ach.evaluate({
+      kills: this._stat('kills', 0),
+      runKills: this._stat('bestRunKills', 0),
+      bestScore: this._stat('bestScore', 0),
+      totalScore: this._stat('totalScore', 0),
+      bombsUsed: this._stat('bombsUsed', 0),
+      games: this._stat('games', 0),
+      bestWave: this._stat('bestWave', 0),
+      bossKills: this._stat('bossKills', 0),
+      bossNoHit: this._stat('bossNoHit', 0),
+      variantKills: kinds + (all2 ? 1 : 0),
+      bestCombo: this._stat('bestCombo', 0),
+      evoCount: this._stat('evoCount', 0),
+      bondCount: this._stat('bondCount', 0),
+      maxedCards: this._stat('maxedCards', 0),
+      bestSlots: this._stat('bestSlots', 0),
+      bestLevel: this._stat('bestLevel', 0),
+      pathClears,
+      eliteKills: this._stat('eliteKills', 0),
+      dualElite: this._stat('dualEliteKills', 0),
+      perfectBest: this._stat('perfectBest', 0),
+      lowHpKills: this._stat('lowHpKills', 0),
+      curseWaves: this._stat('curseWaves', 0),
+      nobomb15: this._stat('nobomb15', 0),
+      bestChain: this._stat('bestChain', 0),
+      mayhemBest: this._mayhemBest(),
+      dailyBest: this._modeBest('daily'),
+      weeklyBest: this._modeBest('weekly'),
+      relicsGot: this._stat('relicsGot', 0),
+      boxOpens: (typeof Shop !== 'undefined' && Shop.boxOpens) || 0,
+      rarePulls: this._stat('rarePulls', 0),
+      chipsEarned: (typeof Shop !== 'undefined' && Shop.chipsEarned) || 0,
+      crystalBalance: (typeof Shop !== 'undefined' && Shop.crystal) || 0,
+      collection: (typeof Shop !== 'undefined' ? Object.keys(Shop.owned || {}).length + Object.keys(Shop.ownedShip || {}).length : 0),
+      bestiary: Object.keys(s.bestSeen || {}).length,
+      tasksDone: this._stat('tasksDone', 0)
+    }, this);
+  }
+
   _refreshStatsPanel() {
     const d = this._dom;
     d.stHi.textContent = this.hi;
@@ -178,18 +226,26 @@ class Game {
     d.stScore.textContent = this._stat('totalScore', 0);
     d.stBoss.textContent = this._stat('bossKills', 0);
     // 成就列表(按分类分组)
+    if (typeof Ach.evaluate === 'function') this._achEvaluate();
     const on = Ach.count();
     const cats = [...new Set(ACHIEVEMENTS.map(a => a.cat))];
-    let html = '<div class="ach-head">' + on + ' / ' + ACHIEVEMENTS.length + '</div>';
+    const fmt = (n) => n >= 10000 ? ((n / 10000).toFixed(n % 10000 !== 0 ? 1 : 0).replace(/\.0$/, '') + '万') : String(n);
+    let html = '<div class="ach-head">' + on + '/' + ACHIEVEMENTS.length + ' 线 · ' + Ach.gotTiers() + '/' + Ach.totalTiers() + ' 级</div>';
     for (const cat of cats) {
       const list = ACHIEVEMENTS.filter(a => a.cat === cat);
-      const gotCat = list.filter(a => Ach.unlocked[a.id]).length;
+      const gotCat = list.filter(a => Ach.levelOf(a.id) > 0).length;
       html += '<div class="ach-cat">' + cat + ' ' + gotCat + '/' + list.length + '</div>';
       for (const a of list) {
-        const got = !!Ach.unlocked[a.id];
-        html += '<div class="ach-item ' + (got ? 'on' : 'off') + '">' +
-          '<i>' + (got ? '🏆' : '🔒') + '</i>' +
-          '<div><b>' + a.name + '</b><span>' + a.desc + '</span></div></div>';
+        const lv = Ach.levelOf(a.id);
+        const max = a.tiers.length;
+        const v = (Ach._last || {})[a.stat] || 0;
+        const next = lv < max ? a.tiers[lv] : null;
+        const prog = lv >= max ? 'MAX' : fmt(Math.min(v, next)) + '/' + fmt(next);
+        html += '<div class="ach-item ' + (lv > 0 ? 'on' : 'off') + '">' +
+          '<i>' + (lv > 0 ? '🏆' : '🔒') + '</i>' +
+          '<div><b>' + a.name + (lv > 0 ? ' <em class="ach-lv">Lv' + lv + '</em>' : '') + '</b>' +
+          '<span>' + a.pre + ' ' + prog + '</span>' +
+          '<span class="ach-tiers">' + a.tiers.map((n, i) => '<i class="' + (i < lv ? 'got' : '') + '">' + fmt(n) + '</i>').join('') + '</span></div></div>';
       }
     }
     d.achList.innerHTML = html;
@@ -732,6 +788,8 @@ class Game {
     const r = this._relicChoices[i];
     if (!r) return;
     this.relics[r.id] = true;
+    this.stats.relicsGot = this._stat('relicsGot', 0) + 1;
+    this._achEvaluate();
     AudioSys.bond();
     this.banner = { text: '遗物获得 · ' + r.name, sub: r.desc, life: 2.6, max: 2.6, gold: true };
     this._relicMode = false;
@@ -900,6 +958,7 @@ class Game {
     if (u.isEvo) {
       // 传说进化:满级卡片质变,不占槽位
       this.evo[u.base] = true;
+      this.stats.evoCount = this._stat('evoCount', 0) + 1;
       this.runEvoCount = (this.runEvoCount || 0) + 1;
       if (this.runEvoCount >= 3) Ach.unlock('evo_3', this);
       if (this.runEvoCount >= 5) Ach.unlock('evo_5', this);
@@ -968,6 +1027,7 @@ class Game {
   _finishPick(u) {
     AudioSys.cardPick();
     const { gained, lost } = this._recalcBonds();
+    if (gained.length) this.stats.bondCount = this._stat('bondCount', 0) + gained.length;
     for (const b of gained) {
       const cfg = BONDS.find(x => x.id === b);
       this.banner = { text: '羁绊觉醒 · ' + cfg.name, sub: cfg.desc, life: 2.6, max: 2.6, gold: true };
@@ -983,8 +1043,10 @@ class Game {
     }
     this._recalc();
     if (u.id === 'vitality') this.player.hp = Math.min(this.player.maxHp, this.player.hp + 25);
+    if ((this.mods[u.id] || 0) >= u.max) this.stats.maxedCards = this._stat('maxedCards', 0) + 1;
     // 满级大师:3 张卡升至满级
     const maxedCount = UPGRADES.filter(x => (this.mods[x.id] || 0) >= x.max && !x.hidden).length;
+    this._achEvaluate();
     if (maxedCount >= 3) Ach.unlock('maxed_3', this);
     if (maxedCount >= 6) Ach.unlock('maxed_6', this);
     if (this.maxSlots >= 9) Ach.unlock('slot_9', this);
@@ -1054,6 +1116,7 @@ class Game {
     }
     // 波次/质变/无弹成就:旗舰连战不按真实波次语义解锁
     if (this.mode !== 'boss') {
+      if (n > this._stat('bestWave', 0)) this.stats.bestWave = n; // 深空远征线实时推进
       if (n >= 5) Ach.unlock('wave_5', this);
       if (n >= 10) Ach.unlock('wave_10', this);
       if (n >= 15) Ach.unlock('wave_15', this);
@@ -1072,10 +1135,11 @@ class Game {
         if (pk) this._recordPathClear(pk);
       }
       // 不使用炸弹通关第 15 波
-      if (n > 15 && (this.runBombsUsed || 0) === 0) Ach.unlock('nobomb_wave15', this);
+      if (n > 15 && (this.runBombsUsed || 0) === 0) this.stats.nobomb15 = this._stat('nobomb15', 0) + 1;
       // 与狼共舞:携带诅咒卡抵达第 10 波
-      if (n >= 10 && UPGRADES.some(x => x.curse && (this.mods[x.id] || 0) > 0)) Ach.unlock('curse_10', this);
+      if (n >= 10 && UPGRADES.some(x => x.curse && (this.mods[x.id] || 0) > 0)) this.stats.curseWaves = this._stat('curseWaves', 0) + 1;
     }
+    this._achEvaluate();
     // 连续无伤波次里程碑
     if (this.perfectStreak >= 6) Ach.unlock('perfect_6', this);
     this.waveDamageTaken = 0;
@@ -1611,7 +1675,7 @@ class Game {
       chainDmg = Math.max(1, Math.round(chainDmg * 0.9));
     }
     if (hit.size > 1) AudioSys.beam();
-    if (hit.size >= 8) Ach.unlock('tesla_chain8', this);
+    if (hit.size > this._stat('bestChain', 0)) this.stats.bestChain = hit.size;
   }
 
   /* 敌机图鉴:分类型击坠累计,首次收录发放星晶 */
@@ -1628,6 +1692,7 @@ class Game {
       this._addFloat(new FloatText(this.player.x, this.player.y - 46, '📖 图鉴新收录 +' + reward + '★', '#ffd166', 12));
     if (Object.keys(this.stats.bestSeen).length >= Object.keys(BESTIARY_INFO).length)
       Ach.unlock('codex_all', this);
+    this._achEvaluate();
   }
 
   /* ---------------- 击杀 / 伤害结算 ---------------- */
@@ -1679,6 +1744,8 @@ class Game {
     // 命运骰子:10% 概率掉落随机道具
     if (this.relics.r_dice && RNG() < 0.10) this._dropPower(e.x, e.y);
     this.stats.kills = this._stat('kills', 0) + 1;
+    if (this.combo > this._stat('bestCombo', 0)) this.stats.bestCombo = this.combo;
+    this._achEvaluate();
     this.waveKills++;
     this.runKills++;
     this._bestiaryKill(e.type);
@@ -1707,7 +1774,7 @@ class Game {
     if (tk >= 10000) Ach.unlock('total_10000', this);
     if (this.runKills >= 120) Ach.unlock('run_kill120', this);
     // 双子星杀手:双词缀精英
-    if (e.elite && e.elite.length >= 2) Ach.unlock('dual_elite', this);
+    if (e.elite && e.elite.length >= 2) this.stats.dualEliteKills = this._stat('dualEliteKills', 0) + 1;
     // 向死而生:濒死状态击坠
     if (this.player.alive && this.player.hp / this.player.maxHp <= 0.1) {
       this.runLowHpKills++;
@@ -1794,8 +1861,11 @@ class Game {
     if (b.variant === 'storm') Ach.unlock('storm_kill', this);
     if (b.variant === 'tyrant') Ach.unlock('tyrant_kill', this);
     if (b.variant === 'dread') Ach.unlock('dread_kill', this);
-    // 完胜旗舰:本波(BOSS 波)未受伤击毁
-    if (this.waveDamageTaken === 0) Ach.unlock('boss_nohit', this);
+    // 完胜旗舰:本波(BOSS 波)未受伤击毁(累计计数)
+    if (this.waveDamageTaken === 0) this.stats.bossNoHit = this._stat('bossNoHit', 0) + 1;
+    const vk = this.stats.variantKills = this.stats.variantKills || {};
+    vk[b.variant] = (vk[b.variant] || 0) + 1;
+    this._achEvaluate();
     const pts = Math.round(b.score * this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1) * (this.mods.pact ? 1 + 0.1 * this.mods.pact : 1));
     this.score += pts;
     this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
@@ -1869,6 +1939,7 @@ class Game {
       } else {
         const r0 = avail[Math.floor(RNG() * avail.length)];
         this.relics[r0.id] = true;
+        this.stats.relicsGot = this._stat('relicsGot', 0) + 1;
         this.rings.push(new Ring(p.x, p.y, '#ffd166', 220, 0.9));
         this.rings.push(new Ring(p.x, p.y, '#fff6cf', 150, 0.6));
         this.rings.push(new Ring(p.x, p.y, '#ffd166', 90, 0.45));
@@ -2523,8 +2594,16 @@ class Game {
     s.eliteKills = this._stat('eliteKills', 0) + this.runEliteKills;
     s.totalScore = this._stat('totalScore', 0) + this.score;
     if (s.totalScore >= 1000000) Ach.unlock('total_score_1m', this);
-    s.bestWave = Math.max(this._stat('bestWave', 0), this.wave);
+    if (this.mode !== 'boss') s.bestWave = Math.max(this._stat('bestWave', 0), this.wave); // 连战阶段号不计波次线
+    s.bestScore = Math.max(this._stat('bestScore', 0), this.score);
+    s.bestRunKills = Math.max(this._stat('bestRunKills', 0), this.runKills);
+    s.bestCombo = Math.max(this._stat('bestCombo', 0), this.maxCombo);
+    s.bestLevel = Math.max(this._stat('bestLevel', 0), this.level);
+    s.bestSlots = Math.max(this._stat('bestSlots', 0), this.maxSlots);
+    s.perfectBest = Math.max(this._stat('perfectBest', 0), this.perfectStreak);
+    s.lowHpKills = this._stat('lowHpKills', 0) + (this.runLowHpKills || 0);
     this.saveStats();
+    this._achEvaluate();
     if (typeof DailyTasks !== 'undefined') {
       DailyTasks.bump('score', this.score, this);
       DailyTasks.save(); // 进度跨局累计,局末持久化一次

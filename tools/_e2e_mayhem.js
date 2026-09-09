@@ -68,7 +68,7 @@ function startServer() {
   r.menu = await page.evaluate(() => ({
     btn: !!document.getElementById('btnMayhem'),
     hiHasMayhem: document.getElementById('menuHi').textContent.indexOf('大乱斗') >= 0,
-    achTotal: (typeof ACHIEVEMENTS !== 'undefined') ? ACHIEVEMENTS.length : -1,
+    achLines: (typeof ACHIEVEMENTS !== 'undefined') ? ACHIEVEMENTS.length : -1,
     augTotal: (typeof AUGMENTS !== 'undefined') ? AUGMENTS.length : -1,
     tiers: (typeof AUGMENTS !== 'undefined') ? [0, 1, 2].map(t => AUGMENTS.filter(a => a.tier === t).length) : []
   }));
@@ -289,7 +289,7 @@ function startServer() {
     if (g.state === 'levelup') g.chooseAugment(0);
     g.score = 31000; g.wave = 12; g.runBossKills = 0; g.runEliteKills = 0;
     g._gameover();
-    out.ach = !!Ach.unlocked['mayhem_30k'];
+    out.ach = (Ach.levelOf('mayhem') || 0) >= 3;
     out.hiFinal = +localStorage.getItem('deepstrike.mayhemHi') === 31000;
     // 构筑摘要含符文 chips
     g.augments = { a_engine: 1, a_nuke: 3 };
@@ -317,7 +317,7 @@ function startServer() {
   const check = (c, m) => { if (c) console.log('ok: ' + m); else { console.error('FAIL: ' + m); bad++; } };
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.menu.btn && r.menu.hiHasMayhem, '菜单入口与纪录行就绪');
-  check(r.menu.achTotal === 83, '成就总数 83(含海克斯狂徒)');
+  check(r.menu.achLines === 34, '成就 34 条线(分级制)');
   check(r.menu.augTotal === 18 && r.menu.tiers.join(',') === '6,6,6', '18 张符文,三档各 6 张');
   check(r.hotkey.ok && r.hotkey.unique && r.hotkey.resumed && r.hotkey.owned, 'L 键开局强化三选一(不重复)并正常返回战场');
   check(r.rounds.w4 && r.rounds.w7 && r.rounds.w10 && r.rounds.w11_no, '第 4/7/10 波依次第 2/3/4 轮(BOSS 波可先选),第 11 波不再弹');

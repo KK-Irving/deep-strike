@@ -435,3 +435,9 @@ h2 {
 .chip.aug.t0 { color: #c0c8d8; border-color: rgba(192, 200, 216, 0.5); }
 .chip.aug.t1 { color: #ffd166; border-color: rgba(255, 209, 102, 0.5); }
 .chip.aug.t2 { color: #ff6ad5; border-color: rgba(255, 106, 213, 0.5); }
+
+/* ---- 成就分级展示 ---- */
+.ach-lv { font-style: normal; color: #ffd166; font-size: 11px; margin-left: 4px; }
+.ach-tiers { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+.ach-tiers i { font-style: normal; font-size: 10px; padding: 1px 5px; border-radius: 6px; border: 1px solid rgba(126, 243, 255, 0.25); color: rgba(200, 220, 240, 0.6); }
+.ach-tiers i.got { color: #ffd166; border-color: rgba(255, 209, 102, 0.55); }

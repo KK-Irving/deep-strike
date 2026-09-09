@@ -54,7 +54,7 @@ function startServer() {
     out.bossReward = crystalAt() === c0 + 40;
     // 4) 收录全部 → 博物学家成就
     for (const k of Object.keys(BESTIARY_INFO)) game._bestiaryKill(k);
-    out.codexAll = !!Ach.unlocked['codex_all'];
+    out.codexAll = (Ach.levelOf('bestiary') || 0) >= 5;
     // 5) 档案页渲染
     game.state = 'menu'; game.menuPanel = 'stats';
     game._refreshStatsPanel();

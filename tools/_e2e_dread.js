@@ -67,7 +67,7 @@ function startServer() {
     out.disarmBanner = game.banner && game.banner.text === '要塞武装解除';
     // 6) 击毁要塞 → 成就
     game.boss.damage(999999, game);
-    out.ach = !!Ach.unlocked['dread_kill'];
+    out.ach = (Ach.levelOf('variants') || 0) >= 1;
     return out;
   });
 

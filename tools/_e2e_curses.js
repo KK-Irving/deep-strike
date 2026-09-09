@@ -79,7 +79,7 @@ function startServer() {
     game.start('normal');
     game.mods = { glass: 1 };
     game.startWave(10);
-    out.ach = !!Ach.unlocked['curse_10'];
+    out.ach = (Ach.levelOf('curse') || 0) >= 1;
     return out;
   });
 

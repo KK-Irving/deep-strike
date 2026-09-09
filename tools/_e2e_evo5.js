@@ -135,12 +135,13 @@ function startServer() {
     // 5) 满级成就:maxed_3(选卡使第 3 张卡满级)
     g.start('normal');
     g.mods = { rate: 5, speed: 5, dmg: 4 };
+    g.stats.maxedCards = 2; // 预置:已有 2 张卡满级
     g._recalc();
     g.state = 'levelup';
     g._pendingSwap = null;
     g._cardChoices = [UPGRADE_MAP.dmg];
     g.chooseCard(0);
-    out.maxed3 = g.mods.dmg === 5 && !!Ach.unlocked['maxed_3'];
+    out.maxed3 = g.mods.dmg === 5 && (Ach.levelOf('maxed') || 0) >= 1;
     g.state = 'menu';
     return out;
   });
