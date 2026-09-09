@@ -448,21 +448,21 @@ class Game {
     const E = this.evo || {};   // 进化状态
     const sh = this.shipDef || {};
     const A = this.augments || {};   // 海克斯大乱斗:已获符文
-    p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0) + (sh.dmgBonus || 0) + (A.a_might ? 2 : 0); // 「巨力弹头」
-    p.dmgMul = (m.glass ? 2 : 1) * (A.a_glass ? 1.5 : 1) * (A.a_urf ? 0.8 : 1); // 玻璃大炮卡 /「玻璃大炮」「无限火力」符文
-    let interval = (p.fireBase || 0.12) * Math.pow(0.85, m.rate || 0);
+    p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0) + (sh.dmgBonus || 0) + (A.a_might ? 2 : 0) + (E.multi ? 1 : 0); // 「巨力弹头」/ 万炮齐发
+    p.dmgMul = (m.glass ? 1 + 0.2 * m.glass : 1) * (A.a_glass ? 1.5 : 1) * (A.a_urf ? 0.8 : 1); // 玻璃大炮卡(+20%/级) / 符文
+    let interval = (p.fireBase || 0.12) * Math.pow(0.88, m.rate || 0);
     if (E.rate) interval *= 0.75;
     if (this.bonds.includes('overdrive')) interval *= 0.85;
     // 轨道炮:蓄力式慢射(高单发伤害);穿甲协议/磁暴风进化缩短蓄力
     if (m.railgun) {
-      let railMul = 3.2 - 0.4 * (m.railgun - 1);
+      let railMul = 3.2 - 0.35 * (m.railgun - 1);
       if (this.bonds.includes('railcrit')) railMul *= 0.7;
       if (E.railgun) railMul *= 0.65;
       interval *= railMul;
     }
     // 回旋刃:双程伤害故投掷偏慢;疾风投掷/龙卷之核缩短间隔
     if (m.boomer) {
-      interval *= 1.45;
+      interval *= 1.45 - 0.06 * (m.boomer - 1);
       if (this.bonds.includes('boomerch')) interval *= 0.75;
       if (E.boomer) interval *= 0.85;
     }
@@ -470,30 +470,34 @@ class Game {
     if (A.a_overclock) interval *= 0.85;
     if (A.a_urf) interval *= 0.65;
     p.fireInterval = Math.max(0.045, interval);
-    p.speed = (sh.speed || 330) * Math.pow(1.15, m.speed || 0) * (A.a_engine ? 1.2 : 1);
-    p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 70;
+    p.speed = (sh.speed || 330) * Math.pow(1.10, m.speed || 0) * (A.a_engine ? 1.2 : 1) * (E.speed ? 1.25 : 1);
+    p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 45;
+    if (E.magnet) p.magnetR *= 1.8;
     // 经验调校 + 经验风暴周变异
-    this.xpMult = (1 + 0.25 * (m.xpchip || 0) + 0.04 * boostLevel('xp10')) * (this._mut && this._mut.id === 'surge' ? 1.5 : 1)
-      * (A.a_scav ? 1.4 : 1) * (this.mode === 'mayhem' ? 1.5 : 1); // 「拾荒者」符文;大乱斗节奏福利 +50%
-    this.comboWindow = 2 + 1.5 * (m.combo || 0);
-    p.shieldInterval = this.bonds.includes('fortress') ? 6 : 12;
+    this.xpMult = (1 + 0.15 * (m.xpchip || 0) + 0.04 * boostLevel('xp10')) * (this._mut && this._mut.id === 'surge' ? 1.5 : 1)
+      * (A.a_scav ? 1.4 : 1) * (E.xpchip ? 1.4 : 1) * (this.mode === 'mayhem' ? 1.5 : 1); // 「拾荒者」符文;大乱斗节奏福利 +50%
+    this.comboWindow = 2 + 0.7 * (m.combo || 0) + (E.combo ? 2 : 0);
+    p.shieldInterval = Math.max(3, (this.bonds.includes('fortress') ? 6 : 12) - (m.shieldgen || 0)); // 护盾发生器每级充能 -1 秒
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
-    const timePerStack = this.bonds.includes('chrono') ? 0.30 : 0.18;
-    this.bulletSlow = (m.time || 0) ? 1 - Math.min(0.62, timePerStack * m.time) : 1;
+    const timePerStack = this.bonds.includes('chrono') ? 0.16 : 0.10;
+    const timeCap = this.bonds.includes('chrono') ? 0.62 : 0.50;
+    this.bulletSlow = (m.time || 0) ? 1 - Math.min(timeCap, timePerStack * m.time) : 1;
     if (this.relics.r_voidwatch) this.bulletSlow = Math.max(0.3, this.bulletSlow * 0.9);
-    if (m.pact) this.bulletSlow = Math.min(1.25, this.bulletSlow * 1.15); // 贪婪契约:敌弹加速
+    if (m.pact) this.bulletSlow = Math.min(1.25, this.bulletSlow * (1 + (E.pact ? 0.015 : 0.03) * m.pact)); // 贪婪契约:敌弹加速(黄金契约惩罚减半)
     if (A.a_chrono) this.bulletSlow *= 0.7; // 「时间领主」:敌弹永久减速 30%
     // 卡槽系统:基础 5 槽,隐藏卡扩展
-    this.maxSlots = 5 + (m.slotplus || 0);
+    this.maxSlots = 5 + (m.slotplus || 0) + (E.slotplus ? 1 : 0); // 无限基因再 +1
     // 生命值系统:上限 = 机体基础 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
-    p.maxHp = Math.round(((sh.hp || 100) + 25 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
-      + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0)) * (m.glass ? 0.6 : 1) * (A.a_glass ? 0.75 : 1));
-    p.armorPct = Math.min(0.5, 0.15 * (m.armor || 0) + (sh.perkArmor || 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 护盾:每级 +1.2% 减伤(满级 +12%)
-    p.regenRate = 0.6 * (m.regen || 0) * (E.regen ? 2 : 1) + (A.a_medic ? 1.5 : 0);
-    p.leechPer = 0.7 * (m.leech || 0) + (A.a_leech ? 1 : 0);
+    const glassHp = m.glass ? (E.glass ? 1 - 0.04 * m.glass : 1 - 0.08 * m.glass) : 1; // 玻璃大炮:逐级 -8%,进化后惩罚减半
+    p.maxHp = Math.round(((sh.hp || 100) + 20 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
+      + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0)) * glassHp * (A.a_glass ? 0.75 : 1));
+    p.armorPct = Math.min(E.armor ? 0.62 : 0.5, 0.08 * (m.armor || 0) + (E.armor ? 0.12 : 0) + (sh.perkArmor || 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 装甲每级 -8%;泰坦装甲 +12% 并抬上限
+    p.regenRate = 0.4 * (m.regen || 0) * (E.regen ? 2 : 1) + (A.a_medic ? 1.5 : 0);
+    p.leechPer = 0.45 * (m.leech || 0) + (A.a_leech ? 1 : 0);
+    if (E.leech) p.leechPer *= 2; // 血之盛宴
     p.hp = Math.min(p.hp, p.maxHp);
     // 幻影僚机:数量同步
-    const wingTarget = (m.wingman || 0) + (A.a_army ? 2 : 0); // 「分身军团」:+2 不占槽位
+    const wingTarget = (m.wingman || 0) + (A.a_army ? 2 : 0) + (E.wingman ? 2 : 0); // 「分身军团」/幽灵中队:+2 不占槽位
     while (this.wingmen.length < wingTarget) this.wingmen.push(new Wingman(this.wingmen.length));
     while (this.wingmen.length > wingTarget) this.wingmen.pop();
     if (m.shieldgen && !p.shield && p.shieldCd <= 0) p.shieldCd = p.shieldInterval;
@@ -515,8 +519,8 @@ class Game {
     const p = this.player, m = this.mods;
     const lvl = m.laser;
     // 卡片协同:dmg 线性增益、pierce 加宽并增伤、crit 周期过载脉冲、split 分裂侧束、要害/处决羁绊放大
-    const critChance = 0.2 * (m.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0)
-      + (m.brittle ? 0.3 : 0);
+    const critChance = 0.1 * (m.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0)
+      + (m.brittle ? 0.06 * m.brittle : 0);
     // 过载脉冲:按暴击率周期性爆发额外伤害(把"暴击"转译为持续武器的节奏)
     this._beamCritT = (this._beamCritT || 0) - dt;
     let critPulse = 1;
@@ -526,13 +530,13 @@ class Game {
       this._beamCrit = 0.12; // 过载可见时长
     }
     this._beamCrit = Math.max(0, (this._beamCrit || 0) - dt);
-    const dps = (8 + 4.5 * (lvl - 1) + 3.2 * p.dmgBonus)
+    const dps = (8 + 2.6 * (lvl - 1) + 3.2 * p.dmgBonus)
       * (this.bonds.includes('focus') ? 1.6 : 1)
       * (1 + 0.18 * (p.weapon - 1))
       * (1 + 0.25 * (m.pierce || 0))          // 贯穿:每层 +25% 灼烧
       * (this._beamCrit > 0 ? critPulse : 1) // 过载脉冲窗口内爆发
       * (p.dmgMul || 1);
-    let halfW = 2.5 + 0.8 * (lvl - 1) + 0.4 * (p.weapon - 1) + 0.6 * (m.pierce || 0);
+    let halfW = 2.5 + 0.5 * (lvl - 1) + 0.4 * (p.weapon - 1) + 0.6 * (m.pierce || 0);
     if (this.evo.laser) halfW *= 1.6;
     const lensPen = this.bonds.includes('laserlens');
     if (lensPen) halfW *= 2;
@@ -1244,7 +1248,7 @@ class Game {
     if (this.mods.rift) {
       this.riftCd -= dt;
       if (this.riftCd <= 0) {
-        this.riftCd = 8.5;
+        this.riftCd = 9 - 0.6 * this.mods.rift - (this.evo.rift ? 2 : 0);
         this.rifts.push(new Rift(rand(70, W - 70), rand(130, 320), this));
         AudioSys.rift();
       }
@@ -1338,7 +1342,7 @@ class Game {
         this.waveClearT = 1.6;
         const bonus = 200 + this.wave * 100;
         this.score += bonus;
-        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5 + (this.evo.vitality ? 15 : 0));
+        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5 + (this.evo.vitality ? 15 : 0) + (this.evo.regen ? 10 : 0));
         // 完美波次:本波未受任何实际伤害
         if (this.waveDamageTaken === 0 && this.wave > 1) {
           this.perfectStreak++;
@@ -1512,7 +1516,7 @@ class Game {
   /* 单发子弹命中结算:暴击 / 贯穿 / 裂变 */
   _hitTarget(b, e) {
     let dmg = b.dmg;
-    let cc = 0.2 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0)
+    let cc = 0.1 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0)
       + (this.mods.brittle ? 0.3 : 0);
     // 虚空之刃:回旋刃暴击率 ×1.5
     if (b.boom && this.bonds.includes('voidedge')) cc *= 1.5;
@@ -1704,7 +1708,8 @@ class Game {
     // 歼灭装填:击坠积累炸弹
     if (this.mods.bombkill) {
       this.bombMeter++;
-      const need = this.mods.bombkill === 1 ? 25 : 15;
+      let need = Math.max(8, 30 - 5 * this.mods.bombkill);
+      if (this.evo.bombkill) need = Math.max(6, need - 5);
       if (this.bombMeter >= need) {
         this.bombMeter = 0;
         if (this.player.bombs < this.bombCap()) {
@@ -1713,7 +1718,7 @@ class Game {
         }
       }
     }
-    const mult = this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1) * (this.mods.pact ? 1.5 : 1);
+    const mult = this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1) * (this.mods.pact ? 1 + 0.1 * this.mods.pact : 1);
     const pts = Math.round(e.score * mult);
     this.score += pts;
     this._addFloat(new FloatText(e.x, e.y - 8, '+' + pts, mult > 1 ? '#ffd166' : '#e8f6ff', e.r > 18 ? 16 : 13));
@@ -1766,7 +1771,7 @@ class Game {
     if (b.variant === 'dread') Ach.unlock('dread_kill', this);
     // 完胜旗舰:本波(BOSS 波)未受伤击毁
     if (this.waveDamageTaken === 0) Ach.unlock('boss_nohit', this);
-    const pts = Math.round(b.score * this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1) * (this.mods.pact ? 1.5 : 1));
+    const pts = Math.round(b.score * this.multiplier() * (this.buffs.x2 > 0 ? 2 : 1) * (this.mods.pact ? 1 + 0.1 * this.mods.pact : 1));
     this.score += pts;
     this._addFloat(new FloatText(b.x, b.y, '+' + pts, '#ffd166', 22));
     // 连战模式:击毁旗舰回复 15% 生命,支撑连续作战
@@ -1880,7 +1885,8 @@ class Game {
       this._thornBlast();
       return;
     }
-    const real = Math.max(1, Math.round(dmg * (1 - p.armorPct) * (this.mods.brittle ? 1.5 : 1)));
+    const brittleTaken = this.mods.brittle ? 1 + (this.evo.brittle ? 0.05 : 0.10) * this.mods.brittle : 1;
+    const real = Math.max(1, Math.round(dmg * (1 - p.armorPct) * brittleTaken));
     p.hp -= real;
     this.waveDamageTaken++;
     this.combo = 0;
@@ -1891,10 +1897,10 @@ class Game {
     this._thornBlast();
     if (p.hp <= 0) {
       // 不屈意志:每局一次,保留 1 点生命并清除全屏弹幕
-      if (this.mods.undying && !p.undyingUsed) {
-        p.undyingUsed = true;
-        p.hp = 1;
-        p.invuln = 2.5;
+      if (this.mods.undying && (p.undyingCount || 0) < (this.evo.undying ? 2 : 1)) {
+        p.undyingCount = (p.undyingCount || 0) + 1;
+        p.hp = Math.max(1, Math.round(p.maxHp * 0.02 * this.mods.undying));
+        p.invuln = 2.5 + (this.evo.undying ? 1 : 0);
         this.enemyBullets.length = 0;
         this._addFloat(new FloatText(p.x, p.y - 30, '🕊 不屈意志!', '#ffd166', 16));
         AudioSys.record();
@@ -1917,7 +1923,9 @@ class Game {
   /* 反击风暴:受击时清除周围弹幕并放出冲击波 */
   _thornBlast() {
     if (!this.mods.thorn || !this.player.alive) return;
-    const p = this.player, R = 150;
+    const p = this.player;
+    const R = 100 + 12 * this.mods.thorn + (this.evo.thorn ? 60 : 0);
+    const thornDmg = (2 + 2 * this.mods.thorn) * (this.evo.thorn ? 2 : 1);
     for (const b of this.enemyBullets) {
       const dx = b.x - p.x, dy = b.y - p.y;
       if (dx * dx + dy * dy < R * R) {
@@ -1927,7 +1935,7 @@ class Game {
     }
     for (const e of this.enemies) {
       const dx = e.x - p.x, dy = e.y - p.y;
-      if (dx * dx + dy * dy < R * R) e.damage(4, this);
+      if (dx * dx + dy * dy < R * R) e.damage(thornDmg, this);
     }
     this.rings.push(new Ring(p.x, p.y, '#a5ffd6', R, 0.45));
     AudioSys.web();
@@ -2470,7 +2478,7 @@ class Game {
     // 星晶结算:得分/1600 + 旗舰×6 + 精英×1;贪婪周 ×1.5;高难 ×1.5
     Shop.lastEarn = Math.floor(this.score / 1600) + (this.runBossKills || 0) * 6 + (this.runEliteKills || 0) * 1;
     if (this._mut && this._mut.id === 'greed') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
-    if (this.mods.pact) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
+    if (this.mods.pact) Shop.lastEarn = Math.round(Shop.lastEarn * (1 + 0.1 * this.mods.pact));
     if (this.hard) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (this.mode === 'mayhem') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5); // 大乱斗节奏福利
     if (this.augments && this.augments.a_stone) Shop.lastEarn = Math.round(Shop.lastEarn * 2); // 「贤者之石」

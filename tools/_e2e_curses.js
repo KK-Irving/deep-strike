@@ -32,23 +32,30 @@ function startServer() {
 
   const r = await page.evaluate(() => {
     const out = {};
-    // 1) 玻璃大炮:伤害 ×2、生命上限 ×0.6
+    // 1) 玻璃大炮(5 级制):满级 5 = 伤害 ×2、生命 ×0.6;1 级 = +20%/-8%;进化净化减半
     game.start('normal');
     const hpBase = game.player.maxHp;
+    game.mods = { glass: 5 };
+    game._recalc();
+    out.glassMul = Math.abs(game.player.dmgMul - 2) < 1e-9;
+    out.glassHp = Math.abs(game.player.maxHp - Math.round(hpBase * 0.6)) <= 1;
     game.mods = { glass: 1 };
     game._recalc();
-    out.glassMul = game.player.dmgMul === 2;
-    out.glassHp = Math.abs(game.player.maxHp - Math.round(hpBase * 0.6)) <= 1;
-    // 2) 脆刃:受击 ×1.5
-    game.mods = { brittle: 1 };
+    out.glassLv1 = Math.abs(game.player.dmgMul - 1.2) < 1e-9 && Math.abs(game.player.maxHp / hpBase - 0.92) < 0.02;
+    game.mods = { glass: 5 }; game.evo = { glass: true };
+    game._recalc();
+    out.glassPurify = Math.abs(game.player.dmgMul - 2) < 1e-9 && Math.abs(game.player.maxHp / hpBase - 0.8) < 0.02;
+    game.evo = {};
+    // 2) 脆刃(5 级制):满级 5 = 受击 ×1.5
+    game.mods = { brittle: 5 };
     game._recalc();
     game.player.invuln = 0; game.player.shield = false; game.player.chillT = 0;
     game.player.maxHp = 1000; game.player.hp = 1000;
     game.enemies.length = 0;
     game._playerHit(100);
     out.brittleTaken = game.player.hp === 1000 - 150;
-    // 3) 贪婪契约:击杀得分 ×1.5
-    game.mods = { pact: 1 };
+    // 3) 贪婪契约(5 级制):满级 5 = 敌弹 ×1.15、得分/星晶 ×1.5
+    game.mods = { pact: 5 };
     game.buffs = { x2: 0, frenzy: 0, frost: 0, jam: 0 };
     game.score = 0; game.combo = 0;
     game._recalc();

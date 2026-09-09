@@ -286,7 +286,7 @@ class Player {
     this.maxHp = shipDef.hp || 100; this.hp = this.maxHp;
     this.fireBase = shipDef.fire || 0.12;
     this.armorPct = 0; this.regenRate = 0; this.leechPer = 0;
-    this.undyingUsed = false;
+    this.undyingCount = 0;
     this.weapon = 1; this.bombs = 2;
     this.shield = false; this.invuln = 2.2;
     this.chillT = 0; this._phaseT = 0; // 相位疾行:受击后短暂加速
@@ -345,7 +345,7 @@ class Player {
     if (game.mods.homing) {
       this.homingCd -= dt;
       if (this.homingCd <= 0) {
-        this.homingCd = 2.4 - game.mods.homing * 0.35;
+        this.homingCd = 2.4 - game.mods.homing * 0.25;
         this._fireHoming(game);
       }
     }
@@ -387,6 +387,7 @@ class Player {
   _fire(game) {
     const P = game.playerBullets;
     const m = game.mods;
+    const multiN = (m.multi || 0) + (game.evo.multi ? 1 : 0); // 万炮齐发:额外 +1 路
     const dmg = (1 + this.dmgBonus) * this.dmgMul;
     const pierce = (m.pierce || 0) + (game.evo.pierce ? 2 : 0);
     const split = m.split || 0;
@@ -396,16 +397,16 @@ class Player {
       // 轨道炮:高速磁轨弹,单发高伤,天然强贯穿(质变路线)。与暴击/贯穿强联动
       const railPierce = 3 + 2 * (m.pierce || 0) + (game.bonds.includes('railpierce') ? 99 : 0)
         + (game.evo.railgun ? 99 : 0);
-      const base = (6 + 3 * (m.railgun - 1) + 2 * this.dmgBonus + 1.5 * (this.weapon - 1)) * this.dmgMul;
+      const base = (6 + 2 * (m.railgun - 1) + 2 * this.dmgBonus + 1.5 * (this.weapon - 1)) * this.dmgMul;
       const railDmg = Math.round(base * (game.evo.railgun ? 1.6 : 1));
       mk(0, -16, 0, -1250, { color: '#bfe4ff', r: 4.4, pierce: railPierce, split, dmg: railDmg, rail: true });
-      for (let i = 1; i <= (m.multi || 0); i++) {
+      for (let i = 1; i <= multiN; i++) {
         mk(-8 - i * 9, -10, 0, -1250, { color: '#bfe4ff', r: 3.6, pierce: railPierce, split, dmg: railDmg, rail: true });
         mk(8 + i * 9, -10, 0, -1250, { color: '#bfe4ff', r: 3.6, pierce: railPierce, split, dmg: railDmg, rail: true });
       }
     } else if (m.tesla) {
       // 电弧发生器:发射一颗"引雷弹",命中即触发链式闪电(在 game 层结算跳跃)
-      const chains = 1 + (m.tesla - 1) + (m.multi || 0) + (game.bonds.includes('teslachain') ? 1 : 0);
+      const chains = 1 + (m.tesla - 1) + multiN + (game.bonds.includes('teslachain') ? 1 : 0);
       // 平衡:提高电弧触发弹基础伤害(2→3 且吃满 dmg 加成),配合链式增强使多目标输出达标
       const teslaDmg = (3 + Math.round(1.3 * this.dmgBonus) + (game.evo.tesla ? 3 : 0)) * this.dmgMul;
       for (let c = 0; c < chains; c++) {
@@ -414,7 +415,7 @@ class Player {
       }
     } else if (m.spread) {
       // 散射炮:宽扇弹幕(质变路线)。卡片协同 —— 弹丸继承 pierce/split,evo 取消衰减并加宽扇形
-      const n = 5 + 2 * (m.spread - 1) + 2 * (m.multi || 0) + (this.weapon - 1)
+      const n = 5 + Math.round(1.5 * (m.spread - 1)) + 2 * multiN + (this.weapon - 1)
         + (game.bonds.includes('suppress') ? 2 : 0) + (game.evo.spread ? 6 : 0);
       const fade = game.evo.spread ? {} : { life: 0.42 };
       const spPierce = Math.floor(pierce / 2) + (game.evo.spread ? 1 : 0);
@@ -430,8 +431,8 @@ class Player {
       }
     } else if (m.boomer) {
       // 回旋刃:掷出减速→折返,去回双重切割;并列弹道生成并排多枚
-      const dmg = (9 + 3 * (m.boomer - 1) + 2 * this.dmgBonus + (this.weapon - 1)) * this.dmgMul;
-      const n = 1 + (m.multi || 0);
+      const dmg = (9 + 2 * (m.boomer - 1) + 2 * this.dmgBonus + (this.weapon - 1)) * this.dmgMul;
+      const n = 1 + multiN;
       for (let i = 0; i < n; i++) {
         const off = n === 1 ? 0 : (i / (n - 1) - 0.5) * 30;
         P.push({
@@ -455,7 +456,7 @@ class Player {
         default: mk(0, -16, 0, -580); mk(-7, -11, -45, -545); mk(7, -11, 45, -545); mk(-13, -4, -160, -480); mk(13, -4, 160, -480); break;
       }
       // 并列弹道:主炮两侧追加直射弹
-      for (let i = 1; i <= (m.multi || 0); i++) {
+      for (let i = 1; i <= multiN; i++) {
         mk(-7 - i * 8, -8, 0, -540);
         mk(7 + i * 8, -8, 0, -540);
       }
@@ -464,15 +465,19 @@ class Player {
     let sideN = m.side || 0;
     if (game.bonds.includes('suppress')) sideN += 2;
     if (game.shipDef && game.shipDef.perkSide) sideN += game.shipDef.perkSide;
+    if (game.evo.side) sideN += 2; // 双子侧翼
     for (let i = 1; i <= sideN; i++) {
       const vx = 95 + i * 55;
-      mk(-10, -4, -vx, -500);
-      mk(10, -4, vx, -500);
+      const sideExtra = game.evo.side ? { pierce: pierce + 1 } : null;
+      mk(-10, -4, -vx, -500, sideExtra);
+      mk(10, -4, vx, -500, sideExtra);
     }
-    // 尾炮
-    for (let i = 1; i <= (m.rear || 0); i++) {
-      mk(-5, 10, -70, 380);
-      mk(5, 10, 70, 380);
+    // 尾炮(龙鳞尾炮:弹丸翻倍且获得 2 次贯穿)
+    const rearN = (m.rear || 0) * (game.evo.rear ? 2 : 1);
+    for (let i = 1; i <= rearN; i++) {
+      const rearExtra = game.evo.rear ? { pierce: pierce + 2 } : null;
+      mk(-5, 10, -70, 380, rearExtra);
+      mk(5, 10, 70, 380, rearExtra);
     }
     AudioSys.shoot();
   }
@@ -1470,8 +1475,8 @@ class Wingman {
         const aim = Math.atan2(ty - this.y, tx - this.x);
         const missile = game.bonds.includes('squad');
         game.playerBullets.push(missile
-          ? { x: this.x, y: this.y, vx: Math.cos(aim) * 300, vy: Math.sin(aim) * 300, r: 4, dmg: Math.round((2 + game.player.dmgBonus) * (game.player.dmgMul || 1)), color: '#ffd166', dead: false, homing: true, life: 2.2, pierce: 0, split: 0 }
-          : { x: this.x, y: this.y, vx: Math.cos(aim) * 480, vy: Math.sin(aim) * 480, r: 2.6, dmg: Math.round((1 + game.player.dmgBonus) * (game.player.dmgMul || 1)), color: '#9ffcf0', dead: false, pierce: 0, split: 0 });
+          ? { x: this.x, y: this.y, vx: Math.cos(aim) * 300, vy: Math.sin(aim) * 300, r: 4, dmg: Math.round((2 + game.player.dmgBonus + (game.evo.wingman ? 1 : 0)) * (game.player.dmgMul || 1)), color: '#ffd166', dead: false, homing: true, life: 2.2, pierce: 0, split: 0 }
+          : { x: this.x, y: this.y, vx: Math.cos(aim) * 480, vy: Math.sin(aim) * 480, r: 2.6, dmg: Math.round((1 + game.player.dmgBonus + (game.evo.wingman ? 1 : 0)) * (game.player.dmgMul || 1)), color: '#9ffcf0', dead: false, pierce: 0, split: 0 });
         AudioSys.missile();
       }
     }
@@ -1498,7 +1503,7 @@ class Wingman {
 class Rift {
   constructor(x, y, game) {
     this.x = x; this.y = y;
-    this.r = 70 + game.mods.rift * 25;
+    this.r = 70 + game.mods.rift * 12 + (game.evo.rift ? 40 : 0);
     if (game.bonds.includes('ghostNet')) this.r *= 1.6;
     this.life = this.max = 3.2;
     this.t = 0; this.dead = false;
