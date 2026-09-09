@@ -63,7 +63,13 @@ const RELICS = [
   { id: 'r_grail',       icon: '🏆', name: '贪婪圣杯', desc: '星晶获取 ×2' },
   { id: 'r_bloodmoon',   icon: '🌙', name: '血月初刃', desc: '击坠 8% 概率回复 8 点生命' },
   { id: 'r_cloak',       icon: '🧿', name: '相位斗篷', desc: '受击后的无敌时间 +0.7 秒' },
-  { id: 'r_thor',        icon: '⚡', name: '雷神之锤', desc: '击坠时 15% 概率引落闪电,重创 3 个随机敌人' }
+  { id: 'r_thor',        icon: '⚡', name: '雷神之锤', desc: '击坠时 15% 概率引落闪电,重创 3 个随机敌人' },
+  { id: 'r_magnet',      icon: '🧲', name: '引力核心', desc: '磁吸范围 +60%' },
+  { id: 'r_frenzy',      icon: '🚩', name: '战意旗帜', desc: '连击维持时间 +1 秒' },
+  { id: 'r_phoenix',     icon: '🪶', name: '不死鸟羽', desc: '每局一次,致死伤害时以 30% 生命浴火重生' },
+  { id: 'r_sage',        icon: '📖', name: '贤者之书', desc: '经验获取 +25%' },
+  { id: 'r_frostgem',    icon: '❄️', name: '寒霜宝石', desc: '击坠 25% 概率触发寒霜脉冲(全场减速 1.5 秒)' },
+  { id: 'r_dice',        icon: '🎲', name: '命运骰子', desc: '击坠 10% 概率掉落随机道具' }
 ];
 
 /* 无尽模式波次词缀:第 6 波起概率出现(BOSS 波除外) */
@@ -265,6 +271,7 @@ class Game {
     this.evo = {}; this.bulletFreezeT = 0;
     this.relics = {}; this.pendingRelic = false; this._relicMode = false; this._relicChoices = [];
     this.augments = {}; this._cometT = 0; this._coilT = 0; this._ammoT = 0; // 海克斯大乱斗:符文与计时器
+    this._forceRelicDrop = false; this._phoenixUsed = false;
     this.levelupCooldown = 0;
     this.waveMod = null; this._env = { hpMul: 1, spdMul: 1, fireMul: 1 };
     this._recalc();
@@ -292,7 +299,7 @@ class Game {
     const load = Shop.consumeLoadout();
     if (load.bomb2) this.player.bombs = Math.min(5, this.player.bombs + 1);
     if (load.lv3) this.pendingLevels += 2;
-    if (load.relic5) this._relicFive = true;
+    if (load.relic5) { this._relicFive = true; this._forceRelicDrop = true; } // 情报网络:首艘旗舰必掉 + 连战五选一
     if (load.bomb2 || load.lv3 || load.relic5)
       this._addFloat(new FloatText(this.player.x, this.player.y - 40, '出击准备生效', '#ffd166', 13));
     this._showState();
@@ -473,10 +480,11 @@ class Game {
     p.speed = (sh.speed || 330) * Math.pow(1.10, m.speed || 0) * (A.a_engine ? 1.2 : 1) * (E.speed ? 1.25 : 1);
     p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 45;
     if (E.magnet) p.magnetR *= 1.8;
+    if (this.relics.r_magnet) p.magnetR *= 1.6;
     // 经验调校 + 经验风暴周变异
     this.xpMult = (1 + 0.15 * (m.xpchip || 0) + 0.04 * boostLevel('xp10')) * (this._mut && this._mut.id === 'surge' ? 1.5 : 1)
-      * (A.a_scav ? 1.4 : 1) * (E.xpchip ? 1.4 : 1) * (this.mode === 'mayhem' ? 1.5 : 1); // 「拾荒者」符文;大乱斗节奏福利 +50%
-    this.comboWindow = 2 + 0.7 * (m.combo || 0) + (E.combo ? 2 : 0);
+      * (A.a_scav ? 1.4 : 1) * (E.xpchip ? 1.4 : 1) * (this.relics.r_sage ? 1.25 : 1) * (this.mode === 'mayhem' ? 1.5 : 1); // 「拾荒者」符文;大乱斗节奏福利 +50%
+    this.comboWindow = 2 + 0.7 * (m.combo || 0) + (E.combo ? 2 : 0) + (this.relics.r_frenzy ? 1 : 0);
     p.shieldInterval = Math.max(3, (this.bonds.includes('fortress') ? 6 : 12) - (m.shieldgen || 0)); // 护盾发生器每级充能 -1 秒
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
     const timePerStack = this.bonds.includes('chrono') ? 0.16 : 0.10;
@@ -1661,6 +1669,13 @@ class Game {
       }
       AudioSys.beam();
     }
+    // 寒霜宝石:25% 概率触发寒霜脉冲(未处于寒霜时)
+    if (this.relics.r_frostgem && this.buffs.frost <= 0 && RNG() < 0.25) {
+      this.buffs.frost = 1.5;
+      this.rings.push(new Ring(e.x, e.y, '#aef0ff', 80, 0.4));
+    }
+    // 命运骰子:10% 概率掉落随机道具
+    if (this.relics.r_dice && RNG() < 0.10) this._dropPower(e.x, e.y);
     this.stats.kills = this._stat('kills', 0) + 1;
     this.waveKills++;
     this.runKills++;
@@ -1756,9 +1771,17 @@ class Game {
     this.waveKills++;
     this._bestiaryKill('boss_' + b.variant);
     if (typeof DailyTasks !== 'undefined') DailyTasks.bump('boss', 1, this);
-    // 旗舰奖励:击毁后获得一次额外升级机会 + 一件遗物三选一
+    // 旗舰奖励:击毁后获得一次额外升级机会;遗物按模式分发——
+    // 连战:每阶段必得遗物三选一(模式核心承诺);其余:5%~10%(随波次)概率掉落未知圣遗物
     this.pendingLevels++;
-    this.pendingRelic = true;
+    if (this.mode === 'boss') {
+      this.pendingRelic = true;
+    } else if (this._forceRelicDrop || RNG() < 0.05 + Math.min(0.05, this.wave * 0.002)) {
+      this._forceRelicDrop = false;
+      this.powerups.push(new PowerUp(b.x, b.y - 20, 'relic'));
+      this._addFloat(new FloatText(b.x, b.y - 54, '✦ 圣遗物坠落!', '#ffd166', 15));
+      AudioSys.record();
+    }
     if (this.state === 'playing' && this.player.alive) this.openLevelup();
     Ach.unlock('boss_1', this);
     if (this.stats.bossKills >= 5) Ach.unlock('boss_5', this);
@@ -1835,6 +1858,29 @@ class Game {
         this.score += 300;
         this._addFloat(new FloatText(p.x, p.y - 24, '+300', '#ffd166'));
       }
+    } else if (type === 'relic') {
+      // 圣遗物:随机授予一件未拥有遗物,伴随闪光动画与横幅播报;已集齐则转化为高额奖励分
+      const avail = RELICS.filter(r0 => !this.relics[r0.id]);
+      if (!avail.length) {
+        this.score += 1000;
+        this._addFloat(new FloatText(p.x, p.y - 24, '遗物已集齐 +1000', '#ffd166', 13));
+      } else {
+        const r0 = avail[Math.floor(RNG() * avail.length)];
+        this.relics[r0.id] = true;
+        this.rings.push(new Ring(p.x, p.y, '#ffd166', 220, 0.9));
+        this.rings.push(new Ring(p.x, p.y, '#fff6cf', 150, 0.6));
+        this.rings.push(new Ring(p.x, p.y, '#ffd166', 90, 0.45));
+        for (let i = 0; i < 26; i++) {
+          const a = rand(0, TAU);
+          this._sparks(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, '#ffe98a', 2);
+        }
+        this.flashT = 0.25; this.flashColor = 'rgba(255,220,130,';
+        this.shake(6, 0.3);
+        this.banner = { text: '✦ 圣遗物 · ' + r0.name, sub: r0.desc, life: 2.8, max: 2.8, gold: true };
+        AudioSys.record();
+        this._recalc();
+        if (r0.id === 'r_belt') this.player.hp = this.player.maxHp;
+      }
     } else if (type === 'x2') {
       this.buffs.x2 = 10;
       this._addFloat(new FloatText(p.x, p.y - 24, '×2 双倍得分!', '#ffd166'));
@@ -1896,6 +1942,17 @@ class Game {
     this._explode(p.x, p.y, 16, '#7ef3ff', 1.4);
     this._thornBlast();
     if (p.hp <= 0) {
+      // 不死鸟羽:每局一次,致死伤害时以 30% 生命浴火重生
+      if (this.relics.r_phoenix && !this._phoenixUsed) {
+        this._phoenixUsed = true;
+        p.hp = Math.max(1, Math.round(p.maxHp * 0.3));
+        p.invuln = 2.0;
+        this.enemyBullets.length = 0;
+        this.rings.push(new Ring(p.x, p.y, '#ff9a3c', 240, 0.7));
+        this._addFloat(new FloatText(p.x, p.y - 30, '🪶 浴火重生!', '#ff9a3c', 16));
+        AudioSys.record();
+        return;
+      }
       // 不屈意志:每局一次,保留 1 点生命并清除全屏弹幕
       if (this.mods.undying && (p.undyingCount || 0) < (this.evo.undying ? 2 : 1)) {
         p.undyingCount = (p.undyingCount || 0) + 1;

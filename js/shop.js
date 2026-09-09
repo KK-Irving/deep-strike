@@ -84,7 +84,7 @@ function boostLevel(id) {
 const LOADOUTS = [
   { id: 'bomb2',  icon: '💣', name: '出击弹药', desc: '下次出击炸弹 +1', price: 15 },
   { id: 'lv3',    icon: '⬆', name: '紧急改装', desc: '下次出击立即获得 2 次强化选择', price: 25 },
-  { id: 'relic5', icon: '👑', name: '情报网络', desc: '下次出击首件遗物五选一', price: 40 }
+  { id: 'relic5', icon: '👑', name: '情报网络', desc: '下次出击首艘旗舰必掉圣遗物(连战中为五选一)', price: 40 }
 ];
 
 const Shop = {

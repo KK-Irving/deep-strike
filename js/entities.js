@@ -1355,7 +1355,8 @@ class PowerUp {
     x2: { color: '#ffd166', label: '×2' },
     frenzy: { color: '#ff9a3c', label: 'F' },
     frost: { color: '#aef0ff', label: '❄' },
-    magstorm: { color: '#c86bff', label: 'M' }
+    magstorm: { color: '#c86bff', label: 'M' },
+    relic: { color: '#ffd166', label: '✦' }
   };
   constructor(x, y, type) {
     this.x = x; this.y = y; this.type = type;
@@ -1384,6 +1385,24 @@ class PowerUp {
     const s = 1 + Math.sin(this.t * 6) * 0.05;
     ctx.save();
     ctx.translate(this.x, this.y);
+    if (this.type === 'relic') {
+      // 圣遗物:旋转四芒光辉 + 呼吸脉冲,与普通道具区分
+      const pul = 1 + Math.sin(this.t * 4) * 0.18;
+      ctx.save();
+      ctx.rotate(this.t * 1.6);
+      ctx.strokeStyle = 'rgba(255, 220, 130, 0.75)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 14 * pul, Math.sin(a) * 14 * pul);
+        ctx.lineTo(Math.cos(a) * 24 * pul, Math.sin(a) * 24 * pul);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.shadowColor = '#ffd166';
+      ctx.shadowBlur = 16;
+    }
     ctx.scale(s, s);
     ctx.drawImage(spr.c, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
     ctx.restore();
