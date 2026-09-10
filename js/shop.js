@@ -129,6 +129,8 @@ const Shop = {
   pityRare: 0,        // 距上次稀有+的抽数(10 抽保底)
   pityEpic: 0,        // 距上次绚丽(episode/mythic)的抽数(40 抽保底)
   loadout: {},        // 出击准备:待生效的战前增益 {bomb2:1, lv3:1, relic5:1}
+  scrap: 0,           // 旗舰残骸(改装件合成材料)
+  tunings: {},        // 改装件等级 {armorT:0~3, wingT:0~3, sideT:0~3}
 
   load() {
     try {
@@ -145,6 +147,8 @@ const Shop = {
       this.pityRare = +localStorage.getItem('deepstrike.pityRare') || 0;
       this.pityEpic = +localStorage.getItem('deepstrike.pityEpic') || 0;
       this.loadout = JSON.parse(localStorage.getItem('deepstrike.loadout')) || {};
+      this.scrap = +localStorage.getItem('deepstrike.scrap') || 0;
+      this.tunings = JSON.parse(localStorage.getItem('deepstrike.tunings')) || {};
     } catch (e) { /* 忽略 */ }
     if (!this.ownedShip.vanguard) this.ownedShip.vanguard = true;
     if (!this.ownedShip[this.equippedShip]) this.equippedShip = 'vanguard';
@@ -193,6 +197,8 @@ const Shop = {
       localStorage.setItem('deepstrike.pityRare', String(this.pityRare));
       localStorage.setItem('deepstrike.pityEpic', String(this.pityEpic));
       localStorage.setItem('deepstrike.loadout', JSON.stringify(this.loadout));
+      localStorage.setItem('deepstrike.scrap', String(this.scrap));
+      localStorage.setItem('deepstrike.tunings', JSON.stringify(this.tunings));
     } catch (e) { /* 忽略 */ }
   },
 
@@ -352,6 +358,47 @@ const Shop = {
     this.offlineTick();
     if (info.gain > 0) this.addCrystal(info.gain);
     return info;
+  },
+
+  /* ---------------- 改装工坊(Phase 4.5) ---------------- */
+  /* 三槽位持久改装件:装甲(生存)/僚机(爆发)/副武器(清场),各 3 级 */
+  TUNINGS: [
+    { id: 'armorT', icon: '🛡', name: '复合装甲改装', flow: '生存',
+      lv: ['受到伤害 -6%', '生命上限 +20', '受击后回复 3 生命'],
+      scrap: [6, 14, 28], crystal: [900, 2200, 4800] },
+    { id: 'wingT', icon: '🛰', name: '僚机强化改装', flow: '爆发',
+      lv: ['僚机伤害 +15%', '+1 架僚机', '僚机射速 +15%'],
+      scrap: [6, 14, 28], crystal: [900, 2200, 4800] },
+    { id: 'sideT', icon: '◎', name: '副武器挂架', flow: '清场',
+      lv: ['侧翼弹 +1 对', '炸弹伤害 +4', '侧翼弹获得 1 次贯穿'],
+      scrap: [6, 14, 28], crystal: [900, 2200, 4800] }
+  ],
+  addScrap(n) {
+    this.scrap += n;
+    this.save();
+  },
+  tuningLv(id) { return this.tunings[id] || 0; },
+  tuningInfo(id) {
+    const def = this.TUNINGS.find(x => x.id === id);
+    const lv = this.tuningLv(id);
+    const maxed = lv >= 3;
+    return {
+      def, lv, maxed,
+      nextScrap: maxed ? 0 : def.scrap[lv],
+      nextCrystal: maxed ? 0 : def.crystal[lv],
+      nextDesc: maxed ? '' : def.lv[lv]
+    };
+  },
+  buyTuning(id) {
+    const info = this.tuningInfo(id);
+    if (!info.def || info.maxed) return { ok: false, msg: '已达最高改装等级' };
+    if (this.scrap < info.nextScrap) return { ok: false, msg: '残骸不足' };
+    if (this.crystal < info.nextCrystal) return { ok: false, msg: '星晶不足' };
+    this.scrap -= info.nextScrap;
+    this.crystal -= info.nextCrystal;
+    this.tunings[id] = info.lv + 1;
+    this.save();
+    return { ok: true, lv: info.lv + 1 };
   },
 
   consumeLoadout() {

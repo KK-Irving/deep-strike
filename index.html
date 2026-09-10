@@ -23,12 +23,21 @@
       <button id="btnBoss" class="menu-btn">▸ 旗舰连战 <i>B</i></button>
       <button id="btnMayhem" class="menu-btn">▸ 海克斯大乱斗 <i>L</i></button>
       <button id="btnCampaign" class="menu-btn">▸ 深空远征 <i>C</i></button>
+      <button id="btnTuning" class="menu-btn">▸ 改装工坊 <i>残骸 <b id="scrapHint">0</b></i></button>
       <button id="btnShop" class="menu-btn">▸ 机库商城 <i>G</i></button>
       <button id="btnHelp" class="menu-btn">▸ 玩法说明 <i>H</i></button>
       <button id="btnStats" class="menu-btn">▸ 战绩档案 <i>T</i></button>
       <button id="btnHard" class="menu-btn">▸ 高难模式:关 <i>星晶×1.5</i></button>
     </div>
     <div class="hint">击落敌机拾取道具,连击提升得分倍率 · 每 5 波遭遇旗舰 BOSS<br>触屏:单指拖动移动并连发,双指点按放炸弹</div>
+    <div id="menuTuning" class="menu-page hidden">
+      <div class="panel scroll">
+        <div class="sec-title">改 装 工 坊</div>
+        <div class="hint" style="margin-bottom:10px">击毁旗舰掉落<b style="color:#ffd166">残骸</b>(连战每阶段 +2)· 以 残骸 + 星晶 合成三槽位持久改装件(局外生效,与局内圣遗物互补)</div>
+        <div id="tuningList" class="menu-btns"></div>
+        <button class="menu-btn" id="btnTuningBack">▸ 返回 <i>Esc</i></button>
+      </div>
+    </div>
     <div id="menuCampaign" class="menu-page hidden">
       <div class="panel scroll">
         <div class="sec-title">深 空 远 征</div>

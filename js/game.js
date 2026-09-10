@@ -148,6 +148,7 @@ class Game {
       taskPanel: document.getElementById('taskPanel'),
       offlinePanel: document.getElementById('offlinePanel'),
       menuCampaign: document.getElementById('menuCampaign'),
+      menuTuning: document.getElementById('menuTuning'),
       btnHard: document.getElementById('btnHard'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
@@ -507,14 +508,15 @@ class Game {
     const glassHp = m.glass ? (E.glass ? 1 - 0.04 * m.glass : 1 - 0.08 * m.glass) : 1; // 玻璃大炮:逐级 -8%,进化后惩罚减半
     p.maxHp = Math.round(((sh.hp || 100) + 20 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
       + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0)) * glassHp * (A.a_glass ? 0.75 : 1));
-    p.armorPct = Math.min(E.armor ? 0.62 : 0.5, 0.08 * (m.armor || 0) + (E.armor ? 0.12 : 0) + (sh.perkArmor || 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 装甲每级 -8%;泰坦装甲 +12% 并抬上限
+    p.armorPct = Math.min(E.armor ? 0.62 : 0.5, 0.08 * (m.armor || 0) + (E.armor ? 0.12 : 0) + (sh.perkArmor || 0) + (this.tuningLv('armorT') >= 1 ? 0.06 : 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 装甲每级 -8%;泰坦装甲 +12% 并抬上限;装甲改装 I -6%
     p.regenRate = 0.4 * (m.regen || 0) * (E.regen ? 2 : 1) + (A.a_medic ? 1.5 : 0);
     p.leechPer = 0.45 * (m.leech || 0) + (A.a_leech ? 1 : 0);
     if (E.leech) p.leechPer *= 2; // 血之盛宴
     if (p.devilCost) { p.maxHp = Math.max(1, p.maxHp - p.devilCost); p.hp = Math.min(p.hp, p.maxHp); } // 恶魔契约:生命上限献祭
+    if (this.tuningLv('armorT') >= 2) p.maxHp += 20; // 装甲改装 II
     p.hp = Math.min(p.hp, p.maxHp);
     // 幻影僚机:数量同步
-    const wingTarget = (m.wingman || 0) + (A.a_army ? 2 : 0) + (E.wingman ? 2 : 0); // 「分身军团」/幽灵中队:+2 不占槽位
+    const wingTarget = (m.wingman || 0) + (A.a_army ? 2 : 0) + (E.wingman ? 2 : 0) + (this.tuningLv('wingT') >= 2 ? 1 : 0); // 「分身军团」/幽灵中队/僚机改装 II:+1 不占槽位
     while (this.wingmen.length < wingTarget) this.wingmen.push(new Wingman(this.wingmen.length));
     while (this.wingmen.length > wingTarget) this.wingmen.pop();
     if (m.shieldgen && !p.shield && p.shieldCd <= 0) p.shieldCd = p.shieldInterval;
@@ -1684,6 +1686,7 @@ class Game {
       const a = i / 15 * TAU;
       this.orbs.push(new XPOrb(b.x + Math.cos(a) * 40, b.y + Math.sin(a) * 24, 4));
     }
+    Shop.addScrap(this.mode === 'boss' ? 2 : 1); // 旗舰残骸(改装件材料)
     // 深空远征:第 5 波旗舰击毁即章节结算
     if (this.mode === 'campaign' && this.wave === 5) {
       this._campKills += this.waveKills;
@@ -1814,6 +1817,10 @@ class Game {
     const brittleTaken = this.mods.brittle ? 1 + (this.evo.brittle ? 0.05 : 0.10) * this.mods.brittle : 1;
     if (this.mode === 'campaign' && !p.shield) this._campClean = false; // 三星:无伤条件(护盾抵挡不算破金身)
     const real = Math.max(1, Math.round(dmg * (1 - p.armorPct) * brittleTaken));
+    if (this.tuningLv('armorT') >= 3 && p.hp < p.maxHp) { // 装甲改装 III:受击回复
+      p.hp = Math.min(p.maxHp, p.hp + 3);
+      this._addFloat(new FloatText(p.x, p.y - 20, '+3', '#51e08a', 11));
+    }
     p.hp -= real;
     this.waveDamageTaken++;
     this.combo = 0;
@@ -1882,6 +1889,8 @@ class Game {
   /* ---------------- 炸弹 ---------------- */
   /* 炸弹携带上限:龙魂遗物 +2、「弹药库」海克斯强化 +2 */
   bombCap() { return (this.relics.r_dragon ? 7 : 5) + ((this.augments && this.augments.a_ammo) ? 2 : 0) + Math.floor(boostLevel('cap0') / 2); }
+  /* 改装件等级(局外持久,改装工坊) */
+  tuningLv(id) { return (typeof Shop !== 'undefined' && Shop.tuningLv(id)) || 0; }
 
   tryBomb() {
     if (this.state !== 'playing' || !this.player.alive) return;
@@ -1901,7 +1910,7 @@ class Game {
     for (const b of this.enemyBullets) this._sparks(b.x, b.y, '#9fe8ff', 3);
     this.enemyBullets.length = 0;
     const nuke = this.augments && this.augments.a_nuke;
-    const bombDmg = (this.relics.r_dragon ? 23 : 8) * (nuke ? 4 : 1);
+    const bombDmg = (this.relics.r_dragon ? 23 : 8) * (nuke ? 4 : 1) + (this.tuningLv('sideT') >= 2 ? 4 : 0);
     for (const e of this.enemies) e.damage(bombDmg, this);
     for (const a of this.asteroids) a.damage(6, this);
     if (this.boss) {

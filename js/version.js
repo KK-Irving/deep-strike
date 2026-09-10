@@ -1,3 +1,3 @@
 'use strict';
 /* 游戏版本号 — 随每次迭代提交递增 */
-window.GAME_VERSION = 'v2.0.0';
+window.GAME_VERSION = 'v2.1.0';

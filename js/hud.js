@@ -61,6 +61,35 @@ Object.assign(Game.prototype, {
       return !!b && b.state === 'fight' && b.fireCd > 0 && b.fireCd < 0.55
         && (b.variant === 'dread' || (b.variant === 'tyrant' && b.phase === 0));
     },
+    _renderTuning() {
+      const el = document.getElementById('tuningList');
+      if (!el) return;
+      el.innerHTML = '';
+      for (const def of Shop.TUNINGS) {
+        const info = Shop.tuningInfo(def.id);
+        const btn = document.createElement('button');
+        btn.className = 'menu-btn';
+        btn.style.cssText = 'flex-basis:100%;text-align:left;font-size:13px';
+        const lvRow = def.lv.map((txt, i) => '<i class="' + (i < info.lv ? 'got' : '') + '" style="font-style:normal;opacity:' + (i < info.lv ? 1 : 0.55) + '">Lv' + (i + 1) + ' ' + txt + '</i>').join('<br>');
+        btn.innerHTML = '▸ ' + def.icon + ' ' + def.name + '(' + def.flow + '流) <i style="float:right;color:#ffd166">Lv' + info.lv + '/3</i><br>' +
+          '<span style="font-size:11.5px;opacity:0.85">' + lvRow + '</span><br>' +
+          (info.maxed
+            ? '<span style="font-size:12px;color:#51e08a">已满改</span>'
+            : '<span style="font-size:12px;color:#ffd166">下一级:' + info.nextDesc + ' · 需 残骸×' + info.nextScrap + ' + ' + info.nextCrystal + '★</span>');
+        btn.addEventListener('click', () => {
+          const res = Shop.buyTuning(def.id);
+          if (res.ok) { AudioSys.bond(); game._addFloat && 0; }
+          btn.blur();
+          game.showMenuPanel('tuning');
+        });
+        el.appendChild(btn);
+      }
+      const scrapRow = document.createElement('div');
+      scrapRow.className = 'hint';
+      scrapRow.style.marginTop = '10px';
+      scrapRow.textContent = '当前残骸:' + (Shop.scrap || 0);
+      el.appendChild(scrapRow);
+    },
     _renderCampaignList() {
       const st = (function () { try { return JSON.parse(localStorage.getItem('deepstrike.campaign')) || {}; } catch (e) { return {}; } })();
       const el = document.getElementById('campaignList');
@@ -121,16 +150,19 @@ Object.assign(Game.prototype, {
       if (this.state === 'menu') {
         d.menuMain.classList.toggle('hidden', this.menuPanel !== 'main');
         d.menuCampaign.classList.toggle('hidden', this.menuPanel !== 'campaign');
+        d.menuTuning.classList.toggle('hidden', this.menuPanel !== 'tuning');
         d.menuHelp.classList.toggle('hidden', this.menuPanel !== 'help');
         d.menuStats.classList.toggle('hidden', this.menuPanel !== 'stats');
         d.menuShop.classList.toggle('hidden', this.menuPanel !== 'shop');
         if (this.menuPanel === 'main') {
           this._refreshTasks();
           this._renderOffline();
-          d.menuCampaign.classList.toggle('hidden', this.menuPanel !== 'campaign');
-          if (this.menuPanel === 'campaign') this._renderCampaignList();
+          const scrapHint = document.getElementById('scrapHint');
+          if (scrapHint) scrapHint.textContent = Shop.scrap || 0;
           if (d.btnHard) d.btnHard.innerHTML = '▸ 高难模式:' + (this.hard ? '开' : '关') + ' <i>星晶×1.5</i>';
         }
+        if (this.menuPanel === 'campaign') this._renderCampaignList();
+        if (this.menuPanel === 'tuning') this._renderTuning();
         if (this.menuPanel === 'shop') Shop.renderPanel();
       }
     },

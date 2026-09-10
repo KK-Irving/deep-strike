@@ -87,6 +87,7 @@
       if (e.code === 'KeyB') game.start('boss');
       if (e.code === 'KeyL') game.start('mayhem');
       if (e.code === 'KeyC') game.showMenuPanel('campaign');
+      if (e.code === 'KeyU') game.showMenuPanel('tuning');
       if (e.code === 'KeyG') game.showMenuPanel('shop');
       if (e.code === 'KeyH') game.showMenuPanel('help');
       if (e.code === 'KeyT') game.showMenuPanel('stats');
@@ -116,6 +117,8 @@
   $('btnMayhem').addEventListener('click', () => { AudioSys.init(); game.start('mayhem'); });
   $('btnCampaign').addEventListener('click', () => game.showMenuPanel('campaign'));
   $('btnCampaignBack').addEventListener('click', () => game.showMenuPanel('main'));
+  $('btnTuning').addEventListener('click', () => game.showMenuPanel('tuning'));
+  $('btnTuningBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnRestart').addEventListener('click', () => { AudioSys.init(); game.start(); });
   $('btnResume').addEventListener('click', () => game.togglePause());
   $('btnRestart2').addEventListener('click', () => { AudioSys.init(); game.start(game.mode); });

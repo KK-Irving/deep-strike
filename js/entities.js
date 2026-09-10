@@ -467,9 +467,11 @@ class Player {
     if (game.bonds.includes('suppress')) sideN += 2;
     if (game.shipDef && game.shipDef.perkSide) sideN += game.shipDef.perkSide;
     if (game.evo.side) sideN += 2; // 双子侧翼
+    if (game.tuningLv('sideT') >= 1) sideN += 1; // 副武器挂架 I
+    const sidePierce = pierce + (game.tuningLv('sideT') >= 3 ? 1 : 0) + (game.evo.side ? 1 : 0);
     for (let i = 1; i <= sideN; i++) {
       const vx = 95 + i * 55;
-      const sideExtra = game.evo.side ? { pierce: pierce + 1 } : null;
+      const sideExtra = sidePierce !== pierce ? { pierce: sidePierce } : null;
       mk(-10, -4, -vx, -500, sideExtra);
       mk(10, -4, vx, -500, sideExtra);
     }
@@ -1500,7 +1502,7 @@ class Wingman {
     this.y = p.y + Math.sin(a) * 36 - 4;
     this.fireCd -= dt;
     if (this.fireCd <= 0) {
-      this.fireCd = 0.85;
+      this.fireCd = 0.85 * (game.tuningLv('wingT') >= 3 ? 0.87 : 1); // 僚机强化改装 III:射速 +15%
       // 索敌:最近的敌机/BOSS
       let tx = null, ty = 0, best = 340 * 340;
       for (const e of game.enemies) {
@@ -1516,8 +1518,8 @@ class Wingman {
         const aim = Math.atan2(ty - this.y, tx - this.x);
         const missile = game.bonds.includes('squad');
         game.playerBullets.push(missile
-          ? { x: this.x, y: this.y, vx: Math.cos(aim) * 300, vy: Math.sin(aim) * 300, r: 4, dmg: Math.round((2 + game.player.dmgBonus + (game.evo.wingman ? 1 : 0)) * (game.player.dmgMul || 1)), color: '#ffd166', dead: false, homing: true, life: 2.2, pierce: 0, split: 0 }
-          : { x: this.x, y: this.y, vx: Math.cos(aim) * 480, vy: Math.sin(aim) * 480, r: 2.6, dmg: Math.round((1 + game.player.dmgBonus + (game.evo.wingman ? 1 : 0)) * (game.player.dmgMul || 1)), color: '#9ffcf0', dead: false, pierce: 0, split: 0 });
+          ? { x: this.x, y: this.y, vx: Math.cos(aim) * 300, vy: Math.sin(aim) * 300, r: 4, dmg: Math.round((2 + game.player.dmgBonus + (game.evo.wingman ? 1 : 0)) * (game.tuningLv('wingT') >= 1 ? 1.15 : 1) * (game.player.dmgMul || 1)), color: '#ffd166', dead: false, homing: true, life: 2.2, pierce: 0, split: 0 }
+          : { x: this.x, y: this.y, vx: Math.cos(aim) * 480, vy: Math.sin(aim) * 480, r: 2.6, dmg: Math.round((1 + game.player.dmgBonus + (game.evo.wingman ? 1 : 0)) * (game.tuningLv('wingT') >= 1 ? 1.15 : 1) * (game.player.dmgMul || 1)), color: '#9ffcf0', dead: false, pierce: 0, split: 0 });
         AudioSys.missile();
       }
     }
