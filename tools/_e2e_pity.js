@@ -22,12 +22,19 @@ const t = H.suite('密匣保底');
     let res = Shop._boxDropBoosted(0);
     out.epicPity = res.tier === 'epic' || res.tier === 'mythic';
     out.epicReset = Shop.pityEpic === 0 && Shop.pityRare === 0;
-    // 2) 10 抽保底:构造 9 抽未出稀有+,下一抽必为稀有以上
-    Shop.pityEpic = 0; Shop.pityRare = 9;
-    res = Shop._boxDropBoosted(0);
-    out.rarePity = ['rare', 'epic', 'mythic'].includes(res.tier);
-    out.rareEpicCounter = Shop.pityEpic; // 稀有命中时 epic 计数应 +1(=1)
-    out.rareReset = Shop.pityRare === 0;
+    // 2) 10 抽保底:构造 9 抽未出稀有+,下一抽必为稀有以上。
+    //    注意:保底只保证 rare+;若该抽自然 roll 出 epic/mythic(约 3.5%),
+    //    epic 计数会被重置而非累加 —— 因此重试到"恰好落在 rare"的样本再断言
+    //    (rare+ 中 rare 占 96.5%,100 次尝试未命中的概率可忽略)
+    let rareEpic = null;
+    for (let i = 0; i < 100 && rareEpic === null; i++) {
+      Shop.pityEpic = 0; Shop.pityRare = 9;
+      res = Shop._boxDropBoosted(0);
+      out.rarePity = ['rare', 'epic', 'mythic'].includes(res.tier);
+      out.rareReset = Shop.pityRare === 0;
+      if (res.tier === 'rare') rareEpic = Shop.pityEpic; // 稀有命中时 epic 计数应 +1(=1)
+    }
+    out.rareEpicCounter = rareEpic === null ? -1 : rareEpic;
     // 3) 普通低抽计数:junk 累加双计数
     Shop.pityEpic = 0; Shop.pityRare = 0;
     let junkN = 0;

@@ -31,9 +31,10 @@
 ## 项目速览
 
 - 纯前端零依赖 Canvas 射击游戏:双击 `index.html` 即可运行;`python tools/serve.py` 为无缓存开发服务器。
-- 模块:`js/game.js`(核心状态机/波次/碰撞/HUD)、`entities.js`(实体与精灵预渲染)、
-  `shop.js`(商城/密匣/兑换)、`upgrades.js`(卡池/羁绊/抽卡)、`achievements.js`(成就)、
-  `audio.js`(WebAudio 合成)、`main.js`(引导/输入/主循环)。
+- 模块:`js/game.js`(核心状态机/碰撞/经验升级/掉落/成就评估)、`waves.js`(波次导演:出怪队列与
+  挑战重播种)、`hud.js`(画布渲染与 DOM 面板,经 Object.assign 挂到 Game.prototype,加载序在 game.js 后)、
+  `entities.js`(实体与精灵预渲染)、`shop.js`(商城/密匣/兑换)、`upgrades.js`(卡池/羁绊/抽卡)、
+  `achievements.js`(成就)、`audio.js`(WebAudio 合成)、`main.js`(引导/输入/主循环)。
 - **每日/周挑战确定性(重要约束,分层契约)**:
   1. **跨设备确定(必须)**:种子基准按日期/周号派生,`startWave(n)` 按波、`_drawChoices` 按抽卡序号
      各自派生独立子流 ⇒ 波次构成(`spawnQueue`/配额/词缀)与出卡序列是 `(种子, 波号/序号)` 的纯函数,

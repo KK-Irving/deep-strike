@@ -562,12 +562,17 @@ const Shop = {
     }
   },
 
-  /* 当前装备的绚丽动效描述:{ anim, accent, dual, tier } 或 null(普通皮肤/机体无动效) */
+  /* 当前装备的绚丽动效描述:{ anim, accent, dual, tier } 或 null(普通皮肤/机体无动效)。
+   * Player.draw 每帧调用:按装备键记忆化,装备未变时零查找零分配 */
   activeFx() {
-    const sp = this.shipSprite();
-    if (!sp || !sp.anim || (sp.tier || 0) < 3) return null;
-    const fx = sp.fx || {};
-    return { anim: sp.anim, accent: sp.accent, dual: fx.dual || sp.accent, tier: sp.tier };
+    const key = this.equipped + '|' + this.equippedShip;
+    if (this._fxKey !== key) {
+      const sp = this.shipSprite();
+      const fx = (sp && sp.anim && (sp.tier || 0) >= 3) ? (sp.fx || {}) : null;
+      this._fxKey = key;
+      this._fxVal = fx ? { anim: sp.anim, accent: sp.accent, dual: fx.dual || sp.accent, tier: sp.tier } : null;
+    }
+    return this._fxVal;
   },
 
   /* 商城面板渲染 */

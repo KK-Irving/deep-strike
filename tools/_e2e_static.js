@@ -107,8 +107,8 @@ const STREAM_ALLOW = new Set([
   'entities.js:Asteroid>constructor',
   'entities.js:Asteroid>damage',
   'entities.js:SupplyDrop>constructor',
-  // 波次导演:按波重播种,是"波次构成确定"的来源
-  'game.js:Game>startWave',
+  // 波次导演:按波重播种,是"波次构成确定"的来源(v1.9.3 起 startWave 位于 waves.js)
+  'waves.js:startWave',
   // 运行期玩法随机:每波重播种保证构成不受影响
   'game.js:Game>_openRelicChoice',
   'game.js:Game>update',                // 事件波(陨石/空投)按队列时间生成

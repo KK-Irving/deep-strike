@@ -549,6 +549,16 @@ class Player {
    *   storm  电磁风暴:环绕跳动的锯齿电弧 + 随机火花
    *   void   虚空卫星:暗色卫星绕行 + 拖影 + 中心吞噬脉动
    *   bloom  花神:绽放/收拢的多瓣光之花冠 + 花蕊流转 */
+  /* 渐变缓存:翅膀/花冠动效的渐变只依赖动效风格与配色(坐标为机体局部系或已平移到原点),
+   * 无需每帧重建。key 含 anim+配色,换装自动失效 */
+  _dazzleGrad(ctx, fx, key, make) {
+    if (!this._dazzleGrads) this._dazzleGrads = {};
+    const k = fx.anim + '|' + fx.accent + '|' + fx.dual + '|' + key;
+    let g = this._dazzleGrads[k];
+    if (!g) { g = make(ctx); this._dazzleGrads[k] = g; }
+    return g;
+  }
+
   _drawDazzle(ctx, fx) {
     const t = this.engine;
     const acc = fx.accent, dual = fx.dual;
@@ -625,9 +635,13 @@ class Player {
       const flap = 0.5 + Math.sin(t * 3) * 0.35;
       for (const side of [-1, 1]) {
         for (let f = 0; f < 3; f++) {
-          const grad = ctx.createLinearGradient(side * 4, 0, side * (18 + f * 8), 0);
-          grad.addColorStop(0, acc);
-          grad.addColorStop(1, 'rgba(255,60,0,0)');
+          // 渐变端点为固定局部坐标 → 缓存复用(原每帧 create 6 次)
+          const grad = this._dazzleGrad(ctx, fx, 'w' + side + '_' + f, (g) => {
+            const gr = g.createLinearGradient(side * 4, 0, side * (18 + f * 8), 0);
+            gr.addColorStop(0, acc);
+            gr.addColorStop(1, 'rgba(255,60,0,0)');
+            return gr;
+          });
           ctx.fillStyle = grad; ctx.globalAlpha = 0.65 - f * 0.12;
           const spread = (f - 1) * 0.5 + flap * 0.6;
           ctx.beginPath();
@@ -718,11 +732,18 @@ class Player {
         const a = t * 0.5 + i / petals * TAU;
         const reach = 12 + open * 14;
         const mx = Math.cos(a) * reach, my = Math.sin(a) * reach;
-        const grad = ctx.createRadialGradient(mx, my, 0, mx, my, 6);
-        grad.addColorStop(0, acc);
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        // 花瓣中心逐帧移动:平移到局部原点,径向渐变按原点缓存(原每帧 create 6 次)
+        ctx.save();
+        ctx.translate(mx, my);
+        const grad = this._dazzleGrad(ctx, fx, 'bloom', (g) => {
+          const gr = g.createRadialGradient(0, 0, 0, 0, 0, 6);
+          gr.addColorStop(0, acc);
+          gr.addColorStop(1, 'rgba(0,0,0,0)');
+          return gr;
+        });
         ctx.fillStyle = grad; ctx.globalAlpha = 0.5 + open * 0.4;
-        ctx.beginPath(); ctx.ellipse(mx, my, 4 + open * 2, 6 + open * 3, a, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0, 0, 4 + open * 2, 6 + open * 3, a, 0, TAU); ctx.fill();
+        ctx.restore();
       }
       // 花蕊流转
       ctx.globalAlpha = 0.9; ctx.fillStyle = dual;
