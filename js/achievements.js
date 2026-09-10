@@ -43,6 +43,7 @@ const ACHIEVEMENTS = [
   { id: 'daily',      cat: '挑战', name: '每日精英', stat: 'dailyBest',  pre: '每日挑战单局得分', tiers: [5000, 12000, 20000, 35000, 60000], rewards: [100, 200, 350, 500, 700] },
   { id: 'weekly',     cat: '挑战', name: '周榜之巅', stat: 'weeklyBest', pre: '周挑战单局得分', tiers: [10000, 20000, 30000, 45000, 70000], rewards: [100, 200, 350, 500, 700] },
   { id: 'games',      cat: '挑战', name: '身经百战', stat: 'games',      pre: '累计出击', unit: '局', tiers: [10, 30, 80, 200, 500], rewards: [50, 100, 250, 400, 600] },
+  { id: 'campaign',   cat: '挑战', name: '远征元帅', stat: 'campaignStars', pre: '远征章节星星', unit: '颗', tiers: [3, 6, 12, 20, 30], rewards: [100, 200, 350, 500, 800] },
   // ---- 收集 ----
   { id: 'relics',     cat: '收集', name: '圣遗物收藏', stat: 'relicsGot',  pre: '累计获得圣遗物', unit: '件', tiers: [1, 5, 12, 25, 45], rewards: [100, 200, 350, 500, 700] },
   { id: 'box',        cat: '收集', name: '开匣成瘾', stat: 'boxOpens',   pre: '累计开启密匣', unit: '次', tiers: [10, 50, 150, 400, 1000], rewards: [100, 200, 300, 450, 600] },

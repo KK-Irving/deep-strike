@@ -61,6 +61,23 @@ Object.assign(Game.prototype, {
       return !!b && b.state === 'fight' && b.fireCd > 0 && b.fireCd < 0.55
         && (b.variant === 'dread' || (b.variant === 'tyrant' && b.phase === 0));
     },
+    _renderCampaignList() {
+      const st = (function () { try { return JSON.parse(localStorage.getItem('deepstrike.campaign')) || {}; } catch (e) { return {}; } })();
+      const el = document.getElementById('campaignList');
+      if (!el) return;
+      el.innerHTML = '';
+      for (let ch = 1; ch <= CAMPAIGN_CHAPTERS; ch++) {
+        const unlocked = ch === 1 || (st[ch - 1] || 0) >= 1;
+        const stars = st[ch] || 0;
+        const btn = document.createElement('button');
+        btn.className = 'menu-btn' + (unlocked ? '' : ' locked');
+        btn.style.cssText = 'flex-basis:100%;text-align:left;font-size:13px' + (unlocked ? '' : ';opacity:0.45');
+        btn.innerHTML = (unlocked ? '▸' : '🔒') + ' 第 ' + ch + ' 章 · ' + BOSS_VARIANTS[CAMPAIGN_VARIANTS[(ch - 1) % 4]].name
+          + ' <i style="float:right;color:#ffd166">' + '★'.repeat(stars) + '☆'.repeat(3 - stars) + '</i>';
+        if (unlocked) btn.addEventListener('click', () => { AudioSys.init(); game.start('campaign', ch); });
+        el.appendChild(btn);
+      }
+    },
     _renderOffline() {
       const el = this._dom.offlinePanel;
       if (!el) return;
@@ -103,12 +120,15 @@ Object.assign(Game.prototype, {
       d.levelup.classList.toggle('hidden', this.state !== 'levelup');
       if (this.state === 'menu') {
         d.menuMain.classList.toggle('hidden', this.menuPanel !== 'main');
+        d.menuCampaign.classList.toggle('hidden', this.menuPanel !== 'campaign');
         d.menuHelp.classList.toggle('hidden', this.menuPanel !== 'help');
         d.menuStats.classList.toggle('hidden', this.menuPanel !== 'stats');
         d.menuShop.classList.toggle('hidden', this.menuPanel !== 'shop');
         if (this.menuPanel === 'main') {
           this._refreshTasks();
           this._renderOffline();
+          d.menuCampaign.classList.toggle('hidden', this.menuPanel !== 'campaign');
+          if (this.menuPanel === 'campaign') this._renderCampaignList();
           if (d.btnHard) d.btnHard.innerHTML = '▸ 高难模式:' + (this.hard ? '开' : '关') + ' <i>星晶×1.5</i>';
         }
         if (this.menuPanel === 'shop') Shop.renderPanel();

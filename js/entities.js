@@ -1125,10 +1125,10 @@ const bossVariant = (wave) => (
 );
 
 class Boss {
-  constructor(wave) {
+  constructor(wave, forceVariant) {
     this.wave = wave;
     this.isBoss = true;
-    this.variant = bossVariant(wave);
+    this.variant = forceVariant || bossVariant(wave);
     const storm = this.variant === 'storm', tyrant = this.variant === 'tyrant';
     this.x = W / 2; this.y = -90;
     this.r = 44;

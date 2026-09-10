@@ -447,3 +447,6 @@ h2 {
 .card.devil:hover { border-color: #c86bff; box-shadow: 0 10px 30px rgba(200, 107, 255, 0.4); }
 @keyframes devilPulse { 50% { box-shadow: 0 0 24px rgba(200, 107, 255, 0.5); } }
 .chip.devil-chip { color: #c86bff; border-color: rgba(200, 107, 255, 0.5); }
+
+/* ---- 深空远征章节列表 ---- */
+.menu-btn.locked { cursor: not-allowed; }

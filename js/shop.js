@@ -29,6 +29,7 @@ const SKINS = [
   { id: 'abyss',    name: '深渊指挥官',   ach: 'wave_20',  tier: 2, hull: '#06282a', stroke: '#2be8c8', cockpit: '#c8fff4', flame: ['rgba(80,230,200,0.9)', 'rgba(0,120,140,0)'], fx: { glow: 1.6, dual: '#7effe0', sheen: '#c8fff4', trail: 1.4 } },
   { id: 'evoProto', name: '进化原型机',   ach: 'evo_3',    tier: 1, hull: '#12240a', stroke: '#9dff5a', cockpit: '#e8ffd6', flame: ['rgba(157,255,90,0.9)', 'rgba(40,140,0,0)'], fx: { glow: 1.4, dual: '#e8ffd6' } },
   { id: 'phantomX', name: '幽灵X',        ach: 'boss_10',  tier: 2, hull: '#1a1a2e', stroke: '#8fa8ff', cockpit: '#dfe8ff', flame: ['rgba(143,168,255,0.8)', 'rgba(40,60,180,0)'], fx: { glow: 1.6, dual: '#c8d4ff', sheen: '#dfe8ff', trail: 1.3 } },
+  { id: 'voyager',  name: '远征·星辉',   price: 0, secret: true, tier: 2, hull: '#0c1030', stroke: '#9fdcff', cockpit: '#eaf6ff', flame: ['rgba(160,220,255,0.95)', 'rgba(90,120,255,0)'], desc: '★ 深空远征第 10 章首通限定', fx: { glow: 1.8, dual: '#ffd166', sheen: '#e8f4ff', trail: 1.6 } },
   { id: 'prism',    name: '棱镜绚彩',     rare: true, tier: 3, hull: '#2a0d3d', stroke: '#ff6ad5', cockpit: '#fff0fb', flame: ['rgba(255,106,213,0.95)', 'rgba(106,180,255,0)'], desc: '★绚丽·仅密匣/兑换获得 · 流转彩虹光环', fx: { glow: 2.2, dual: '#6ab4ff', sheen: '#ffffff', trail: 2.0, rainbow: true, anim: 'prism' } },
   { id: 'celestial',name: '天穹圣辉',     rare: true, tier: 3, hull: '#3a2f05', stroke: '#ffe66a', cockpit: '#fffbe0', flame: ['rgba(255,230,106,0.95)', 'rgba(255,140,0,0)'], desc: '★绚丽·仅密匣/兑换获得 · 环绕圣光轨道', fx: { glow: 2.4, dual: '#fff6cf', sheen: '#ffffff', trail: 2.2, halo: true, anim: 'halo' } },
   { id: 'singularity', name: '奇点', rare: true, tier: 3, hull: '#0d1030', stroke: '#7ea0ff', cockpit: '#e6ecff', flame: ['rgba(126,160,255,0.95)', 'rgba(60,0,160,0)'], desc: '★绚丽·仅密匣/兑换获得 · 引力吸积粒子', fx: { glow: 2.3, dual: '#c8a8ff', sheen: '#ffffff', trail: 2.1, anim: 'orbit' } },
@@ -234,7 +235,7 @@ const Shop = {
 
   buySkin(id) {
     const sk = SKINS.find(x => x.id === id);
-    if (!sk || sk.ach || sk.rare || this.owned[id]) return { ok: false, msg: '无法购买' };
+    if (!sk || sk.ach || sk.rare || sk.secret || this.owned[id]) return { ok: false, msg: '无法购买' };
     if (this.crystal < sk.price) return { ok: false, msg: '星晶不足' };
     this.crystal -= sk.price;
     this.owned[id] = true;

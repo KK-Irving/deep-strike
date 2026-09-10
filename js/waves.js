@@ -10,6 +10,11 @@
 Object.assign(Game.prototype, {
     startWave(n) {
       this.wave = n; this.waveTime = 0; this.spawnQueue = []; this.waveClearT = -1;
+      if (this.mode === 'campaign' && this._campPrev !== null) {
+        this._campKills += this._campPrevKills || 0;
+        this._campQuota += this._campPrevQuota || 0;
+      }
+      if (this.mode === 'campaign') { this._campPrev = n; this._campPrevKills = 0; this._campPrevQuota = 0; }
       this.waveKills = 0; this.trickleT = 0;
       if (typeof DailyTasks !== 'undefined') DailyTasks.bump('wave', n, this);
       // 挑战模式:按波派生独立子流——出怪序列/词缀只取决于日期种子与波号,
@@ -81,11 +86,16 @@ Object.assign(Game.prototype, {
       if (n % 5 === 0 || this.mode === 'boss') {
         this.waveQuota = 1; // 目标:击毁旗舰
         // 连战模式:第 k 阶段按虚拟波号 5k 构造旗舰(难度递增,变体自然轮换)
-        const vw = this.mode === 'boss' ? n * 5 : n;
-        const bname = BOSS_VARIANTS[bossVariant(vw)].name;
+        const cv = this.mode === 'campaign'
+          ? CAMPAIGN_VARIANTS[(this.campaignChapter - 1) % CAMPAIGN_VARIANTS.length]
+          : bossVariant(this.mode === 'boss' ? n * 5 : n);
+        const vw = this.mode === 'boss' ? n * 5
+          : this.mode === 'campaign' ? 12 + this.campaignChapter * 3
+          : n;
+        const bname = BOSS_VARIANTS[cv].name;
         this.banner = { text: '⚠ WARNING ⚠', sub: '目标:击毁' + bname, life: 2.2, max: 2.2, red: true };
         AudioSys.alarm();
-        this.spawnQueue.push({ boss: true, t: 2.0 });
+        this.spawnQueue.push({ boss: true, t: 2.0, variant: cv, vw });
         return;
       }
       this.banner = { text: 'WAVE ' + n, sub: '', life: 1.8, max: 1.8, red: false };

@@ -72,6 +72,11 @@ const RELICS = [
   { id: 'r_dice',        icon: '🎲', name: '命运骰子', desc: '击坠 10% 概率掉落随机道具' }
 ];
 
+/* 深空远征(章节战役):10 章固定变体轮换,难度随章递增(vw = 12 + 章×3) */
+const CAMPAIGN_VARIANTS = ['flag', 'storm', 'tyrant', 'dread'];
+const CAMPAIGN_CHAPTERS = 10;
+const CAMPAIGN_STORE = 'deepstrike.campaign';
+
 /* 无尽模式波次词缀:第 6 波起概率出现(BOSS 波除外) */
 const WAVE_MODS = [
   { id: 'horde',   icon: '✸', name: '狂潮', desc: '出怪配额 +40%' },
@@ -142,6 +147,7 @@ class Game {
       menuShop: document.getElementById('menuShop'),
       taskPanel: document.getElementById('taskPanel'),
       offlinePanel: document.getElementById('offlinePanel'),
+      menuCampaign: document.getElementById('menuCampaign'),
       btnHard: document.getElementById('btnHard'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
@@ -214,7 +220,8 @@ class Game {
       crystalBalance: (typeof Shop !== 'undefined' && Shop.crystal) || 0,
       collection: (typeof Shop !== 'undefined' ? Object.keys(Shop.owned || {}).length + Object.keys(Shop.ownedShip || {}).length : 0),
       bestiary: Object.keys(s.bestSeen || {}).length,
-      tasksDone: this._stat('tasksDone', 0)
+      tasksDone: this._stat('tasksDone', 0),
+      campaignStars: this.campaignStars()
     }, this);
   }
 
@@ -269,14 +276,16 @@ class Game {
     this.relics = {}; this.pendingRelic = false; this._relicMode = false; this._relicChoices = [];
     this.augments = {}; this._cometT = 0; this._coilT = 0; this._ammoT = 0; // 海克斯大乱斗:符文与计时器
     this._forceRelicDrop = false; this._phoenixUsed = false;
+    this._campKills = 0; this._campQuota = 0; this._campClean = true; this._campPrev = null; // 深空远征统计
     this._devilMode = false; this._devilChoices = []; this._devilPending = false;
     this.levelupCooldown = 0;
     this.waveMod = null; this._env = { hpMul: 1, spdMul: 1, fireMul: 1 };
     this._recalc();
   }
 
-  start(challengeMode) {
+  start(challengeMode, campaignChapter) {
     this.mode = challengeMode || 'normal';
+    if (this.mode === 'campaign') this.campaignChapter = Math.max(1, Math.min(CAMPAIGN_CHAPTERS, campaignChapter || this.campaignChapter || 1));
     // 每日/周挑战:播种固定波次序列与抽卡序列;周挑战威胁+1
     // 种子基准保留,供 startWave 按波派生与 _drawChoices 按抽卡序号派生
     Shop.offlineTick(); // 进入对局即起算新一轮离线补给
@@ -311,6 +320,7 @@ class Game {
     if (this.mode === 'weekly') this.banner = { text: '周挑战', sub: this._challengeKey() + (this._mut ? ' · ' + this._mut.icon + ' ' + this._mut.name + ':' + this._mut.desc : '') + ' · 威胁+1,冲击纪录', life: 3.0, max: 3.0, gold: true };
     if (this.mode === 'boss') this.banner = { text: '旗舰连战', sub: '连续击毁不断强化的旗舰 · 每阶段升级+遗物 · 每日芯片限领', life: 2.6, max: 2.6, gold: true };
     if (this.mode === 'mayhem') this.banner = { text: '海克斯大乱斗', sub: '经验/星晶 +50% · 出怪更凶 · 四轮海克斯强化三选一', life: 2.8, max: 2.8, gold: true };
+    if (this.mode === 'campaign') this.banner = { text: '深空远征 · 第 ' + this.campaignChapter + ' 章', sub: '5 波固守 · 击败' + BOSS_VARIANTS[CAMPAIGN_VARIANTS[(this.campaignChapter - 1) % 4]].name, life: 3.0, max: 3.0, gold: true };
   }
 
   /* ---- 每日挑战 ---- */
@@ -330,10 +340,28 @@ class Game {
     return isoYear + '-W' + String(week).padStart(2, '0');
   }
   _challengeKey() {
+    if (this.mode === 'campaign') return 'campaign-' + (this.campaignChapter || 1);
     return this.mode === 'weekly' ? this._weekKey() : this._dailyKey();
   }
-  /* 是否种子挑战模式(每日/周)——旗舰连战与普通模式使用真随机 */
-  isChallenge() { return this.mode === 'daily' || this.mode === 'weekly'; }
+  /* 是否种子挑战模式(每日/周/章节战役)——旗舰连战与普通模式使用真随机 */
+  isChallenge() { return this.mode === 'daily' || this.mode === 'weekly' || this.mode === 'campaign'; }
+  /* 战役存取:章号 → 星数(0~3) */
+  _campaignLoad() {
+    try { return JSON.parse(localStorage.getItem(CAMPAIGN_STORE)) || {}; }
+    catch (e) { return {}; }
+  }
+  _campaignSave(st) {
+    try { localStorage.setItem(CAMPAIGN_STORE, JSON.stringify(st)); } catch (e) { /* 忽略 */ }
+  }
+  campaignStars() {
+    const st = this._campaignLoad();
+    return Object.keys(st).reduce((s, k) => s + (st[k] || 0), 0);
+  }
+  campaignUnlocked(ch) {
+    if (ch <= 1) return true;
+    const st = this._campaignLoad();
+    return (st[ch - 1] || 0) >= 1;
+  }
   /* 周挑战全局变异:按周种子派生(加盐避免与出怪序列同流),本周固定且人人一致 */
   _weekMutator() {
     if (this.mode !== 'weekly') return null;
@@ -347,7 +375,7 @@ class Game {
     return this.mode === 'weekly' ? 'deepstrike.weeklyClaim' : 'deepstrike.dailyClaim';
   }
   _canClaimChips() {
-    if (this.mode === 'normal') return false;
+    if (this.mode === 'normal' || this.mode === 'campaign' || this.mode === 'mayhem') return false;
     try {
       const claimed = localStorage.getItem(this._claimStoreKey());
       return claimed !== this._challengeKey();
@@ -364,6 +392,7 @@ class Game {
     return h >>> 0;
   }
   _challengePrefix() {
+    if (this.mode === 'campaign') return 'deepstrike.campaignHi.';
     return this.mode === 'weekly' ? 'deepstrike.weeklyHi.' : 'deepstrike.dailyHi.';
   }
   _challengeBest() {
@@ -425,7 +454,7 @@ class Game {
   /* 无尽模式威胁等级:第 15 波起每 5 波 +1;周挑战全程 +1;高难 +2 */
   threatLevel() {
     const base = Math.floor(Math.max(0, this.wave - 10) / 5);
-    return base + (this.mode === 'weekly' ? 1 : 0) + (this.hard ? 2 : 0);
+    return base + (this.mode === 'weekly' ? 1 : 0) + (this.mode === 'campaign' ? Math.floor(((this.campaignChapter || 1) - 1) / 2) : 0) + (this.hard ? 2 : 0);
   }
 
   /* ---------------- 肉鸽升级系统 ---------------- */
@@ -770,6 +799,26 @@ class Game {
     this._showState();
     this._addFloat(new FloatText(this.player.x, this.player.y - 30, '恶魔悻悻离去…', '#b0a0ff', 12));
   }
+  /* ---------------- 深空远征:章节结算 ---------------- */
+  _campaignClear() {
+    const rate = this._campQuota > 0 ? this._campKills / this._campQuota : 1;
+    const stars = 1 + (this._campClean ? 1 : 0) + (rate >= 0.65 ? 1 : 0);
+    const st = this._campaignLoad();
+    const prev = st[this.campaignChapter] || 0;
+    const firstClear = prev === 0;
+    if (stars > prev) st[this.campaignChapter] = stars;
+    this._campaignSave(st);
+    this._campaignResult = { stars, rate, firstClear };
+    if (firstClear) {
+      Shop.addCrystal(200 + this.campaignChapter * 50);
+      if (this.campaignChapter >= CAMPAIGN_CHAPTERS && !Shop.owned.voyager) {
+        Shop.owned.voyager = true; // 通关最终章赠专属涂装
+        Shop.save();
+      }
+    }
+    this._achEvaluate();
+    this._gameover();
+  }
   /* 恶魔判定(独立方法便于测试注入) */
   _devilRollHit() { return RNG() < 0.35; }
   /* 恶魔契约结算链检查点:升级/遗物链全部结束后,恶魔才现身 */
@@ -969,7 +1018,7 @@ class Game {
       const s = this.spawnQueue[i];
       if (s.t <= this.waveTime) {
         if (s.boss) {
-          this.boss = new Boss(this.mode === 'boss' ? this.wave * 5 : this.wave);
+          this.boss = new Boss(s.vw || (this.mode === 'boss' ? this.wave * 5 : this.wave), s.variant);
           // BOSS 演出:登场瞬间全场敌弹转化为星晶(1★/5 弹折算,Phase 4.2)
           const n2 = this.enemyBullets.length;
           if (n2 > 0) {
@@ -1490,6 +1539,7 @@ class Game {
     }
     // 命运骰子:10% 概率掉落随机道具
     if (this.relics.r_dice && RNG() < 0.10) this._dropPower(e.x, e.y);
+    if (this.mode === 'campaign') { this._campPrevKills = this.waveKills; this._campPrevQuota = this.waveQuota; }
     this.stats.kills = this._stat('kills', 0) + 1;
     if (this.combo > this._stat('bestCombo', 0)) this.stats.bestCombo = this.combo;
     this._achEvaluate();
@@ -1634,6 +1684,13 @@ class Game {
       const a = i / 15 * TAU;
       this.orbs.push(new XPOrb(b.x + Math.cos(a) * 40, b.y + Math.sin(a) * 24, 4));
     }
+    // 深空远征:第 5 波旗舰击毁即章节结算
+    if (this.mode === 'campaign' && this.wave === 5) {
+      this._campKills += this.waveKills;
+      this._campQuota += 1; // 旗舰计入 1
+      this._campaignClear();
+      return;
+    }
     // 恶魔契约:无伤击毁旗舰后 35% 概率现身(连战不叠加;待升级/遗物链结束后弹出)
     if (this.mode !== 'boss' && this.waveDamageTaken === 0 && this.player.alive && this._devilRollHit())
       this._devilPending = true;
@@ -1755,6 +1812,7 @@ class Game {
       return;
     }
     const brittleTaken = this.mods.brittle ? 1 + (this.evo.brittle ? 0.05 : 0.10) * this.mods.brittle : 1;
+    if (this.mode === 'campaign' && !p.shield) this._campClean = false; // 三星:无伤条件(护盾抵挡不算破金身)
     const real = Math.max(1, Math.round(dmg * (1 - p.armorPct) * brittleTaken));
     p.hp -= real;
     this.waveDamageTaken++;
@@ -2049,7 +2107,8 @@ class Game {
       const period = this.mode === 'weekly' ? '本周' : '今日';
       d.overCrystals.textContent += ' · ' + period + '芯片奖励已领取';
     }
-    d.overRunStats.textContent = this._runStatsText();
+    d.overRunStats.textContent = this._runStatsText()
+      + (this.mode === 'campaign' && this._campaignResult ? ' · ' + '★'.repeat(this._campaignResult.stars) + '☆'.repeat(3 - this._campaignResult.stars) + (this._campaignResult.firstClear ? ' · 首通奖励已发放' : '') : '');
     d.overBuild.innerHTML = this._buildSummaryHTML();
     d.newRecord.classList.toggle('hidden', !this.newRecord);
     this._showState();
