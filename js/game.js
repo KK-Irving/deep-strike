@@ -269,6 +269,7 @@ class Game {
     this.relics = {}; this.pendingRelic = false; this._relicMode = false; this._relicChoices = [];
     this.augments = {}; this._cometT = 0; this._coilT = 0; this._ammoT = 0; // 海克斯大乱斗:符文与计时器
     this._forceRelicDrop = false; this._phoenixUsed = false;
+    this._devilMode = false; this._devilChoices = []; this._devilPending = false;
     this.levelupCooldown = 0;
     this.waveMod = null; this._env = { hpMul: 1, spdMul: 1, fireMul: 1 };
     this._recalc();
@@ -481,6 +482,7 @@ class Game {
     p.regenRate = 0.4 * (m.regen || 0) * (E.regen ? 2 : 1) + (A.a_medic ? 1.5 : 0);
     p.leechPer = 0.45 * (m.leech || 0) + (A.a_leech ? 1 : 0);
     if (E.leech) p.leechPer *= 2; // 血之盛宴
+    if (p.devilCost) { p.maxHp = Math.max(1, p.maxHp - p.devilCost); p.hp = Math.min(p.hp, p.maxHp); } // 恶魔契约:生命上限献祭
     p.hp = Math.min(p.hp, p.maxHp);
     // 幻影僚机:数量同步
     const wingTarget = (m.wingman || 0) + (A.a_army ? 2 : 0) + (E.wingman ? 2 : 0); // 「分身军团」/幽灵中队:+2 不占槽位
@@ -674,6 +676,7 @@ class Game {
     if (r.id === 'r_belt') this.player.hp = this.player.maxHp;
     this.state = 'playing';
     this._showState();
+    this._maybeDevil();
   }
 
 
@@ -721,6 +724,89 @@ class Game {
     this._showState();
   }
 
+  /* ---------------- 恶魔契约(Phase 4.4) ---------------- */
+  _openDevilOffer() {
+    const pathId = UPGRADES.find(u => u.path && (this.mods[u.id] || 0) > 0);
+    const pool = UPGRADES.filter(u => u.rar === 2 && !u.hidden && !u.curse
+      && (this.mods[u.id] || 0) < u.max
+      && !(u.path && pathId && pathId.id !== u.id));
+    if (pool.length < 3) return;
+    const picks = [];
+    const left = pool.slice();
+    for (let i = 0; i < 3 && left.length; i++)
+      picks.push(left.splice(Math.floor(RNG() * left.length), 1)[0]);
+    if (picks.length < 3) return;
+    this._devilMode = true;
+    this._devilChoices = picks;
+    this.state = 'levelup';
+    AudioSys.alarm();
+    this._renderDevils();
+    this._showState();
+  }
+  chooseDevil(i) {
+    if (!this._devilMode || this.state !== 'levelup') return;
+    const u = this._devilChoices[i];
+    if (!u) return;
+    const p = this.player;
+    const cost = Math.max(1, Math.round(p.maxHp * 0.1));
+    p.devilCost = (p.devilCost || 0) + cost; // 本局生命上限扣减(随 _recalc 生效)
+    p.hp = Math.max(1, p.hp - cost);
+    this.mods[u.id] = (this.mods[u.id] || 0) + 1;
+    if ((this.mods[u.id] || 0) >= u.max) this.stats.maxedCards = this._stat('maxedCards', 0) + 1;
+    this._devilMode = false;
+    this._devilChoices = [];
+    AudioSys.bond();
+    this.banner = { text: '😈 契约达成 · ' + u.name, sub: u.desc + ' · 生命上限 -' + cost, life: 2.8, max: 2.8, gold: true };
+    this._recalc();
+    this._achEvaluate();
+    this.state = 'playing';
+    this._showState();
+  }
+  rejectDevil() {
+    if (!this._devilMode || this.state !== 'levelup') return;
+    this._devilMode = false;
+    this._devilChoices = [];
+    this.state = 'playing';
+    this._showState();
+    this._addFloat(new FloatText(this.player.x, this.player.y - 30, '恶魔悻悻离去…', '#b0a0ff', 12));
+  }
+  /* 恶魔判定(独立方法便于测试注入) */
+  _devilRollHit() { return RNG() < 0.35; }
+  /* 恶魔契约结算链检查点:升级/遗物链全部结束后,恶魔才现身 */
+  _maybeDevil() {
+    if (this._devilPending && this.state === 'playing' && this.pendingLevels <= 0
+      && !this.pendingRelic && !this._relicMode && !this._augMode && this.player.alive) {
+      this._devilPending = false;
+      this._openDevilOffer();
+    }
+  }
+  _renderDevils() {
+    const row = this._dom.cardRow;
+    row.innerHTML = '';
+    this._dom.lvTitle.textContent = '😈 恶魔契约';
+    const cost = Math.max(1, Math.round(this.player.maxHp * 0.1));
+    this._dom.lvSub.innerHTML = '<b style="color:#ff6ad5">献祭 ' + cost + ' 点生命上限</b> · 换取一项史诗强化(按 1 / 2 / 3,或 4 拒绝)';
+    this._devilChoices.forEach((u, i) => {
+      const el = document.createElement('button');
+      el.className = 'card devil';
+      el.innerHTML =
+        '<div class="card-rar" style="color:#c86bff">😈 恶魔的馈赠</div>' +
+        '<div class="card-icon">' + u.icon + '</div>' +
+        '<div class="card-name">' + u.name + '</div>' +
+        '<div class="card-desc">' + u.desc + '</div>' +
+        '<div class="card-lv">' + (u.max > 1 ? 'Lv ' + (this.mods[u.id] || 0) + ' → ' + ((this.mods[u.id] || 0) + 1) : '被动生效') + ' · 按 ' + (i + 1) + '</div>';
+      el.addEventListener('click', () => this.chooseDevil(i));
+      row.appendChild(el);
+    });
+    const skip = document.createElement('button');
+    skip.className = 'menu-btn';
+    skip.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center;margin-top:10px';
+    skip.innerHTML = '▸ 拒绝契约(保留生命上限,按 4)';
+    skip.addEventListener('click', () => this.rejectDevil());
+    row.appendChild(skip);
+    this._dom.ownRow.innerHTML = '<span class="chip devil-chip">😈 代价:本局生命上限 -' + cost + '(当前生命同步扣减,至少保留 1)</span>';
+  }
+
   /* 取消替换:回到三选一界面 */
   cancelSwap() {
     if (this.state !== 'levelup' || !this._pendingSwap) return;
@@ -739,6 +825,7 @@ class Game {
     this.state = 'playing';
     this._showState();
     this._addFloat(new FloatText(this.player.x, this.player.y - 30, '升级已暂存,稍后自动弹出', '#9fe8ff', 12));
+    this._maybeDevil();
   }
 
   /* 满槽替换界面:展示已持有模块,点击丢弃 */
@@ -864,6 +951,7 @@ class Game {
         this.pendingRelic = false;
         this._openRelicChoice();
       }
+      this._maybeDevil();
     }
   }
 
@@ -874,6 +962,7 @@ class Game {
     this.stars.update(dt, this.state === 'playing' ? 1 : 0.35);
     this._decayFx(dt);
     if (this.state !== 'playing') return;
+    this._maybeDevil(); // 恶魔契约:升级/遗物链结算干净后,下一帧自动现身
 
     this.waveTime += dt;
     for (let i = this.spawnQueue.length - 1; i >= 0; i--) {
@@ -1545,6 +1634,9 @@ class Game {
       const a = i / 15 * TAU;
       this.orbs.push(new XPOrb(b.x + Math.cos(a) * 40, b.y + Math.sin(a) * 24, 4));
     }
+    // 恶魔契约:无伤击毁旗舰后 35% 概率现身(连战不叠加;待升级/遗物链结束后弹出)
+    if (this.mode !== 'boss' && this.waveDamageTaken === 0 && this.player.alive && this._devilRollHit())
+      this._devilPending = true;
   }
 
   _dropPower(x, y, force) {

@@ -48,6 +48,13 @@
     if (e.code === 'KeyR' && (game.state === 'paused' || game.state === 'gameover')) game.start(game.mode);
     // 升级选卡快捷键(遗物模式下选择遗物;满槽替换模式下选择要丢弃的模块)
     if (game.state === 'levelup') {
+      // 恶魔契约:献祭三选一(4/0 拒绝)
+      if (game._devilMode) {
+        const di = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
+        if (di >= 0) game.chooseDevil(di % 3);
+        if (e.code === 'Digit4' || e.code === 'Numpad4' || e.code === 'Digit0' || e.code === 'Numpad0') game.rejectDevil();
+        return;
+      }
       // 海克斯大乱斗:强化三选一
       if (game._augMode) {
         const ai = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);

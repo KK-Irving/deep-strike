@@ -287,6 +287,7 @@ class Player {
     this.fireBase = shipDef.fire || 0.12;
     this.armorPct = 0; this.regenRate = 0; this.leechPer = 0;
     this.undyingCount = 0;
+    this.devilCost = 0;
     this.weapon = 1; this.bombs = 2;
     this.shield = false; this.invuln = 2.2;
     this.chillT = 0; this._phaseT = 0; // 相位疾行:受击后短暂加速

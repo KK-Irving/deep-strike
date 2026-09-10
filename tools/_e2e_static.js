@@ -115,6 +115,8 @@ const STREAM_ALLOW = new Set([
   'game.js:Game>_hitTarget',            // 暴击判定
   'game.js:Game>killEnemy',             // 击坠掉落/词缀触发
   'game.js:Game>killBoss',              // 旗舰遗物掉落
+  'game.js:Game>_openDevilOffer',       // 恶魔契约:史诗三选一抽取(玩法随机;恶魔仅普通模式触发,不涉及挑战确定性契约)
+  'game.js:Game',                       // 恶魔契约 _devilRollHit:35% 触发概率 roll(单行方法,扫描器栈不识别;普通模式专属玩法随机)
   'game.js:Game>_dropPower',
   'game.js:Game>_applyPower',           // 随机授予(遗物/道具)
   // 商城与抽卡:与挑战序列无关
