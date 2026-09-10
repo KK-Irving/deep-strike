@@ -55,6 +55,12 @@ Object.assign(Game.prototype, {
         d.bestiaryGrid.innerHTML = bhtml;
       }
     },
+    /* BOSS 演出:瞄准系大招前摇警示是否生效(纯读状态,不改攻击时序)
+     * 覆盖:要塞旗舰任意阶段的重压扇面 / 暴君一阶段的瞄准五连 */
+    _bossTelegraphOn(b) {
+      return !!b && b.state === 'fight' && b.fireCd > 0 && b.fireCd < 0.55
+        && (b.variant === 'dread' || (b.variant === 'tyrant' && b.phase === 0));
+    },
     _renderOffline() {
       const el = this._dom.offlinePanel;
       if (!el) return;
@@ -307,6 +313,33 @@ Object.assign(Game.prototype, {
       for (const pt of this.particles) pt.draw(ctx);
       for (const rg of this.rings) rg.draw(ctx);
       ctx.restore();
+
+      // BOSS 演出层(纯表现,Phase 4.2):登场警戒线 + 瞄准大招前摇警示圈
+      if (this.boss && !this.boss.dead) {
+        const b0 = this.boss;
+        if (b0.state === 'enter') {
+          const prog = clamp((b0.y + 90) / 205, 0, 1);
+          ctx.save();
+          ctx.globalAlpha = 0.2 + 0.5 * prog;
+          ctx.strokeStyle = '#ff4d6d';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([18, 12]);
+          ctx.lineDashOffset = -(Date.now() / 28) % 60;
+          ctx.beginPath(); ctx.moveTo(0, 115); ctx.lineTo(W, 115); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        } else if (this._bossTelegraphOn(b0)) {
+          const k = b0.fireCd / 0.55; // 1 → 0 收缩
+          ctx.save();
+          ctx.globalAlpha = 0.35 + 0.45 * (1 - k);
+          ctx.strokeStyle = '#ff8c42';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.arc(b0.x, b0.y + 26, 14 + 22 * k, 0, TAU); ctx.stroke();
+          ctx.globalAlpha *= 0.5;
+          ctx.beginPath(); ctx.arc(b0.x, b0.y + 26, 6, 0, TAU); ctx.fillStyle = '#ff8c42'; ctx.fill();
+          ctx.restore();
+        }
+      }
 
       if (this.bombActive) {
         const f = 1 - this.bombT / 0.9;

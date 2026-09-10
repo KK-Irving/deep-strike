@@ -879,7 +879,20 @@ class Game {
     for (let i = this.spawnQueue.length - 1; i >= 0; i--) {
       const s = this.spawnQueue[i];
       if (s.t <= this.waveTime) {
-        if (s.boss) this.boss = new Boss(this.mode === 'boss' ? this.wave * 5 : this.wave);
+        if (s.boss) {
+          this.boss = new Boss(this.mode === 'boss' ? this.wave * 5 : this.wave);
+          // BOSS 演出:登场瞬间全场敌弹转化为星晶(1★/5 弹折算,Phase 4.2)
+          const n2 = this.enemyBullets.length;
+          if (n2 > 0) {
+            for (const b2 of this.enemyBullets) this._sparks(b2.x, b2.y, '#ffd166', 1);
+            const stars = Math.floor(n2 / 5);
+            this.enemyBullets.length = 0;
+            if (stars > 0) {
+              Shop.addCrystal(stars, this);
+              this._addFloat(new FloatText(W / 2, 168, '✦ 清场折算 +' + stars + '★', '#ffd166', 13));
+            }
+          }
+        }
         else if (s.asteroid) this.asteroids.push(new Asteroid(s.x, -30, s.r));
         else if (s.supply) this.supplies.push(new SupplyDrop(s.x, SUPPLY_LOOT[irand(0, SUPPLY_LOOT.length - 1)]));
         else {
