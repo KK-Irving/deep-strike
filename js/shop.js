@@ -330,6 +330,29 @@ const Shop = {
   },
 
   /* 开局消耗:返回并清空待生效增益(游戏 start 时调用) */
+  /* ---------------- 离线补给站(Phase 4.1) ----------------
+   * 按离线时长折算星晶:费率对齐经济审计口径(≈休闲局每小时收入的一半,42★/时),8 小时封顶。
+   * localStorage 时间戳实现;领取走 addCrystal,自动计入"累计星晶"任务事件源。 */
+  OFFLINE_RATE: 42,     // ★ / 小时
+  OFFLINE_CAP: 8 * 3600, // 封顶秒数
+  offlineInfo() {
+    let last = 0;
+    try { last = (+JSON.parse(localStorage.getItem('deepstrike.offline')).t) || 0; } catch (e) { /* 首次 */ }
+    const now = Date.now();
+    if (!last || now <= last) return { gain: 0, seconds: 0 };
+    const capped = Math.min(this.OFFLINE_CAP, (now - last) / 1000);
+    return { gain: Math.floor(capped * this.OFFLINE_RATE / 3600), seconds: Math.floor(capped) };
+  },
+  offlineTick() {
+    try { localStorage.setItem('deepstrike.offline', JSON.stringify({ t: Date.now() })); } catch (e) { /* 忽略 */ }
+  },
+  claimOffline() {
+    const info = this.offlineInfo();
+    this.offlineTick();
+    if (info.gain > 0) this.addCrystal(info.gain);
+    return info;
+  },
+
   consumeLoadout() {
     const l = this.loadout || {};
     this.loadout = {};

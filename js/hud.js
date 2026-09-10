@@ -55,6 +55,25 @@ Object.assign(Game.prototype, {
         d.bestiaryGrid.innerHTML = bhtml;
       }
     },
+    _renderOffline() {
+      const el = this._dom.offlinePanel;
+      if (!el) return;
+      const info = Shop.offlineInfo();
+      if (!info.gain) { el.classList.add('hidden'); return; }
+      el.classList.remove('hidden');
+      const hh = Math.floor(info.seconds / 3600);
+      const mm = Math.floor((info.seconds % 3600) / 60);
+      el.innerHTML = '<div class="sec-title">🛰 离线补给站</div>' +
+        '<div class="task-row"><span class="task-text">离线补给已就绪 ' + (hh ? hh + ' 时 ' : '') + mm + ' 分</span>' +
+        '<span class="task-prog"><button class="menu-btn" id="btnClaimOffline" style="width:auto;padding:4px 14px;font-size:12px">领取 +' + info.gain + '★</button></span></div>';
+      const btn = document.getElementById('btnClaimOffline');
+      if (btn) btn.addEventListener('click', () => {
+        Shop.claimOffline();
+        AudioSys.bond();
+        this._renderOffline();
+        this._refreshTasks();
+      });
+    },
     _refreshTasks() {
       if (typeof DailyTasks !== 'undefined') DailyTasks.render(this._dom.taskPanel);
     },
@@ -83,6 +102,7 @@ Object.assign(Game.prototype, {
         d.menuShop.classList.toggle('hidden', this.menuPanel !== 'shop');
         if (this.menuPanel === 'main') {
           this._refreshTasks();
+          this._renderOffline();
           if (d.btnHard) d.btnHard.innerHTML = '▸ 高难模式:' + (this.hard ? '开' : '关') + ' <i>星晶×1.5</i>';
         }
         if (this.menuPanel === 'shop') Shop.renderPanel();

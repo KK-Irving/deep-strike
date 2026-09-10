@@ -141,6 +141,7 @@ class Game {
       overCrystals: document.getElementById('overCrystals'),
       menuShop: document.getElementById('menuShop'),
       taskPanel: document.getElementById('taskPanel'),
+      offlinePanel: document.getElementById('offlinePanel'),
       btnHard: document.getElementById('btnHard'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
@@ -277,6 +278,7 @@ class Game {
     this.mode = challengeMode || 'normal';
     // 每日/周挑战:播种固定波次序列与抽卡序列;周挑战威胁+1
     // 种子基准保留,供 startWave 按波派生与 _drawChoices 按抽卡序号派生
+    Shop.offlineTick(); // 进入对局即起算新一轮离线补给
     this._seedBase = this._challengeSeed();
     RNG = this.isChallenge() ? mulberry32(this._seedBase) : Math.random;
     // 周挑战全局变异(由周种子决定)
