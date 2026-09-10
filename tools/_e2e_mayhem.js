@@ -299,7 +299,7 @@ const t = H.suite('海克斯大乱斗');
   const check = t.check;
   check(errors.length === 0, '无 JS 运行时异常');
   check(r.menu.btn && r.menu.hiHasMayhem, '菜单入口与纪录行就绪');
-  check(r.menu.achLines === 34, '成就 34 条线(分级制)');
+  check(r.menu.achLines === 35, '成就 35 条线(分级制,含远征元帅)');
   check(r.menu.augTotal === 18 && r.menu.tiers.join(',') === '6,6,6', '18 张符文,三档各 6 张');
   check(r.hotkey.ok && r.hotkey.unique && r.hotkey.resumed && r.hotkey.owned, 'L 键开局强化三选一(不重复)并正常返回战场');
   check(r.rounds.w4 && r.rounds.w7 && r.rounds.w10 && r.rounds.w11_no, '第 4/7/10 波依次第 2/3/4 轮(BOSS 波可先选),第 11 波不再弹');

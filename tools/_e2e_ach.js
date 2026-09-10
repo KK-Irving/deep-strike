@@ -43,11 +43,11 @@ const t = H.suite('成就分级制');
   const r = await page.evaluate(() => {
     const out = {};
     // 1) 结构
-    out.lines = ACHIEVEMENTS.length === 34;
+    out.lines = ACHIEVEMENTS.length === 35;
     out.all5 = ACHIEVEMENTS.every(a => a.tiers.length === 5 && a.rewards.length === 5);
-    out.noDup = new Set(ACHIEVEMENTS.map(a => a.id)).size === 34;
+    out.noDup = new Set(ACHIEVEMENTS.map(a => a.id)).size === 35;
     out.monotonic = ACHIEVEMENTS.every(a => a.tiers.every((n, i) => i === 0 || n > a.tiers[i - 1]) && a.rewards.every((n, i) => i === 0 || n >= a.rewards[i - 1]));
-    out.totalTiers = Ach.totalTiers() === 170;
+    out.totalTiers = Ach.totalTiers() === 175;
     // 2) touch 分级推进:只升不降、边界
     Ach.unlocked = {}; Ach.save();
     Ach.touch('kills', 999, null);          // < 1000 → Lv1
