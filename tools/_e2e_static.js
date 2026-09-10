@@ -173,10 +173,25 @@ function checkStreamHygiene() {
   for (const s of stale) t.fail('白名单条目已无对应消费点(请清理或确认重构): ' + s);
 }
 
+/* --------------------------------------------- 3) 版本号三处一致(AGENTS.md 规则 2) */
+
+function checkVersionSync() {
+  const read = (p) => { try { return fs.readFileSync(path.join(ROOT, p), 'utf8'); } catch (e) { return ''; } };
+  const verJs = (read('js/version.js').match(/GAME_VERSION\s*=\s*'([^']+)'/) || [])[1] || null;
+  let pkgVer = null;
+  try { pkgVer = 'v' + JSON.parse(read('package.json')).version; } catch (_) { /* ignore */ }
+  const readme = read('README.md');
+  const readmeVer = (readme.match(/\*\*当前版本[:：]\s*(v[\d.]+)\*\*/) || [])[1] || null;
+  const ok = !!verJs && verJs === pkgVer && pkgVer === readmeVer;
+  t.check(ok, '版本号三处一致(version.js / package.json / README): '
+    + [verJs, pkgVer, readmeVer].map((v) => v || '缺失').join(' / '));
+}
+
 /* ------------------------------------------------------------------ 主流程 */
 
 (async () => {
   checkEncoding(listTextFiles(ROOT, []));
   checkStreamHygiene();
+  checkVersionSync();
   t.finish();
 })().catch((e) => t.crash(e));
