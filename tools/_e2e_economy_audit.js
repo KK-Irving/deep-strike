@@ -111,6 +111,11 @@ const t = H.suite('经济审计');
   t.check(r.box.median > 0 && days <= 3650, '密匣限定收集时长在合理区间(中位 ' + r.box.median + ' 抽 ≈ ' + days + ' 天)');
 
   /* ── 审计数据输出(调价/加内容的决策依据)── */
+  // Phase 4/5 经济面:改装件满改与远征首通(数量级 info,供调价参考)
+  const tuningStar = 900 + 2200 + 4800;   // 单槽满改星晶
+  let campStar = 0; for (let k = 1; k <= 10; k++) campStar += 200 + 50 * k; // 远征全首通
+  t.info('改装件: 3 槽 × 满改 = ' + (tuningStar * 3) + '★ + 残骸 ' + (6 + 14 + 28) * 3 + '(旗舰 +1/局、连战 +2/阶段)');
+  t.info('深空远征: 全 10 章首通合计 ' + campStar + '★;第 10 章首通赠限定涂装「远征·星辉」');
   t.info('★ 可购目录: 皮肤×' + r.catalog.skins + '=' + r.catalog.skinsStar
     + ' + 机体×' + r.catalog.ships + '=' + r.catalog.shipsStar
     + ' + 强化×' + r.catalog.boostKinds + '条×10级=' + r.catalog.boostsStar
