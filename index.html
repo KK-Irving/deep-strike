@@ -24,6 +24,7 @@
       <button id="btnMayhem" class="menu-btn">▸ 海克斯大乱斗 <i>L</i></button>
       <button id="btnCampaign" class="menu-btn">▸ 深空远征 <i>C</i></button>
       <button id="btnTuning" class="menu-btn">▸ 改装工坊 <i>残骸 <b id="scrapHint">0</b></i></button>
+      <button id="btnSave" class="menu-btn">▸ 存档中心 <i>备份</i></button>
       <button id="btnShop" class="menu-btn">▸ 机库商城 <i>G</i></button>
       <button id="btnHelp" class="menu-btn">▸ 玩法说明 <i>H</i></button>
       <button id="btnStats" class="menu-btn">▸ 战绩档案 <i>T</i></button>
@@ -33,6 +34,23 @@
     <div id="offlinePanel" class="task-panel hidden"></div>
     <div id="taskPanel" class="task-panel"></div>
     <div id="menuHi" class="hi-score">最高纪录 0</div>
+  </div>
+
+  <!-- 存档中心 -->
+  <div id="menuSave" class="menu-page hidden">
+    <div class="panel scroll">
+      <div class="sec-title">存 档 中 心</div>
+      <div class="hint" style="margin-bottom:10px">进度保存在本机浏览器;换设备/清缓存前请先「导出存档码」备份,导入后自动刷新生效</div>
+      <textarea id="saveText" class="save-area" spellcheck="false" placeholder="导出的存档码会显示在这里;导入时把存档码粘贴到这里"></textarea>
+      <div class="menu-btns">
+        <button class="menu-btn" id="btnExportSave" style="flex-basis:100%">▸ 导出存档码</button>
+        <button class="menu-btn" id="btnCopySave" style="flex-basis:100%">▸ 复制到剪贴板</button>
+        <button class="menu-btn" id="btnImportSave" style="flex-basis:100%">▸ 导入上框存档码(自动刷新)</button>
+        <button class="menu-btn" id="btnClearSave" style="flex-basis:100%;border-color:rgba(255,85,119,0.5)">▸ 清空本机存档(两步确认)</button>
+      </div>
+      <div class="hint" id="saveMsg"></div>
+      <button class="menu-btn" id="btnSaveBack">▸ 返回 <i>Esc</i></button>
+    </div>
   </div>
 
   <!-- 改装工坊 -->

@@ -450,3 +450,11 @@ h2 {
 
 /* ---- 深空远征章节列表 ---- */
 .menu-btn.locked { cursor: not-allowed; }
+
+/* ---- 存档中心 ---- */
+.save-area {
+  width: 100%; min-height: 110px; resize: vertical; margin-bottom: 10px;
+  background: rgba(5, 12, 28, 0.8); color: #bfe8ff;
+  border: 1px solid rgba(126, 243, 255, 0.25); border-radius: 8px;
+  padding: 8px; font: 11px Consolas, monospace; word-break: break-all;
+}

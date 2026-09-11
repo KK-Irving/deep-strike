@@ -401,6 +401,35 @@ const Shop = {
     return { ok: true, lv: info.lv + 1 };
   },
 
+  /* ---------------- 存档中心(Phase 5.1) ----------------
+   * 全部 deepstrike.* 键合并导出为存档码(base64 文本),粘贴导入后刷新生效。 */
+  exportSave() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf('deepstrike.') === 0) data[k] = localStorage.getItem(k);
+    }
+    return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  },
+  importSave(code) {
+    try {
+      const data = JSON.parse(decodeURIComponent(escape(atob(String(code || '').trim()))));
+      let n = 0;
+      for (const k in data)
+        if (k.indexOf('deepstrike.') === 0 && typeof data[k] === 'string') { localStorage.setItem(k, data[k]); n++; }
+      return { ok: n > 0, n };
+    } catch (e) { return { ok: false, msg: '存档码无法识别' }; }
+  },
+  clearSave() {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf('deepstrike.') === 0) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+    return keys.length;
+  },
+
   consumeLoadout() {
     const l = this.loadout || {};
     this.loadout = {};

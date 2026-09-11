@@ -61,6 +61,14 @@ Object.assign(Game.prototype, {
       return !!b && b.state === 'fight' && b.fireCd > 0 && b.fireCd < 0.55
         && (b.variant === 'dread' || (b.variant === 'tyrant' && b.phase === 0));
     },
+    _renderSave() {
+      const ta = document.getElementById('saveText');
+      const msg = document.getElementById('saveMsg');
+      if (msg) msg.textContent = '';
+      if (ta) ta.value = '';
+      const clear = document.getElementById('btnClearSave');
+      if (clear) { clear.dataset.arm = ''; clear.innerHTML = '▸ 清空本机存档(两步确认)'; }
+    },
     _renderTuning() {
       const el = document.getElementById('tuningList');
       if (!el) return;
@@ -151,6 +159,7 @@ Object.assign(Game.prototype, {
         d.menuMain.classList.toggle('hidden', this.menuPanel !== 'main');
         d.menuCampaign.classList.toggle('hidden', this.menuPanel !== 'campaign');
         d.menuTuning.classList.toggle('hidden', this.menuPanel !== 'tuning');
+        d.menuSave.classList.toggle('hidden', this.menuPanel !== 'save');
         d.menuHelp.classList.toggle('hidden', this.menuPanel !== 'help');
         d.menuStats.classList.toggle('hidden', this.menuPanel !== 'stats');
         d.menuShop.classList.toggle('hidden', this.menuPanel !== 'shop');

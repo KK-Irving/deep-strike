@@ -119,6 +119,34 @@
   $('btnCampaignBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnTuning').addEventListener('click', () => game.showMenuPanel('tuning'));
   $('btnTuningBack').addEventListener('click', () => game.showMenuPanel('main'));
+  $('btnSave').addEventListener('click', () => game.showMenuPanel('save'));
+  $('btnSaveBack').addEventListener('click', () => game.showMenuPanel('main'));
+  $('btnExportSave').addEventListener('click', () => {
+    const code = Shop.exportSave();
+    document.getElementById('saveText').value = code;
+    document.getElementById('saveMsg').textContent = '存档码已生成(' + code.length + ' 字符),复制后妥善保存';
+  });
+  $('btnCopySave').addEventListener('click', () => {
+    const ta = document.getElementById('saveText');
+    if (!ta.value) { document.getElementById('saveMsg').textContent = '请先导出存档码'; return; }
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { /* 忽略 */ }
+    if (!ok && navigator.clipboard) navigator.clipboard.writeText(ta.value).then(() => {}, () => {});
+    document.getElementById('saveMsg').textContent = ok ? '已复制到剪贴板' : '已全选,请手动 Ctrl+C 复制';
+  });
+  $('btnImportSave').addEventListener('click', () => {
+    const res = Shop.importSave(document.getElementById('saveText').value);
+    if (!res.ok) { document.getElementById('saveMsg').textContent = res.msg || '导入失败'; return; }
+    document.getElementById('saveMsg').textContent = '已导入 ' + res.n + ' 项,正在刷新…';
+    setTimeout(() => location.reload(), 600);
+  });
+  $('btnClearSave').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    if (!btn.dataset.arm) { btn.dataset.arm = '1'; btn.innerHTML = '⚠ 再次点击确认清空(不可恢复)'; return; }
+    Shop.clearSave();
+    location.reload();
+  });
   $('btnRestart').addEventListener('click', () => { AudioSys.init(); game.start(); });
   $('btnResume').addEventListener('click', () => game.togglePause());
   $('btnRestart2').addEventListener('click', () => { AudioSys.init(); game.start(game.mode); });

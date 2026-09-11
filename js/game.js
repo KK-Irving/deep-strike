@@ -149,6 +149,7 @@ class Game {
       offlinePanel: document.getElementById('offlinePanel'),
       menuCampaign: document.getElementById('menuCampaign'),
       menuTuning: document.getElementById('menuTuning'),
+      menuSave: document.getElementById('menuSave'),
       btnHard: document.getElementById('btnHard'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')
