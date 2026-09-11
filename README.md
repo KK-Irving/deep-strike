@@ -3,7 +3,7 @@
 一款纯前端、零依赖的纵版街机 **肉鸽射击** 游戏(打飞机)。
 画面由 Canvas 2D 实时绘制,音效与背景音乐由 WebAudio 实时合成——没有任何素材文件,也不需要服务器。
 
-**当前版本:v2.1.2**
+**当前版本:v2.2.0**
 
 ## 如何运行
 
@@ -201,6 +201,7 @@ deep-strike/
 ├── js/shop.js         机库商城:星晶货币/皮肤预渲染/永久强化
 ├── js/tasks.js        每日任务:按日期种子生成 3 条,完成发放战术芯片
 ├── js/game.js        游戏核心(状态机、碰撞、经验升级、羁绊、成就评估、掉落)
+├── js/modes.js       模式流程(海克斯大乱斗/恶魔契约/深空远征,v2.2.0 拆分)
 ├── js/waves.js       波次导演:按波构建出怪队列/配额/词缀/事件波(挑战模式按波重播种)
 ├── js/hud.js         渲染与面板:画布场景/HUD 绘制 + 全部 DOM 面板(选卡/遗物/符文/战绩/任务)
 ├── js/main.js        启动引导、输入绑定(键盘/触屏)、自适应缩放
@@ -282,8 +283,21 @@ ISO 周号修正;星晶高频进账延迟落盘;文档与商城文案全面回�
 `v2.1.0` 改装工坊(Phase 4.5,竞品借鉴:雷霆战机分解→合成) — 击毁旗舰掉「残骸」(普通 +1/连战 +2);机库以 残骸+星晶 合成三槽位持久改装件:复合装甲(生存:减伤/生命/受击回复)/僚机强化(爆发:伤害/+1机/射速)/副武器挂架(清场:侧翼弹/炸弹伤害/贯穿),各 3 级,与局内圣遗物分工(局外持久 vs 局内获得);新增 _e2e_tuning 套件 8 断言
 `v2.1.1` 修复 — 深空远征/改装工坊菜单页误嵌套在主菜单容器内,切页时随父级隐藏导致点击入口后页面不显示;移出为兄弟节点并补齐帮助文案与页面可见性 e2e 断言(防回归)
 `v2.1.2` 存档中心(Phase 5.1) — 主菜单新增存档中心页:全部 deepstrike.* 存档键一键导出为 base64 存档码(可复制备份)/粘贴导入自动刷新/两步确认清空;防止清浏览器数据丢失全部进度;新增 _e2e_save 套件 9 断言
+`v2.2.0` 结构治理(Phase 5.5) — 恶魔契约/海克斯大乱斗/深空远征三块模式流程自 game.js 拆至 js/modes.js(Object.assign 挂 prototype,沿 waves.js 先例,game.js 2125→1962 行);README 新增「存档键清单」小节登记全部 30+ localStorage 键;静态守卫白名单随迁移同步
 (每次迭代一个 commit + tag,见 `git tag`)
 
 ## 后续可扩展
 
 见 [`ROADMAP.md`](ROADMAP.md)(Phase 1 内容填充 → Phase 2 模式扩展 → Phase 3 大内容版本)。
+
+## 存档键清单(v2.2.0)
+
+全部进度仅存于本机浏览器 localStorage(前缀 `deepstrike.`,可在「存档中心」导出备份):
+
+`crystal` 星晶 · `chips` 芯片 · `scrap` 残骸 · `tunings` 改装件等级 · `shopOwned` 皮肤拥有 · `skin` 当前皮肤 ·
+`shipsOwned` 机体拥有 · `ship` 当前机体 · `boosts` 永久强化等级 · `granted` 已发放成就奖励 · `loadout` 出击准备 ·
+`pityRare`/`pityEpic` 密匣保底计数 · `boxOpens`/`chipsEarned` 开匣与芯片累计 · `hi` 最高纪录 · `stats` 累计战绩 ·
+`ach` 成就等级表 · `bestiary` 图鉴击坠 · `pathClears` 质变精通 · `campaign`/`campaignHi.*` 远征星与章节纪录 ·
+`dailyHi.*`/`weeklyHi.*` 挑战纪录 · `dailyClaim`/`weeklyClaim`/`bossClaim` 芯片限领 · `bossHi` 连战纪录 ·
+`mayhemHi` 大乱斗纪录 · `dailyTasks`/`weekTasks` 任务进度 · `offline` 离线补给时间戳 · `hard` 高难开关 ·
+`pathClears` · `mayhemHi` · `seeded` 引导标记等
