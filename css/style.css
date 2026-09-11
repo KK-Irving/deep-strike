@@ -458,3 +458,6 @@ h2 {
   border: 1px solid rgba(126, 243, 255, 0.25); border-radius: 8px;
   padding: 8px; font: 11px Consolas, monospace; word-break: break-all;
 }
+
+/* ---- 纪元天赋 ---- */
+.menu-btn.era-node.lit { border-color: rgba(81, 224, 138, 0.55); }

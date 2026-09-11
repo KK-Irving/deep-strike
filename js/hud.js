@@ -80,6 +80,43 @@ Object.assign(Game.prototype, {
       if (ta) ta.value = '';
       const clear = document.getElementById('btnClearSave');
       if (clear) { clear.dataset.arm = ''; clear.innerHTML = '▸ 清空本机存档(两步确认)'; }
+      // 纪元区块
+      const box = document.getElementById('eraBox');
+      if (!box) return;
+      const avail = Shop.epochAvailable();
+      const cores = Shop.eraCores();
+      let html = '<div class="sec-title">♾ 纪 元</div>';
+      if (!avail) {
+        html += '<div class="hint">以 <b style="color:#ffd166">三星</b>通关深空远征第 10 章后,可开启纪元重置:保留涂装/机体/成就/图鉴,重置星晶/强化/改装,换取<b style="color:#c86bff">纪元核心</b>点亮全局天赋。</div>';
+      } else {
+        html += '<div class="hint">当前纪元核心:<b style="color:#c86bff">' + cores + '</b> · 已重置 ' + Shop.eraResets() + ' 次</div>';
+        html += '<div class="menu-btns" style="margin-bottom:8px">';
+        for (const def of Shop.ERA_TREE) {
+          const lv = Shop.eraLv(def.id);
+          const lit = lv > 0;
+          html += '<button class="menu-btn era-node' + (lit ? ' lit' : '') + '" data-era="' + def.id + '" style="flex-basis:100%;text-align:left;font-size:12px">' +
+            def.icon + ' ' + def.branch + ' ' + def.lv + ' · ' + def.desc +
+            (lit ? ' <b style="color:#51e08a">已点亮</b>' : ' <i style="float:right;color:#c86bff">核心 ×' + def.lv + '</i>') + '</button>';
+        }
+        html += '</div>';
+        html += '<button class="menu-btn" id="btnEpochReset" style="flex-basis:100%;border-color:rgba(200,107,255,0.5)">▸ 纪元重置(三星通关第 10 章后可用,保留收藏重置养成)</button>';
+      }
+      box.innerHTML = html;
+      if (avail) {
+        box.querySelectorAll('[data-era]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const res = Shop.eraBuy(btn.dataset.era);
+            if (!res.ok && res.msg) { const m = document.getElementById('saveMsg'); if (m) m.textContent = res.msg; }
+            AudioSys.bond();
+            game.showMenuPanel('save');
+          });
+        });
+        const resetBtn = document.getElementById('btnEpochReset');
+        if (resetBtn) resetBtn.addEventListener('click', () => {
+          const res = Shop.epochReset();
+          if (res.ok) { AudioSys.record(); location.reload(); }
+        });
+      }
     },
     _renderTuning() {
       const el = document.getElementById('tuningList');
@@ -165,6 +202,7 @@ Object.assign(Game.prototype, {
       if (this.state === 'gameover') this.toMenu();
       this.menuPanel = name;
       if (name === 'stats') this._refreshStatsPanel();
+      if (name === 'save') this._renderSave();
       if (name === 'shop') Shop.renderPanel();
       this._showState();
     },

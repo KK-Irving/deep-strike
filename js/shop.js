@@ -354,7 +354,8 @@ const Shop = {
     const now = Date.now();
     if (!last || now <= last) return { gain: 0, seconds: 0 };
     const capped = Math.min(this.OFFLINE_CAP, (now - last) / 1000);
-    return { gain: Math.floor(capped * this.OFFLINE_RATE / 3600), seconds: Math.floor(capped) };
+    const rate = this.OFFLINE_RATE * (this.eraLv('eco3') ? 1.5 : 1); // 纪元·丰饶 III
+    return { gain: Math.floor(capped * rate / 3600), seconds: Math.floor(capped) };
   },
   offlineTick() {
     try { localStorage.setItem('deepstrike.offline', JSON.stringify({ t: Date.now() })); } catch (e) { /* 忽略 */ }
@@ -434,6 +435,82 @@ const Shop = {
     }
     keys.forEach(k => localStorage.removeItem(k));
     return keys.length;
+  },
+
+  /* ---------------- 纪元系统(Phase 5.2) ----------------
+   * 第 10 章三星后可纪元重置:保留涂装/机体/成就/图鉴,重置星晶/强化/改装/残骸/出击准备,
+   * 按重置进度获得纪元核心,点亮 4 支线 × 3 层全局天赋树(跨纪元持久)。 */
+  ERA_TREE: [
+    { id: 'atk1', branch: '贯穿', icon: '⚔', lv: 1, desc: '所有伤害 +1' },
+    { id: 'atk2', branch: '贯穿', icon: '⚔', lv: 2, desc: '射击间隔 -6%' },
+    { id: 'atk3', branch: '贯穿', icon: '⚔', lv: 3, desc: '所有伤害 +8%' },
+    { id: 'def1', branch: '庇护', icon: '🛡', lv: 1, desc: '生命上限 +15' },
+    { id: 'def2', branch: '庇护', icon: '🛡', lv: 2, desc: '受到伤害 -3%' },
+    { id: 'def3', branch: '庇护', icon: '🛡', lv: 3, desc: '过波额外回复 +5' },
+    { id: 'eco1', branch: '丰饶', icon: '💎', lv: 1, desc: '星晶获取 +10%' },
+    { id: 'eco2', branch: '丰饶', icon: '💎', lv: 2, desc: '经验获取 +10%' },
+    { id: 'eco3', branch: '丰饶', icon: '💎', lv: 3, desc: '离线补给 +50%' },
+    { id: 'tec1', branch: '机变', icon: '🌀', lv: 1, desc: '磁吸范围 +30' },
+    { id: 'tec2', branch: '机变', icon: '🌀', lv: 2, desc: '炸弹上限 +1' },
+    { id: 'tec3', branch: '机变', icon: '🌀', lv: 3, desc: '出击即获 2 次强化选择' }
+  ],
+  eraLoad() {
+    try { return JSON.parse(localStorage.getItem('deepstrike.eras')) || { cores: 0, spent: {}, resets: 0 }; }
+    catch (e) { return { cores: 0, spent: {}, resets: 0 }; }
+  },
+  eraSave(era) {
+    try { localStorage.setItem('deepstrike.eras', JSON.stringify(era)); } catch (e) { /* 忽略 */ }
+  },
+  eraLv(id) {
+    const era = this.eraLoad();
+    return era.spent[id] || 0;
+  },
+  eraCores() { return this.eraLoad().cores || 0; },
+  eraResets() { return this.eraLoad().resets || 0; },
+  epochAvailable() {
+    try {
+      const st = JSON.parse(localStorage.getItem('deepstrike.campaign')) || {};
+      return (st[10] || 0) >= 3;
+    } catch (e) { return false; }
+  },
+  epochReset() {
+    if (!this.epochAvailable()) return { ok: false, msg: '需先以三星通关远征第 10 章' };
+    let stars = 0;
+    try {
+      const st = JSON.parse(localStorage.getItem('deepstrike.campaign')) || {};
+      for (const k in st) stars += st[k] || 0;
+    } catch (e) { /* 忽略 */ }
+    let tuned = 0;
+    for (const id in this.tunings) tuned += this.tunings[id] || 0;
+    const cores = 3 + Math.floor(stars / 2) + tuned;
+    const era = this.eraLoad();
+    era.cores += cores;
+    era.resets = (era.resets || 0) + 1;
+    this.eraSave(era);
+    // 重置:星晶/强化/改装/残骸/出击准备/保底(保留 涂装·机体·成就·图鉴·纪录·任务)
+    const resetKeys = ['deepstrike.crystal', 'deepstrike.boosts', 'deepstrike.tunings', 'deepstrike.scrap', 'deepstrike.loadout', 'deepstrike.pityRare', 'deepstrike.pityEpic', 'deepstrike.offline'];
+    resetKeys.forEach(k => localStorage.removeItem(k));
+    this.crystal = 0; this.boosts = {}; this.tunings = {}; this.scrap = 0; this.loadout = {};
+    this.pityRare = 0; this.pityEpic = 0;
+    this.equippedShip = 'vanguard'; // 机体收藏保留,仅装备回默认
+    this.save();
+    return { ok: true, cores };
+  },
+  eraBuy(id) {
+    const def = this.ERA_TREE.find(x => x.id === id);
+    if (!def) return { ok: false, msg: '未知天赋' };
+    const era = this.eraLoad();
+    const lv = era.spent[id] || 0;
+    if (lv > 0) return { ok: false, msg: '已点亮' };
+    const cost = def.lv; // 核心消耗 = 层级
+    // 前置:同支线按层顺序
+    const branchDone = this.ERA_TREE.filter(x => x.branch === def.branch && x.lv < def.lv).every(x => (era.spent[x.id] || 0) > 0);
+    if (!branchDone) return { ok: false, msg: '需先点亮同支线前层' };
+    if (era.cores < cost) return { ok: false, msg: '纪元核心不足' };
+    era.cores -= cost;
+    era.spent[id] = def.lv;
+    this.eraSave(era);
+    return { ok: true, lv: def.lv };
   },
 
   consumeLoadout() {

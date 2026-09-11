@@ -312,6 +312,7 @@ class Game {
     if (load.relic5) { this._relicFive = true; this._forceRelicDrop = true; } // 情报网络:首艘旗舰必掉 + 连战五选一
     if (load.heal0) this.player.hp = this.player.maxHp;
     if (load.aegis0) this.player.shield = true;
+    if (Shop.eraLv('tec3')) this.pendingLevels += 2; // 纪元·机变 III:出击即获 2 次强化选择
     if (load.bomb2 || load.lv3 || load.relic5 || load.heal0 || load.aegis0)
       this._addFloat(new FloatText(this.player.x, this.player.y - 40, '出击准备生效', '#ffd166', 13));
     this._showState();
@@ -450,8 +451,9 @@ class Game {
     const E = this.evo || {};   // 进化状态
     const sh = this.shipDef || {};
     const A = this.augments || {};   // 海克斯大乱斗:已获符文
-    p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0) + (sh.dmgBonus || 0) + (A.a_might ? 2 : 0) + (E.multi ? 1 : 0); // 「巨力弹头」/ 万炮齐发
-    p.dmgMul = (m.glass ? 1 + 0.2 * m.glass : 1) * (A.a_glass ? 1.5 : 1) * (A.a_urf ? 0.8 : 1); // 玻璃大炮卡(+20%/级) / 符文
+    p.dmgBonus = (m.dmg || 0) + (E.dmg ? 2 : 0) + (sh.dmgBonus || 0) + (A.a_might ? 2 : 0) + (E.multi ? 1 : 0)
+      + (Shop.eraLv('atk1') ? 1 : 0); // 纪元·贯穿 I
+    p.dmgMul = (m.glass ? 1 + 0.2 * m.glass : 1) * (A.a_glass ? 1.5 : 1) * (A.a_urf ? 0.8 : 1) * (Shop.eraLv('atk3') ? 1.08 : 1); // 玻璃大炮卡(+20%/级) / 符文 / 纪元·贯穿 III
     let interval = (p.fireBase || 0.12) * Math.pow(0.88, m.rate || 0);
     if (E.rate) interval *= 0.75;
     if (this.bonds.includes('overdrive')) interval *= 0.85;
@@ -471,14 +473,15 @@ class Game {
     // 海克斯强化:「超频射击」-15% /「无限火力」-35%
     if (A.a_overclock) interval *= 0.85;
     if (A.a_urf) interval *= 0.65;
+    if (Shop.eraLv('atk2')) interval *= 0.94; // 纪元·贯穿 II
     p.fireInterval = Math.max(0.045, interval);
     p.speed = (sh.speed || 330) * Math.pow(1.10, m.speed || 0) * (A.a_engine ? 1.2 : 1) * (E.speed ? 1.25 : 1);
-    p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 45 + 18 * boostLevel('magnet0');
+    p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 45 + 18 * boostLevel('magnet0') + (Shop.eraLv('tec1') ? 30 : 0); // 纪元·机变 I
     if (E.magnet) p.magnetR *= 1.8;
     if (this.relics.r_magnet) p.magnetR *= 1.6;
     // 经验调校 + 经验风暴周变异
     this.xpMult = (1 + 0.15 * (m.xpchip || 0) + 0.04 * boostLevel('xp10')) * (this._mut && this._mut.id === 'surge' ? 1.5 : 1)
-      * (A.a_scav ? 1.4 : 1) * (E.xpchip ? 1.4 : 1) * (this.relics.r_sage ? 1.25 : 1) * (this.mode === 'mayhem' ? 1.5 : 1); // 「拾荒者」符文;大乱斗节奏福利 +50%
+      * (A.a_scav ? 1.4 : 1) * (E.xpchip ? 1.4 : 1) * (this.relics.r_sage ? 1.25 : 1) * (Shop.eraLv('eco2') ? 1.1 : 1) * (this.mode === 'mayhem' ? 1.5 : 1); // 「拾荒者」符文;大乱斗节奏福利 +50%
     this.comboWindow = 2 + 0.7 * (m.combo || 0) + (E.combo ? 2 : 0) + (this.relics.r_frenzy ? 1 : 0);
     p.shieldInterval = Math.max(3, (this.bonds.includes('fortress') ? 6 : 12) - (m.shieldgen || 0)); // 护盾发生器每级充能 -1 秒
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
@@ -494,12 +497,13 @@ class Game {
     const glassHp = m.glass ? (E.glass ? 1 - 0.04 * m.glass : 1 - 0.08 * m.glass) : 1; // 玻璃大炮:逐级 -8%,进化后惩罚减半
     p.maxHp = Math.round(((sh.hp || 100) + 20 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
       + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0)) * glassHp * (A.a_glass ? 0.75 : 1));
-    p.armorPct = Math.min(E.armor ? 0.62 : 0.5, 0.08 * (m.armor || 0) + (E.armor ? 0.12 : 0) + (sh.perkArmor || 0) + (this.tuningLv('armorT') >= 1 ? 0.06 : 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 装甲每级 -8%;泰坦装甲 +12% 并抬上限;装甲改装 I -6%
+    p.armorPct = Math.min(E.armor ? 0.62 : 0.5, 0.08 * (m.armor || 0) + (E.armor ? 0.12 : 0) + (sh.perkArmor || 0) + (this.tuningLv('armorT') >= 1 ? 0.06 : 0) + (Shop.eraLv('def2') ? 0.03 : 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 装甲每级 -8%;泰坦装甲 +12%;装甲改装 I -6%;纪元·庇护 II -3%
     p.regenRate = 0.4 * (m.regen || 0) * (E.regen ? 2 : 1) + (A.a_medic ? 1.5 : 0);
     p.leechPer = 0.45 * (m.leech || 0) + (A.a_leech ? 1 : 0);
     if (E.leech) p.leechPer *= 2; // 血之盛宴
     if (p.devilCost) { p.maxHp = Math.max(1, p.maxHp - p.devilCost); p.hp = Math.min(p.hp, p.maxHp); } // 恶魔契约:生命上限献祭
     if (this.tuningLv('armorT') >= 2) p.maxHp += 20; // 装甲改装 II
+    if (Shop.eraLv('def1')) p.maxHp += 15; // 纪元·庇护 I
     p.hp = Math.min(p.hp, p.maxHp);
     // 幻影僚机:数量同步
     const wingTarget = (m.wingman || 0) + (A.a_army ? 2 : 0) + (E.wingman ? 2 : 0) + (this.tuningLv('wingT') >= 2 ? 1 : 0); // 「分身军团」/幽灵中队/僚机改装 II:+1 不占槽位
@@ -1053,7 +1057,7 @@ class Game {
         this.waveClearT = 1.6;
         const bonus = 200 + this.wave * 100;
         this.score += bonus;
-        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5 + (this.evo.vitality ? 15 : 0) + (this.evo.regen ? 10 : 0));
+        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5 + (this.evo.vitality ? 15 : 0) + (this.evo.regen ? 10 : 0) + (Shop.eraLv('def3') ? 5 : 0)); // 纪元·庇护 III
         // 完美波次:本波未受任何实际伤害
         if (this.waveDamageTaken === 0 && this.wave > 1) {
           this.perfectStreak++;
@@ -1727,7 +1731,7 @@ class Game {
 
   /* ---------------- 炸弹 ---------------- */
   /* 炸弹携带上限:龙魂遗物 +2、「弹药库」海克斯强化 +2 */
-  bombCap() { return (this.relics.r_dragon ? 7 : 5) + ((this.augments && this.augments.a_ammo) ? 2 : 0) + Math.floor(boostLevel('cap0') / 2); }
+  bombCap() { return (this.relics.r_dragon ? 7 : 5) + ((this.augments && this.augments.a_ammo) ? 2 : 0) + Math.floor(boostLevel('cap0') / 2) + (Shop.eraLv('tec2') ? 1 : 0); }
   /* 改装件等级(局外持久,改装工坊) */
   tuningLv(id) { return (typeof Shop !== 'undefined' && Shop.tuningLv(id)) || 0; }
 
@@ -1910,6 +1914,7 @@ class Game {
     if (this._mut && this._mut.id === 'greed') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (this.mods.pact) Shop.lastEarn = Math.round(Shop.lastEarn * (1 + 0.1 * this.mods.pact));
     if (this.hard) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
+    if (Shop.eraLv('eco1')) Shop.lastEarn = Math.round(Shop.lastEarn * 1.1); // 纪元·丰饶 I
     if (this.mode === 'mayhem') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5); // 大乱斗节奏福利
     if (this.augments && this.augments.a_stone) Shop.lastEarn = Math.round(Shop.lastEarn * 2); // 「贤者之石」
     if (this.relics.r_grail) Shop.lastEarn *= 2;
