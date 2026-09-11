@@ -100,6 +100,7 @@ const Ach = {
       const v = this.unlocked[id];
       if (this.def(id)) {
         if (typeof v !== 'number' || v < 0) { this.unlocked[id] = 0; migrated = true; }
+        else if (v > 5) { this.unlocked[id] = 5; migrated = true; } // 等级钳制
         continue;
       }
       delete this.unlocked[id];

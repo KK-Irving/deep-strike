@@ -488,9 +488,13 @@ const Shop = {
     } catch (e) { /* 忽略 */ }
     let tuned = 0;
     for (const id in this.tunings) tuned += this.tunings[id] || 0;
-    const cores = 3 + Math.floor(stars / 2) + tuned;
+    // 核心按「自上次重置以来的新增进度」结算,防止同进度反复重置刷核心
     const era = this.eraLoad();
+    const base = era.lastStars || 0;
+    const delta = Math.max(0, stars - base);
+    const cores = (era.resets === 0 ? 3 : 0) + Math.floor(delta / 2) + tuned; // 基础 3 仅首次,增量防刷
     era.cores += cores;
+    era.lastStars = stars;
     era.resets = (era.resets || 0) + 1;
     this.eraSave(era);
     // 重置:星晶/强化/改装/残骸/出击准备/保底(保留 涂装·机体·成就·图鉴·纪录·任务)
