@@ -37,6 +37,18 @@ Object.assign(Game.prototype, {
             '<span class="ach-tiers">' + a.tiers.map((n, i) => '<i class="' + (i < lv ? 'got' : '') + '">' + fmt(n) + '</i>').join('') + '</span></div></div>';
         }
       }
+      // 远征星图(10 章 ★ 总览)
+      if (typeof CAMPAIGN_CHAPTERS !== 'undefined') {
+        const cst = (function () { try { return JSON.parse(localStorage.getItem('deepstrike.campaign')) || {}; } catch (e) { return {}; } })();
+        let campHtml = '<div class="sec-title">远 征 星 图</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">';
+        for (let ch = 1; ch <= CAMPAIGN_CHAPTERS; ch++) {
+          const st2 = cst[ch] || 0;
+          const unlocked = ch === 1 || (cst[ch - 1] || 0) >= 1;
+          campHtml += '<span class="chip' + (st2 === 3 ? ' evo' : '') + '" style="font-size:11px">' + (unlocked ? ch : '🔒') + ' ' + '★'.repeat(st2) + '☆'.repeat(3 - st2) + '</span>';
+        }
+        campHtml += '</div>';
+        html = campHtml + html;
+      }
       d.achList.innerHTML = html;
       // 敌机图鉴
       if (d.bestiaryGrid) {

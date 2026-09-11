@@ -46,6 +46,9 @@ const SHIPS = [
   { id: 'aegis',     name: '守望',       price: 3200, desc: '护卫型:中坚装甲,宽磁吸',   hp: 125, speed: 320, fire: 0.125, dmgBonus: 0, perkArmor: 0.06, perkMagnet: 40 },
   { id: 'wasp',      name: '黄蜂',       price: 3800, desc: '蜂刺型:极速高频,轻装袭扰', hp: 85,  speed: 390, fire: 0.095, dmgBonus: 1, perkMagnet: 30 },
   { id: 'nova',      name: '新星',       price: 4600, desc: '明星型:高伤火力特化',      hp: 100, speed: 350, fire: 0.11,  dmgBonus: 3 },
+  { id: 'ronin',     name: '浪客',       price: 5200, desc: '剑袭型:窄身高速,双倍弹头', hp: 95,  speed: 370, fire: 0.105, dmgBonus: 2, perkMagnet: 30 },
+  { id: 'fortress2', name: '堡垒·改',    price: 5800, desc: '要塞型:极致重甲,稳如山岳', hp: 150, speed: 300, fire: 0.13,  dmgBonus: 0, perkArmor: 0.12 },
+  { id: 'zenith',    name: '天顶',       price: 6400, desc: '天顶型:全能平衡,自带侧翼', hp: 105, speed: 360, fire: 0.10,  dmgBonus: 1, perkSide: 1, perkMagnet: 20 },
   { id: 'tempest',   name: '风暴棱镜',   ach: 'wave_25', desc: '特化型:开局自带侧翼弹',     hp: 90,  speed: 350, fire: 0.11,  dmgBonus: 0, perkSide: 1 },
   { id: 'titanX',    name: '泰坦·X',     rare: true, desc: '★绚丽机体:全能强袭 · 电磁风暴环绕,仅密匣/兑换获得', hp: 130, speed: 355, fire: 0.10, dmgBonus: 2, perkArmor: 0.08, perkSide: 1, fx: { glow: 2.4, dual: '#8fe4ff', sheen: '#ffffff', trail: 2.1, anim: 'storm', shipTier: 3 } },
   { id: 'seraph',    name: '炽天使',     rare: true, desc: '★绚丽机体:环绕圣光,高机动高伤 · 超新星脉冲,仅密匣/兑换获得', hp: 120, speed: 365, fire: 0.095, dmgBonus: 2, perkArmor: 0.06, perkMagnet: 50, perkSide: 1, fx: { glow: 2.3, dual: '#fff6cf', sheen: '#ffffff', trail: 2.0, anim: 'nova', shipTier: 3 } },
@@ -67,6 +70,9 @@ const SHIP_SHAPES = {
   aegis:      (g) => { g.moveTo(0, -15); g.lineTo(10, -8); g.lineTo(16, 2); g.lineTo(10, 10); g.lineTo(4, 7); g.lineTo(0, 13); g.lineTo(-4, 7); g.lineTo(-10, 10); g.lineTo(-16, 2); g.lineTo(-10, -8); g.closePath(); },
   wasp:       (g) => { g.moveTo(0, -21); g.lineTo(4, -4); g.lineTo(11, 8); g.lineTo(3, 6); g.lineTo(0, 12); g.lineTo(-3, 6); g.lineTo(-11, 8); g.lineTo(-4, -4); g.closePath(); },
   nova:       (g) => { g.moveTo(0, -18); g.lineTo(6, -8); g.lineTo(15, -2); g.lineTo(8, 4); g.lineTo(12, 12); g.lineTo(3, 8); g.lineTo(0, 14); g.lineTo(-3, 8); g.lineTo(-12, 12); g.lineTo(-8, 4); g.lineTo(-15, -2); g.lineTo(-6, -8); g.closePath(); },
+  ronin:     (g) => { g.moveTo(0, -22); g.lineTo(3, -6); g.lineTo(9, 2); g.lineTo(14, 14); g.lineTo(2, 8); g.lineTo(0, 14); g.lineTo(-2, 8); g.lineTo(-14, 14); g.lineTo(-9, 2); g.lineTo(-3, -6); g.closePath(); },
+  fortress2: (g) => { g.moveTo(0, -13); g.lineTo(12, -7); g.lineTo(17, 6); g.lineTo(8, 13); g.lineTo(0, 10); g.lineTo(-8, 13); g.lineTo(-17, 6); g.lineTo(-12, -7); g.closePath(); },
+  zenith:    (g) => { g.moveTo(0, -19); g.lineTo(8, -4); g.lineTo(13, 8); g.lineTo(5, 6); g.lineTo(7, 13); g.lineTo(0, 9); g.lineTo(-7, 13); g.lineTo(-5, 6); g.lineTo(-13, 8); g.lineTo(-8, -4); g.closePath(); },
   bloomlord: (g) => { g.moveTo(0, -16); g.lineTo(8, -8); g.lineTo(15, 4); g.lineTo(8, 6); g.lineTo(6, 13); g.lineTo(0, 9); g.lineTo(-6, 13); g.lineTo(-8, 6); g.lineTo(-15, 4); g.lineTo(-8, -8); g.closePath(); }
 };
 
