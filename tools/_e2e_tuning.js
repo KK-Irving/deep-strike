@@ -67,11 +67,15 @@ const t = H.suite('改装工坊');
     g.bombActive = false;
     out.bombPlus = dummy.taken === 12;
     Shop.tunings = {};
-    // 4) 面板渲染
+    // 4) 面板渲染(含菜单页可见性:面板必须为 menuMain 兄弟节点,防止嵌套隐藏回归)
     g.state = 'menu';
     game.showMenuPanel('tuning');
     const html = document.getElementById('tuningList').innerHTML;
+    const vis = () => { const el = document.getElementById('menuTuning'); return !el.classList.contains('hidden') && el.offsetParent !== null; };
     out.panel = html.indexOf('复合装甲改装') >= 0 && html.indexOf('残骸') >= 0;
+    out.menuVisible = vis();
+    game.showMenuPanel('main');
+    out.backToMain = document.getElementById('menuMain').offsetParent !== null && !vis();
     g.state = 'menu';
     return out;
   });

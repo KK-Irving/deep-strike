@@ -84,7 +84,11 @@ const t = H.suite('深空远征');
     g.state = 'playing'; g.wave = 5; g.waveDamageTaken = 0; g.player.alive = true;
     g.killBoss(mkBoss('dread'));
     out.voyager = !!Shop.owned.voyager;
-    // 7) 成就线存在
+    // 7) 菜单页可见性(面板必须为 menuMain 兄弟节点,防止嵌套隐藏回归)
+    g.showMenuPanel('campaign');
+    const vis = (id) => { const el = document.getElementById(id); return !el.classList.contains('hidden') && el.offsetParent !== null; };
+    out.menuVisible = vis('menuCampaign') && document.getElementById('campaignList').children.length >= 10;
+    // 8) 成就线存在
     out.achLine = ACHIEVEMENTS.some(a => a.id === 'campaign' && a.tiers.length === 5);
     g.state = 'menu';
     return out;
@@ -105,6 +109,7 @@ const t = H.suite('深空远征');
   t.check(r.oneStar, '低击坠+有伤 = 1 星');
   t.check(r.unlockChain && r.unlockAfterStars, '解锁链(上一章 ≥1 星)');
   t.check(r.voyager, '第 10 章首通赠「远征·星辉」');
-  t.check(r.achLine, '远征元帅成就线(5 级)');
+      t.check(r.menuVisible, '深空远征菜单页可见且列出 10 章');
+    t.check(r.achLine, '远征元帅成就线(5 级)');
   t.finish();
 })().catch((e) => { console.error('E2E 异常: ' + e.stack); process.exitCode = 1; });
