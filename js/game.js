@@ -852,6 +852,46 @@ class Game {
   /* ---------------- 波次导演 ---------------- */
 
   /* ---------------- 主更新 ---------------- */
+  /* 波次流:增援补给 / 波清奖励 / 切波(自 update 拆出,v4.0.2) */
+  _updateWaveFlow(dt) {
+    // 波次推进:配额达成 + 出怪完毕且场上无敌人
+    const quotaMet = this.waveKills >= this.waveQuota;
+    if (this.spawnQueue.length === 0 && this.enemies.length === 0 && !this.boss) {
+      if (!quotaMet) {
+        // 配额未达成:持续派出增援,躲避无法过关
+        this.trickleT -= dt;
+        if (this.trickleT <= 0) {
+          this.trickleT = Math.max(0.7, 1.6 - this.wave * 0.06);
+          const roll = RNG();
+          const type = this.wave >= 3 && roll < 0.13 ? 'tank'
+            : this.wave >= 4 && roll < 0.24 ? 'bomber'
+            : this.wave >= 5 && roll < 0.32 ? 'shielder'
+            : this.wave >= 8 && roll < 0.41 ? 'mender'
+            : this.wave >= 7 && roll < 0.48 ? 'jammer'
+            : this.wave >= 2 && roll < 0.66 ? 'waver'
+            : this.wave >= 4 && roll < 0.81 ? 'sniper' : 'drone';
+          this.enemies.push(new Enemy(type, rand(60, W - 60), this.wave, null, this._env));
+        }
+      } else if (this.waveClearT < 0) {
+        this.waveClearT = 1.6;
+        const bonus = 200 + this.wave * 100;
+        this.score += bonus;
+        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5 + (this.evo.vitality ? 15 : 0) + (this.evo.regen ? 10 : 0) + (Shop.eraLv('def3') ? 5 : 0)); // 纪元·庇护 III
+        // 完美波次:本波未受任何实际伤害
+        if (this.waveDamageTaken === 0 && this.wave > 1) {
+          this.perfectStreak++;
+          Ach.unlock('perfect_wave', this);
+          if (this.perfectStreak >= 3) Ach.unlock('perfect_3', this);
+        } else this.perfectStreak = 0;
+        this.banner = { text: 'WAVE CLEAR', sub: '奖励 +' + bonus, life: 1.6, max: 1.6, red: false };
+        AudioSys.waveStart();
+      } else {
+        this.waveClearT -= dt;
+        if (this.waveClearT <= 0) this.startWave(this.wave + 1);
+      }
+    }
+  }
+
   update(dt) {
     this.stars.update(dt, this.state === 'playing' ? 1 : 0.35);
     this._decayFx(dt);
@@ -1035,42 +1075,7 @@ class Game {
 
     this._collide();
 
-    // 波次推进:配额达成 + 出怪完毕且场上无敌人
-    const quotaMet = this.waveKills >= this.waveQuota;
-    if (this.spawnQueue.length === 0 && this.enemies.length === 0 && !this.boss) {
-      if (!quotaMet) {
-        // 配额未达成:持续派出增援,躲避无法过关
-        this.trickleT -= dt;
-        if (this.trickleT <= 0) {
-          this.trickleT = Math.max(0.7, 1.6 - this.wave * 0.06);
-          const roll = RNG();
-          const type = this.wave >= 3 && roll < 0.13 ? 'tank'
-            : this.wave >= 4 && roll < 0.24 ? 'bomber'
-            : this.wave >= 5 && roll < 0.32 ? 'shielder'
-            : this.wave >= 8 && roll < 0.41 ? 'mender'
-            : this.wave >= 7 && roll < 0.48 ? 'jammer'
-            : this.wave >= 2 && roll < 0.66 ? 'waver'
-            : this.wave >= 4 && roll < 0.81 ? 'sniper' : 'drone';
-          this.enemies.push(new Enemy(type, rand(60, W - 60), this.wave, null, this._env));
-        }
-      } else if (this.waveClearT < 0) {
-        this.waveClearT = 1.6;
-        const bonus = 200 + this.wave * 100;
-        this.score += bonus;
-        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5 + (this.evo.vitality ? 15 : 0) + (this.evo.regen ? 10 : 0) + (Shop.eraLv('def3') ? 5 : 0)); // 纪元·庇护 III
-        // 完美波次:本波未受任何实际伤害
-        if (this.waveDamageTaken === 0 && this.wave > 1) {
-          this.perfectStreak++;
-          Ach.unlock('perfect_wave', this);
-          if (this.perfectStreak >= 3) Ach.unlock('perfect_3', this);
-        } else this.perfectStreak = 0;
-        this.banner = { text: 'WAVE CLEAR', sub: '奖励 +' + bonus, life: 1.6, max: 1.6, red: false };
-        AudioSys.waveStart();
-      } else {
-        this.waveClearT -= dt;
-        if (this.waveClearT <= 0) this.startWave(this.wave + 1);
-      }
-    }
+    this._updateWaveFlow(dt);
 
     // 玩家阵亡 → 延迟结算
     if (!this.player.alive) {
