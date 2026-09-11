@@ -77,6 +77,8 @@ const SHIP_SHAPES = {
   ronin:     (g) => { g.moveTo(0, -22); g.lineTo(3, -6); g.lineTo(9, 2); g.lineTo(14, 14); g.lineTo(2, 8); g.lineTo(0, 14); g.lineTo(-2, 8); g.lineTo(-14, 14); g.lineTo(-9, 2); g.lineTo(-3, -6); g.closePath(); },
   fortress2: (g) => { g.moveTo(0, -13); g.lineTo(12, -7); g.lineTo(17, 6); g.lineTo(8, 13); g.lineTo(0, 10); g.lineTo(-8, 13); g.lineTo(-17, 6); g.lineTo(-12, -7); g.closePath(); },
   zenith:    (g) => { g.moveTo(0, -19); g.lineTo(8, -4); g.lineTo(13, 8); g.lineTo(5, 6); g.lineTo(7, 13); g.lineTo(0, 9); g.lineTo(-7, 13); g.lineTo(-5, 6); g.lineTo(-13, 8); g.lineTo(-8, -4); g.closePath(); },
+  riftblade: (g) => { g.moveTo(0, -20); g.lineTo(5, -10); g.lineTo(15, -4); g.lineTo(6, 2); g.lineTo(10, 12); g.lineTo(3, 7); g.lineTo(0, 13); g.lineTo(-3, 7); g.lineTo(-10, 12); g.lineTo(-6, 2); g.lineTo(-15, -4); g.lineTo(-5, -10); g.closePath(); },
+  winterwind:(g) => { g.moveTo(0, -16); g.lineTo(9, -9); g.lineTo(14, 0); g.lineTo(9, 9); g.lineTo(0, 15); g.lineTo(-9, 9); g.lineTo(-14, 0); g.lineTo(-9, -9); g.closePath(); },
   bloomlord: (g) => { g.moveTo(0, -16); g.lineTo(8, -8); g.lineTo(15, 4); g.lineTo(8, 6); g.lineTo(6, 13); g.lineTo(0, 9); g.lineTo(-6, 13); g.lineTo(-8, 6); g.lineTo(-15, 4); g.lineTo(-8, -8); g.closePath(); }
 };
 
