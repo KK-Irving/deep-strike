@@ -529,8 +529,8 @@ Object.assign(Game.prototype, {
       }
       // 挑战模式标识
       if (this.mode !== 'normal') {
-        const tagName = this.mode === 'weekly' ? '周挑战' : this.mode === 'boss' ? '旗舰连战' : this.mode === 'mayhem' ? '海克斯大乱斗' : '每日挑战';
-        const best = this.mode === 'boss' ? this._bossBest() : this.mode === 'mayhem' ? this._mayhemBest() : this._challengeBest();
+        const tagName = this.mode === 'weekly' ? '周挑战' : this.mode === 'boss' ? '旗舰连战' : this.mode === 'mayhem' ? '海克斯大乱斗' : this.mode === 'campaign' ? (this.campaignChapter > 10 ? '远征回廊·' + this.campaignChapter + ' 层' : '远征·第 ' + this.campaignChapter + ' 章') : '每日挑战';
+        const best = this.mode === 'boss' ? this._bossBest() : this.mode === 'campaign' ? this._challengeBest() : this.mode === 'mayhem' ? this._mayhemBest() : this._challengeBest();
         ctx.fillStyle = '#ffd166';
         ctx.font = 'bold 11px Consolas, monospace';
         ctx.fillText(tagName + ' · 纪录 ' + best, W - 14, 54);
