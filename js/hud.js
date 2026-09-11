@@ -126,6 +126,17 @@ Object.assign(Game.prototype, {
         if (unlocked) btn.addEventListener('click', () => { AudioSys.init(); game.start('campaign', ch); });
         el.appendChild(btn);
       }
+      // 无尽回廊:第 10 章通关后开放(层号自 11 起,点击即从当前最深未通关层进入)
+      if ((st[CAMPAIGN_CHAPTERS] || 0) >= 1) {
+        let deepest = CAMPAIGN_CHAPTERS + 1;
+        while (st[deepest] >= 1) deepest++;
+        const btn = document.createElement('button');
+        btn.className = 'menu-btn';
+        btn.style.cssText = 'flex-basis:100%;text-align:left;font-size:13px;border-color:rgba(255,106,213,0.55)';
+        btn.innerHTML = '▸ ♾ 无尽回廊 · 第 ' + deepest + ' 层起 <i style="float:right;color:#ff6ad5">难度无上限</i>';
+        btn.addEventListener('click', () => { AudioSys.init(); game.start('campaign', deepest); });
+        el.appendChild(btn);
+      }
     },
     _renderOffline() {
       const el = this._dom.offlinePanel;

@@ -287,7 +287,7 @@ class Game {
 
   start(challengeMode, campaignChapter) {
     this.mode = challengeMode || 'normal';
-    if (this.mode === 'campaign') this.campaignChapter = Math.max(1, Math.min(CAMPAIGN_CHAPTERS, campaignChapter || this.campaignChapter || 1));
+    if (this.mode === 'campaign') this.campaignChapter = Math.max(1, Math.min(9999, campaignChapter || this.campaignChapter || 1)); // >10 为无尽回廊层
     // 每日/周挑战:播种固定波次序列与抽卡序列;周挑战威胁+1
     // 种子基准保留,供 startWave 按波派生与 _drawChoices 按抽卡序号派生
     Shop.offlineTick(); // 进入对局即起算新一轮离线补给
@@ -322,7 +322,9 @@ class Game {
     if (this.mode === 'weekly') this.banner = { text: '周挑战', sub: this._challengeKey() + (this._mut ? ' · ' + this._mut.icon + ' ' + this._mut.name + ':' + this._mut.desc : '') + ' · 威胁+1,冲击纪录', life: 3.0, max: 3.0, gold: true };
     if (this.mode === 'boss') this.banner = { text: '旗舰连战', sub: '连续击毁不断强化的旗舰 · 每阶段升级+遗物 · 每日芯片限领', life: 2.6, max: 2.6, gold: true };
     if (this.mode === 'mayhem') this.banner = { text: '海克斯大乱斗', sub: '经验/星晶 +50% · 出怪更凶 · 四轮海克斯强化三选一', life: 2.8, max: 2.8, gold: true };
-    if (this.mode === 'campaign') this.banner = { text: '深空远征 · 第 ' + this.campaignChapter + ' 章', sub: '5 波固守 · 击败' + BOSS_VARIANTS[CAMPAIGN_VARIANTS[(this.campaignChapter - 1) % 4]].name, life: 3.0, max: 3.0, gold: true };
+    if (this.mode === 'campaign') this.banner = this.campaignChapter > CAMPAIGN_CHAPTERS
+      ? { text: '远征回廊 · 第 ' + this.campaignChapter + ' 层', sub: '5 波固守 · 击败' + BOSS_VARIANTS[CAMPAIGN_VARIANTS[(this.campaignChapter - 1) % 4]].name + ' · 难度持续攀升', life: 3.0, max: 3.0, gold: true }
+      : { text: '深空远征 · 第 ' + this.campaignChapter + ' 章', sub: '5 波固守 · 击败' + BOSS_VARIANTS[CAMPAIGN_VARIANTS[(this.campaignChapter - 1) % 4]].name, life: 3.0, max: 3.0, gold: true };
   }
 
   /* ---- 每日挑战 ---- */

@@ -188,6 +188,7 @@ Object.assign(Game.prototype, {
     campaignUnlocked(ch) {
       if (ch <= 1) return true;
       const st = this._campaignLoad();
+      if (ch > CAMPAIGN_CHAPTERS) return (st[CAMPAIGN_CHAPTERS] || 0) >= 1; // 回廊:第 10 章通关即全开
       return (st[ch - 1] || 0) >= 1;
     },
 });
