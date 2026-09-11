@@ -401,13 +401,17 @@ class Player {
     const skin = typeof Shop !== 'undefined' ? Shop.skinSprite() : null;
     const flame = skin ? skin.flame : ['rgba(120,230,255,0.9)', 'rgba(0,120,255,0)'];
     const fl = 9 + Math.sin(this.engine) * 3;
-    const fg = ctx.createLinearGradient(0, 10, 0, 24 + fl);
-    fg.addColorStop(0, flame[0]);
-    fg.addColorStop(1, flame[1]);
-    ctx.fillStyle = fg;
-    ctx.beginPath();
-    ctx.moveTo(-3.5, 11); ctx.lineTo(3.5, 11); ctx.lineTo(0, 13 + fl + 6);
-    ctx.closePath(); ctx.fill();
+    const flL = fl * (1 + Math.sin(this.engine * 2.7) * 0.18); // 左右独立抖动
+    const flR = fl * (1 + Math.sin(this.engine * 2.7 + 1.9) * 0.18);
+    for (const [sx, fl2] of [[-5.2, flL], [5.2, flR]]) {
+      const fg = ctx.createLinearGradient(0, 10, 0, 12 + fl2 + 6);
+      fg.addColorStop(0, flame[0]);
+      fg.addColorStop(1, flame[1]);
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.moveTo(sx - 2.4, 11); ctx.lineTo(sx + 2.4, 11); ctx.lineTo(sx, 13 + fl2 + 5);
+      ctx.closePath(); ctx.fill();
+    }
     // 机体(预渲染精灵,应用当前机体造型与皮肤)
     const spr = (typeof Shop !== 'undefined') ? Shop.shipSprite() : (skin || SPRITES.player);
     ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
@@ -1203,11 +1207,12 @@ class Boss {
 
   draw(ctx) {
     const cfg = BOSS_VARIANTS[this.variant];
+    const ph = this.phase || 0; // 阶段形态档位(表现层)
     ctx.save();
     ctx.translate(this.x, this.y);
-    // 旋转外环
+    // 旋转外环(阶段 ≥2 转速 ×2.4)
     ctx.save();
-    ctx.rotate(this.t * 0.7);
+    ctx.rotate(this.t * (ph >= 2 ? 1.68 : 0.7));
     ctx.strokeStyle = cfg.color;
     ctx.globalAlpha = 0.45;
     ctx.lineWidth = 3;
@@ -1219,13 +1224,29 @@ class Boss {
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
+    // 阶段形态(≥1:装甲裂纹;≥2:裂纹加宽);外环转速随阶段提升
+    if (ph >= 1) {
+      ctx.save();
+      g0: {
+        ctx.strokeStyle = ph >= 2 ? 'rgba(255,77,109,0.85)' : 'rgba(255,77,109,0.55)';
+        ctx.lineWidth = ph >= 2 ? 2.4 : 1.5;
+        // 确定性裂纹:以舰体哈希为种子的固定三向裂缝
+        const cracks = [[-30, -22, -8, 26], [12, -30, 34, 10], [-34, 8, -12, 30]];
+        for (const [x1, y1, x2, y2] of cracks) {
+          ctx.beginPath(); ctx.moveTo(x1, y1);
+          ctx.lineTo((x1 + x2) / 2 + 4, (y1 + y2) / 2 - 5);
+          ctx.lineTo(x2, y2); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
     // 舰体(按变体取预渲染精灵——暴君旗舰用专属紫色舰体)
     const spr = SPRITES.boss[this.variant];
     ctx.globalAlpha = 1;
     ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
-    // 核心
-    const pr = 11 + Math.sin(this.t * 5) * 3;
-    ctx.fillStyle = this.flash > 0 ? '#ffffff' : cfg.core;
+    // 核心(阶段 ≥2:转红急闪)
+    const pr = 11 + Math.sin(this.t * (ph >= 2 ? 10 : 5)) * 3;
+    ctx.fillStyle = this.flash > 0 ? '#ffffff' : (ph >= 2 ? '#ff4d6d' : cfg.core);
     ctx.beginPath();
     ctx.arc(0, 0, pr, 0, TAU);
     ctx.fill();
