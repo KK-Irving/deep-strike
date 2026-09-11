@@ -310,7 +310,7 @@ class Game {
     if (load.bomb2) this.player.bombs = Math.min(5, this.player.bombs + 1);
     if (load.lv3) this.pendingLevels += 2;
     if (load.relic5) { this._relicFive = true; this._forceRelicDrop = true; } // 情报网络:首艘旗舰必掉 + 连战五选一
-    if (load.heal0) this.player.hp = this.player.maxHp;
+    if (load.heal0) { this.player.hp = this.player.maxHp; this._heal2x = true; } // 战地维修:过波回复 ×2
     if (load.aegis0) this.player.shield = true;
     if (Shop.eraLv('tec3')) this.pendingLevels += 2; // 纪元·机变 III:出击即获 2 次强化选择
     if (load.bomb2 || load.lv3 || load.relic5 || load.heal0 || load.aegis0)
@@ -498,7 +498,7 @@ class Game {
     p.maxHp = Math.round(((sh.hp || 100) + 20 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
       + 10 * boostLevel('hp25') + (this.relics.r_belt ? 30 : 0)) * glassHp * (A.a_glass ? 0.75 : 1));
     p.armorPct = Math.min(E.armor ? 0.62 : 0.5, 0.08 * (m.armor || 0) + (E.armor ? 0.12 : 0) + (sh.perkArmor || 0) + (this.tuningLv('armorT') >= 1 ? 0.06 : 0) + (Shop.eraLv('def2') ? 0.03 : 0) + Math.min(0.12, 0.012 * boostLevel('shield'))); // 装甲每级 -8%;泰坦装甲 +12%;装甲改装 I -6%;纪元·庇护 II -3%
-    p.regenRate = 0.4 * (m.regen || 0) * (E.regen ? 2 : 1) + (A.a_medic ? 1.5 : 0);
+    p.regenRate = 0.4 * (m.regen || 0) * (E.regen ? 2 : 1) + (A.a_medic ? 1.5 : 0) + (sh.perkRegen || 0); // 堡垒·改:机体自愈
     p.leechPer = 0.45 * (m.leech || 0) + (A.a_leech ? 1 : 0);
     if (E.leech) p.leechPer *= 2; // 血之盛宴
     if (p.devilCost) { p.maxHp = Math.max(1, p.maxHp - p.devilCost); p.hp = Math.min(p.hp, p.maxHp); } // 恶魔契约:生命上限献祭
@@ -876,7 +876,8 @@ class Game {
         this.waveClearT = 1.6;
         const bonus = 200 + this.wave * 100;
         this.score += bonus;
-        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 5 + (this.evo.vitality ? 15 : 0) + (this.evo.regen ? 10 : 0) + (Shop.eraLv('def3') ? 5 : 0)); // 纪元·庇护 III
+        const healMul = this._heal2x ? 2 : 1; // 战地维修:过波回复 ×2
+        if (this.player.alive) this.player.hp = Math.min(this.player.maxHp, this.player.hp + (5 + (this.evo.vitality ? 15 : 0) + (this.evo.regen ? 10 : 0) + (Shop.eraLv('def3') ? 5 : 0)) * healMul); // 纪元·庇护 III
         // 完美波次:本波未受任何实际伤害
         if (this.waveDamageTaken === 0 && this.wave > 1) {
           this.perfectStreak++;

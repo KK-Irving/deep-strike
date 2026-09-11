@@ -604,6 +604,71 @@ class Player {
         ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.4, 0, TAU); ctx.fill();
       }
       ctx.globalAlpha = 1;
+    } else if (fx.anim === 'horizon') {
+      // 黑洞视界:吸积环 + 内陷粒子
+      const ring = ctx.createRadialGradient(0, 0, 6, 0, 0, 22);
+      ring.addColorStop(0, 'rgba(10,10,20,0.95)');
+      ring.addColorStop(0.55, 'rgba(122,74,255,0.5)');
+      ring.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = ring;
+      ctx.beginPath(); ctx.arc(0, 0, 22, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(184,168,255,0.9)'; ctx.lineWidth = 1.6;
+      for (let i = 0; i < 3; i++) {
+        const rr = 12 + i * 4 + Math.sin(t * 3 + i) * 1.2;
+        ctx.beginPath(); ctx.ellipse(0, 0, rr, rr * 0.42, t * (1.1 + i * 0.35), 0, TAU); ctx.stroke();
+      }
+      for (let i = 0; i < 5; i++) {
+        const a = t * 2.4 + i / 5 * TAU;
+        ctx.fillStyle = 'rgba(200,180,255,0.8)';
+        ctx.beginPath(); ctx.arc(Math.cos(a) * (20 - (t * 6 + i * 4) % 9), Math.sin(a) * (20 - (t * 6 + i * 4) % 9), 1.3, 0, TAU); ctx.fill();
+      }
+    } else if (fx.anim === 'thorchain') {
+      // 天罚雷链:机体周围折线雷弧
+      ctx.strokeStyle = 'rgba(143,220,255,0.9)'; ctx.lineWidth = 1.6;
+      for (let i = 0; i < 3; i++) {
+        if (((t * 6 + i * 7) % 9) < 3.2) {   // 间歇放电
+          let a0 = t * 1.5 + i / 3 * TAU;
+          ctx.beginPath(); ctx.moveTo(Math.cos(a0) * 10, Math.sin(a0) * 10);
+          for (let k = 1; k <= 3; k++) {
+            const a1 = a0 + (k % 2 ? 0.5 : -0.4) + Math.sin(t * 11 + k + i) * 0.3;
+            ctx.lineTo(Math.cos(a1) * (10 + k * 6), Math.sin(a1) * (10 + k * 6));
+          }
+          ctx.stroke();
+        }
+      }
+      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 14);
+      glow.addColorStop(0, 'rgba(200,240,255,0.5)');
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
+    } else if (fx.anim === 'rift') {
+      // 空间裂隙:机体两侧撕开的紫绿裂口
+      for (const sx of [-15, 15]) {
+        const h = 12 + Math.sin(t * 5 + sx) * 4;
+        ctx.fillStyle = 'rgba(122,255,212,0.55)';
+        ctx.beginPath();
+        ctx.moveTo(sx, -h); ctx.lineTo(sx + 4, 0); ctx.lineTo(sx, h); ctx.lineTo(sx - 4, 0);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(122,255,212,0.9)'; ctx.lineWidth = 1.2; ctx.stroke();
+      }
+      // 裂隙电光
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(-15, -8 + Math.sin(t * 9) * 6); ctx.lineTo(15, 8 - Math.sin(t * 9) * 6); ctx.stroke();
+    } else if (fx.anim === 'frostnova') {
+      // 寒霜新星:六向冰晶 + 呼吸霜环
+      ctx.strokeStyle = 'rgba(174,240,255,0.85)'; ctx.lineWidth = 1.4;
+      for (let i = 0; i < 6; i++) {
+        const a = i / 6 * TAU + t * 0.6;
+        const r1 = 8, r2 = 15 + Math.sin(t * 4 + i) * 3;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
+        ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(Math.cos(a) * r2, Math.sin(a) * r2, 1.4, 0, TAU); ctx.stroke();
+      }
+      const fr = 17 + Math.sin(t * 2.4) * 3;
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath(); ctx.arc(0, 0, fr, 0, TAU);
+      ctx.strokeStyle = 'rgba(174,240,255,0.7)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.globalAlpha = 1;
     } else if (fx.anim === 'void') {
       // 虚空:中心吞噬暗核(反差用深色描边 + 亮环)
       ctx.globalAlpha = 0.6; ctx.strokeStyle = dual; ctx.lineWidth = 2;
