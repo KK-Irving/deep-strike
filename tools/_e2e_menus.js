@@ -27,8 +27,15 @@ const t = H.suite('菜单页全量冒烟');
   t.check(await vis('menuStats'), '战绩档案页可见');
   const achOk = await page.evaluate(() => document.getElementById('achList').children.length > 0);
   t.check(achOk, '成就分级列表已渲染');
-  // 3) 商城(皮肤页/密匣/出击准备真实点击)
+  // 3) 出击模式二级页(5 模式按钮 + 纪录行)与机库中心二级页
   await page.keyboard.press('Escape');
+  await page.click('#btnModes');
+  t.check(await vis('menuModes'), '出击模式二级页可见');
+  t.check(await page.evaluate(() => document.querySelectorAll('#menuModes .menu-btn:not(#btnModesBack)').length === 5), '出击模式列出 5 种玩法');
+  t.check(await page.evaluate(() => document.getElementById('modeRecords').innerHTML.indexOf('纪录') >= 0), '模式纪录行渲染');
+  await page.keyboard.press('Escape');
+  await page.click('#btnHangar');
+  t.check(await vis('menuHangar'), '机库中心二级页可见');
   await page.click('#btnShop');
   t.check(await vis('menuShop'), '商城页可见');
   // 3a) 买一款皮肤
@@ -45,6 +52,7 @@ const t = H.suite('菜单页全量冒烟');
   if (boxBtn) { try { await boxBtn.click({ timeout: 2000 }); } catch (e) { /* 动画遮罩 */ } }
   // 4) 深空远征:进入 + 点击第一章真实开局
   await page.keyboard.press('Escape');
+  await page.evaluate(() => game.showMenuPanel('modes'));
   await page.click('#btnCampaign');
   t.check(await vis('menuCampaign'), '深空远征页可见');
   const chapterBtns = await page.$$('#campaignList .menu-btn');

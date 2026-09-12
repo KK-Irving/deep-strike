@@ -73,6 +73,12 @@ Object.assign(Game.prototype, {
       return !!b && b.state === 'fight' && b.fireCd > 0 && b.fireCd < 0.55
         && (b.variant === 'dread' || (b.variant === 'tyrant' && b.phase === 0));
     },
+    _renderModeRecords() {
+      const el = document.getElementById('modeRecords');
+      if (!el) return;
+      el.innerHTML = '纪录 · 每日 ' + this._modeBest('daily') + ' · 周挑战 ' + this._modeBest('weekly')
+        + ' · 连战 ' + this._bossBest() + ' · 大乱斗 ' + this._mayhemBest() + ' · 远征星 ' + this.campaignStars();
+    },
     _renderSave() {
       const ta = document.getElementById('saveText');
       const msg = document.getElementById('saveMsg');
@@ -203,6 +209,7 @@ Object.assign(Game.prototype, {
       this.menuPanel = name;
       if (name === 'stats') this._refreshStatsPanel();
       if (name === 'save') this._renderSave();
+      if (name === 'modes') this._renderModeRecords();
       if (name === 'shop') Shop.renderPanel();
       this._showState();
     },
@@ -221,6 +228,8 @@ Object.assign(Game.prototype, {
         d.menuCampaign.classList.toggle('hidden', this.menuPanel !== 'campaign');
         d.menuTuning.classList.toggle('hidden', this.menuPanel !== 'tuning');
         d.menuSave.classList.toggle('hidden', this.menuPanel !== 'save');
+        d.menuModes.classList.toggle('hidden', this.menuPanel !== 'modes');
+        d.menuHangar.classList.toggle('hidden', this.menuPanel !== 'hangar');
         d.menuHelp.classList.toggle('hidden', this.menuPanel !== 'help');
         d.menuStats.classList.toggle('hidden', this.menuPanel !== 'stats');
         d.menuShop.classList.toggle('hidden', this.menuPanel !== 'shop');

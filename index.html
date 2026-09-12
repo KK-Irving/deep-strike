@@ -18,22 +18,45 @@
   <div id="menuMain" class="menu-page">
     <div class="menu-btns">
       <button id="btnStart" class="menu-btn primary">▸ 开始出击 <i>Enter</i></button>
-      <button id="btnDaily" class="menu-btn">▸ 每日挑战 <i>D</i></button>
-      <button id="btnWeekly" class="menu-btn">▸ 周挑战 <i>W</i></button>
-      <button id="btnBoss" class="menu-btn">▸ 旗舰连战 <i>B</i></button>
-      <button id="btnMayhem" class="menu-btn">▸ 海克斯大乱斗 <i>L</i></button>
-      <button id="btnCampaign" class="menu-btn">▸ 深空远征 <i>C</i></button>
-      <button id="btnTuning" class="menu-btn">▸ 改装工坊 <i>残骸 <b id="scrapHint">0</b></i></button>
+      <button id="btnModes" class="menu-btn">▸ 出击模式 <i>5 种玩法</i></button>
+      <button id="btnHangar" class="menu-btn">▸ 机库中心 <i>商城·改装</i></button>
       <button id="btnSave" class="menu-btn">▸ 存档中心 <i>备份·纪元</i></button>
-      <button id="btnShop" class="menu-btn">▸ 机库商城 <i>G</i></button>
-      <button id="btnHelp" class="menu-btn">▸ 玩法说明 <i>H</i></button>
       <button id="btnStats" class="menu-btn">▸ 战绩档案 <i>T</i></button>
+      <button id="btnHelp" class="menu-btn">▸ 玩法说明 <i>H</i></button>
       <button id="btnHard" class="menu-btn">▸ 高难模式:关 <i>星晶×1.5</i></button>
     </div>
     <div class="hint">击落敌机拾取道具,连击提升得分倍率 · 每 5 波遭遇旗舰 BOSS<br>触屏:单指拖动移动并连发,双指点按放炸弹</div>
     <div id="offlinePanel" class="task-panel hidden"></div>
     <div id="taskPanel" class="task-panel"></div>
     <div id="menuHi" class="hi-score">最高纪录 0</div>
+  </div>
+
+  <!-- 出击模式(二级) -->
+  <div id="menuModes" class="menu-page hidden">
+    <div class="panel scroll">
+      <div class="sec-title">出 击 模 式</div>
+      <div class="menu-btns">
+        <button id="btnDaily" class="menu-btn">▸ 每日挑战 <i>D</i></button>
+        <button id="btnWeekly" class="menu-btn">▸ 周挑战 <i>W</i></button>
+        <button id="btnBoss" class="menu-btn">▸ 旗舰连战 <i>B</i></button>
+        <button id="btnMayhem" class="menu-btn">▸ 海克斯大乱斗 <i>L</i></button>
+        <button id="btnCampaign" class="menu-btn">▸ 深空远征 <i>C</i></button>
+      </div>
+      <div id="modeRecords" class="hint" style="margin-top:10px"></div>
+      <button class="menu-btn" id="btnModesBack">▸ 返回 <i>Esc</i></button>
+    </div>
+  </div>
+
+  <!-- 机库中心(二级) -->
+  <div id="menuHangar" class="menu-page hidden">
+    <div class="panel scroll">
+      <div class="sec-title">机 库 中 心</div>
+      <div class="menu-btns">
+        <button id="btnShop" class="menu-btn">▸ 机库商城 <i>G</i></button>
+        <button id="btnTuning" class="menu-btn">▸ 改装工坊 <i>残骸 <b id="scrapHint">0</b></i></button>
+      </div>
+      <button class="menu-btn" id="btnHangarBack">▸ 返回 <i>Esc</i></button>
+    </div>
   </div>
 
   <!-- 存档中心 -->

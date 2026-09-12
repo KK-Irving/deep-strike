@@ -150,6 +150,8 @@ class Game {
       menuCampaign: document.getElementById('menuCampaign'),
       menuTuning: document.getElementById('menuTuning'),
       menuSave: document.getElementById('menuSave'),
+      menuModes: document.getElementById('menuModes'),
+      menuHangar: document.getElementById('menuHangar'),
       btnHard: document.getElementById('btnHard'),
       cardRow: document.getElementById('cardRow'),
       ownRow: document.getElementById('ownRow')

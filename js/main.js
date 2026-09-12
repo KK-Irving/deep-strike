@@ -120,6 +120,10 @@
   $('btnTuning').addEventListener('click', () => game.showMenuPanel('tuning'));
   $('btnTuningBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnSave').addEventListener('click', () => game.showMenuPanel('save'));
+  $('btnModes').addEventListener('click', () => game.showMenuPanel('modes'));
+  $('btnModesBack').addEventListener('click', () => game.showMenuPanel('main'));
+  $('btnHangar').addEventListener('click', () => game.showMenuPanel('hangar'));
+  $('btnHangarBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnSaveBack').addEventListener('click', () => game.showMenuPanel('main'));
   $('btnExportSave').addEventListener('click', () => {
     const code = Shop.exportSave();

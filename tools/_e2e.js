@@ -37,6 +37,7 @@ const path = require('path');
   await page.waitForTimeout(400);
 
   // 打开商城
+  await page.evaluate(() => game.showMenuPanel('hangar'));
   await page.click('#btnShop');
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(outDir, '01-shop-top.png') });
