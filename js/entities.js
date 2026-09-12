@@ -169,6 +169,286 @@ class Starfield {
 /* ============================================================
  * 玩家
  * ============================================================ */
+
+/* 绚丽动效绘制查表(v4.2.3 查表化):anim 名 → 绘制函数(g, fx, t) */
+const DAZZLE_PAINTERS = {
+    prism(ctx, fx, t, acc, dual) {
+      const hue = (t * 70) % 360;
+      // 双向反旋彩环
+      for (let ring = 0; ring < 2; ring++) {
+        const dir = ring ? -1 : 1;
+        for (let i = 0; i < 6; i++) {
+          const a = dir * t * 1.4 + i / 6 * TAU;
+          const r = 18 + ring * 6 + Math.sin(t * 3 + i) * 1.5;
+          ctx.fillStyle = 'hsla(' + ((hue + i * 60 + ring * 30) % 360) + ',100%,68%,0.85)';
+          ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.9, 0, TAU); ctx.fill();
+        }
+      }
+      // 折射光刺(6 向,长度脉动)
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 6; i++) {
+        const a = t * 0.8 + i / 6 * TAU;
+        const len = 24 + Math.sin(t * 4 + i) * 6;
+        ctx.strokeStyle = 'hsla(' + ((hue + i * 60) % 360) + ',100%,72%,0.5)';
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * 8, Math.sin(a) * 8);
+        ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len); ctx.stroke();
+      }
+      // 中心棱光
+      ctx.fillStyle = 'hsla(' + hue + ',100%,85%,0.6)';
+      ctx.beginPath(); ctx.arc(0, 0, 4 + Math.sin(t * 6) * 1.5, 0, TAU); ctx.fill();
+    },
+    halo(ctx, fx, t, acc, dual) {
+
+      // 倾斜光晕(椭圆,缓慢摆动)
+      ctx.save();
+      ctx.rotate(Math.sin(t * 0.8) * 0.3);
+      ctx.strokeStyle = acc; ctx.globalAlpha = 0.7; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.ellipse(0, -14, 13, 5, 0, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 0.35; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(0, -14, 16, 6.5, 0, 0, TAU); ctx.stroke();
+      ctx.restore();
+      // 三振翅羽光(左右对称,上下扇动)
+      const beat = Math.sin(t * 3) * 0.4;
+      ctx.globalAlpha = 0.6; ctx.strokeStyle = dual; ctx.lineWidth = 2;
+      for (const side of [-1, 1]) for (let i = 0; i < 3; i++) {
+        const a = side * (0.5 + i * 0.35 + beat);
+        const len = 20 + i * 3;
+        ctx.beginPath(); ctx.moveTo(side * 4, 0);
+        ctx.quadraticCurveTo(side * len * 0.6, -4, side * len, -2 - i * 3); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    },
+    orbit(ctx, fx, t, acc, dual) {
+
+      // 事件视界暗环
+      ctx.globalAlpha = 0.5; ctx.strokeStyle = dual; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(0, 0, 9 + Math.sin(t * 4) * 1.2, 0, TAU); ctx.stroke();
+      // 吸积盘:两条相反倾角的尘埃带,粒子向内螺旋
+      ctx.globalAlpha = 1;
+      for (let band = 0; band < 2; band++) {
+        const tilt = band ? -0.5 : 0.5;
+        for (let i = 0; i < 10; i++) {
+          const phase = (t * 1.1 + i / 10 + band * 0.5) % 1;
+          const r = 8 + (1 - phase) * 24;
+          const a = i / 10 * TAU + t * (2 + band);
+          const px = Math.cos(a) * r, py = Math.sin(a) * r * (1 - Math.abs(tilt) * 0.5);
+          ctx.fillStyle = band ? dual : acc;
+          ctx.globalAlpha = 0.2 + phase * 0.7;
+          ctx.beginPath(); ctx.arc(px, py + tilt * px * 0.3, 1.2 + phase * 1.3, 0, TAU); ctx.fill();
+        }
+      }
+      // 极向喷流(上下)
+      ctx.globalAlpha = 0.4; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+      const jet = 18 + Math.sin(t * 5) * 5;
+      ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(0, -jet); ctx.moveTo(0, 6); ctx.lineTo(0, jet); ctx.stroke();
+      ctx.globalAlpha = 1;
+    },
+    wings(ctx, fx, t, acc, dual) {
+
+      // 不死鸟:上下扇动的火焰羽翼(多层羽片)
+      const flap = 0.5 + Math.sin(t * 3) * 0.35;
+      for (const side of [-1, 1]) {
+        for (let f = 0; f < 3; f++) {
+          // 渐变端点为固定局部坐标 → 缓存复用(原每帧 create 6 次)
+          const grad = this._dazzleGrad(ctx, fx, 'w' + side + '_' + f, (g) => {
+            const gr = g.createLinearGradient(side * 4, 0, side * (18 + f * 8), 0);
+            gr.addColorStop(0, acc);
+            gr.addColorStop(1, 'rgba(255,60,0,0)');
+            return gr;
+          });
+          ctx.fillStyle = grad; ctx.globalAlpha = 0.65 - f * 0.12;
+          const spread = (f - 1) * 0.5 + flap * 0.6;
+          ctx.beginPath();
+          ctx.moveTo(side * 4, 2);
+          ctx.quadraticCurveTo(side * (16 + f * 6), -6 + spread * 10, side * (22 + f * 8), 2 + spread * 8);
+          ctx.quadraticCurveTo(side * (14 + f * 5), 4 + spread * 6, side * 5, 7);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+      // 升腾火羽粒子
+      for (let i = 0; i < 4; i++) {
+        const ph = (t * 1.5 + i / 4) % 1;
+        ctx.fillStyle = dual; ctx.globalAlpha = (1 - ph) * 0.8;
+        ctx.beginPath(); ctx.arc(Math.sin(i * 2 + t) * 6, 6 - ph * 22, 1.6 * (1 - ph) + 0.6, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    },
+    nova(ctx, fx, t, acc, dual) {
+
+      // 超新星:周期性冲击波爆环(节律脉冲)
+      const period = 1.6;
+      const ph = (t % period) / period;          // 0→1
+      const r = 6 + ph * 30;
+      ctx.globalAlpha = (1 - ph) * 0.8; ctx.strokeStyle = acc; ctx.lineWidth = 3 * (1 - ph) + 0.5;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+      // 次级波(相位错开)
+      const ph2 = ((t + period * 0.5) % period) / period;
+      ctx.globalAlpha = (1 - ph2) * 0.5; ctx.strokeStyle = dual;
+      ctx.beginPath(); ctx.arc(0, 0, 6 + ph2 * 30, 0, TAU); ctx.stroke();
+      // 放射光芒(旋转)
+      ctx.globalAlpha = 0.6; ctx.lineWidth = 1.5; ctx.strokeStyle = '#ffffff';
+      for (let i = 0; i < 8; i++) {
+        const a = t * 0.6 + i / 8 * TAU;
+        const len = 12 + Math.sin(t * 8 + i) * 4;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * 7, Math.sin(a) * 7);
+        ctx.lineTo(Math.cos(a) * (7 + len), Math.sin(a) * (7 + len)); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    },
+    storm(ctx, fx, t, acc, dual) {
+
+      // 电磁风暴:环绕跳动的锯齿电弧
+      ctx.strokeStyle = acc; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.85;
+      const arcs = 3;
+      for (let k = 0; k < arcs; k++) {
+        const base = t * 2 + k / arcs * TAU;
+        ctx.beginPath();
+        const seg = 7;
+        for (let s = 0; s <= seg; s++) {
+          const a = base + s / seg * (TAU / arcs);
+          // 锯齿半径:用正弦+伪随机抖动模拟闪电
+          const jag = 15 + ((Math.sin(a * 9 + t * 20) + Math.sin(a * 4 - t * 13)) * 2.2);
+          const px = Math.cos(a) * jag, py = Math.sin(a) * jag;
+          s ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        }
+        ctx.stroke();
+      }
+      // 随机火花
+      ctx.globalAlpha = 0.9; ctx.fillStyle = dual;
+      for (let i = 0; i < 4; i++) {
+        const a = t * 5 + i * 1.7;
+        const r = 15 + Math.sin(t * 30 + i * 3) * 3;
+        ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.4, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    },
+    horizon(ctx, fx, t, acc, dual) {
+
+      // 黑洞视界:吸积环 + 内陷粒子
+      const ring = ctx.createRadialGradient(0, 0, 6, 0, 0, 22);
+      ring.addColorStop(0, 'rgba(10,10,20,0.95)');
+      ring.addColorStop(0.55, 'rgba(122,74,255,0.5)');
+      ring.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = ring;
+      ctx.beginPath(); ctx.arc(0, 0, 22, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(184,168,255,0.9)'; ctx.lineWidth = 1.6;
+      for (let i = 0; i < 3; i++) {
+        const rr = 12 + i * 4 + Math.sin(t * 3 + i) * 1.2;
+        ctx.beginPath(); ctx.ellipse(0, 0, rr, rr * 0.42, t * (1.1 + i * 0.35), 0, TAU); ctx.stroke();
+      }
+      for (let i = 0; i < 5; i++) {
+        const a = t * 2.4 + i / 5 * TAU;
+        ctx.fillStyle = 'rgba(200,180,255,0.8)';
+        ctx.beginPath(); ctx.arc(Math.cos(a) * (20 - (t * 6 + i * 4) % 9), Math.sin(a) * (20 - (t * 6 + i * 4) % 9), 1.3, 0, TAU); ctx.fill();
+      }
+    },
+    thorchain(ctx, fx, t, acc, dual) {
+
+      // 天罚雷链:机体周围折线雷弧
+      ctx.strokeStyle = 'rgba(143,220,255,0.9)'; ctx.lineWidth = 1.6;
+      for (let i = 0; i < 3; i++) {
+        if (((t * 6 + i * 7) % 9) < 3.2) {   // 间歇放电
+          let a0 = t * 1.5 + i / 3 * TAU;
+          ctx.beginPath(); ctx.moveTo(Math.cos(a0) * 10, Math.sin(a0) * 10);
+          for (let k = 1; k <= 3; k++) {
+            const a1 = a0 + (k % 2 ? 0.5 : -0.4) + Math.sin(t * 11 + k + i) * 0.3;
+            ctx.lineTo(Math.cos(a1) * (10 + k * 6), Math.sin(a1) * (10 + k * 6));
+          }
+          ctx.stroke();
+        }
+      }
+      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 14);
+      glow.addColorStop(0, 'rgba(200,240,255,0.5)');
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
+    },
+    rift(ctx, fx, t, acc, dual) {
+
+      // 空间裂隙:机体两侧撕开的紫绿裂口
+      for (const sx of [-15, 15]) {
+        const h = 12 + Math.sin(t * 5 + sx) * 4;
+        ctx.fillStyle = 'rgba(122,255,212,0.55)';
+        ctx.beginPath();
+        ctx.moveTo(sx, -h); ctx.lineTo(sx + 4, 0); ctx.lineTo(sx, h); ctx.lineTo(sx - 4, 0);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(122,255,212,0.9)'; ctx.lineWidth = 1.2; ctx.stroke();
+      }
+      // 裂隙电光
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(-15, -8 + Math.sin(t * 9) * 6); ctx.lineTo(15, 8 - Math.sin(t * 9) * 6); ctx.stroke();
+    },
+    frostnova(ctx, fx, t, acc, dual) {
+
+      // 寒霜新星:六向冰晶 + 呼吸霜环
+      ctx.strokeStyle = 'rgba(174,240,255,0.85)'; ctx.lineWidth = 1.4;
+      for (let i = 0; i < 6; i++) {
+        const a = i / 6 * TAU + t * 0.6;
+        const r1 = 8, r2 = 15 + Math.sin(t * 4 + i) * 3;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
+        ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(Math.cos(a) * r2, Math.sin(a) * r2, 1.4, 0, TAU); ctx.stroke();
+      }
+      const fr = 17 + Math.sin(t * 2.4) * 3;
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath(); ctx.arc(0, 0, fr, 0, TAU);
+      ctx.strokeStyle = 'rgba(174,240,255,0.7)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.globalAlpha = 1;
+    },
+    void(ctx, fx, t, acc, dual) {
+
+      // 虚空:中心吞噬暗核(反差用深色描边 + 亮环)
+      ctx.globalAlpha = 0.6; ctx.strokeStyle = dual; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 7 + Math.sin(t * 3) * 1.5, 0, TAU); ctx.stroke();
+      // 三颗暗色卫星绕行,各带拖影
+      for (let i = 0; i < 3; i++) {
+        const a = t * 1.8 + i / 3 * TAU;
+        const rx = 22, ry = 12;                    // 椭圆轨道
+        for (let tr = 0; tr < 4; tr++) {
+          const aa = a - tr * 0.18;
+          const px = Math.cos(aa) * rx, py = Math.sin(aa) * ry;
+          ctx.globalAlpha = (1 - tr / 4) * 0.7;
+          ctx.fillStyle = tr === 0 ? acc : dual;
+          ctx.beginPath(); ctx.arc(px, py, (tr === 0 ? 2.6 : 1.6) * (1 - tr / 5), 0, TAU); ctx.fill();
+        }
+      }
+      // 吞噬脉动核心
+      ctx.globalAlpha = 0.5 + Math.sin(t * 4) * 0.3; ctx.fillStyle = acc;
+      ctx.beginPath(); ctx.arc(0, 0, 3, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+    },
+    bloom(ctx, fx, t, acc, dual) {
+
+      // 花神:绽放/收拢的光之花冠(6 瓣,呼吸式开合)
+      const open = 0.5 + Math.sin(t * 1.6) * 0.5;   // 0→1 开合
+      const petals = 6;
+      for (let i = 0; i < petals; i++) {
+        const a = t * 0.5 + i / petals * TAU;
+        const reach = 12 + open * 14;
+        const mx = Math.cos(a) * reach, my = Math.sin(a) * reach;
+        // 花瓣中心逐帧移动:平移到局部原点,径向渐变按原点缓存(原每帧 create 6 次)
+        ctx.save();
+        ctx.translate(mx, my);
+        const grad = this._dazzleGrad(ctx, fx, 'bloom', (g) => {
+          const gr = g.createRadialGradient(0, 0, 0, 0, 0, 6);
+          gr.addColorStop(0, acc);
+          gr.addColorStop(1, 'rgba(0,0,0,0)');
+          return gr;
+        });
+        ctx.fillStyle = grad; ctx.globalAlpha = 0.5 + open * 0.4;
+        ctx.beginPath(); ctx.ellipse(0, 0, 4 + open * 2, 6 + open * 3, a, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+      // 花蕊流转
+      ctx.globalAlpha = 0.9; ctx.fillStyle = dual;
+      for (let i = 0; i < 5; i++) {
+        const a = -t * 1.5 + i / 5 * TAU;
+        ctx.beginPath(); ctx.arc(Math.cos(a) * 5, Math.sin(a) * 5, 1.4, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    },
+};
 class Player {
   constructor() { this.reset(); }
   reset(shipDef) {
@@ -467,260 +747,8 @@ class Player {
     const acc = fx.accent, dual = fx.dual;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    if (fx.anim === 'prism') {
-      const hue = (t * 70) % 360;
-      // 双向反旋彩环
-      for (let ring = 0; ring < 2; ring++) {
-        const dir = ring ? -1 : 1;
-        for (let i = 0; i < 6; i++) {
-          const a = dir * t * 1.4 + i / 6 * TAU;
-          const r = 18 + ring * 6 + Math.sin(t * 3 + i) * 1.5;
-          ctx.fillStyle = 'hsla(' + ((hue + i * 60 + ring * 30) % 360) + ',100%,68%,0.85)';
-          ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.9, 0, TAU); ctx.fill();
-        }
-      }
-      // 折射光刺(6 向,长度脉动)
-      ctx.lineWidth = 1.5;
-      for (let i = 0; i < 6; i++) {
-        const a = t * 0.8 + i / 6 * TAU;
-        const len = 24 + Math.sin(t * 4 + i) * 6;
-        ctx.strokeStyle = 'hsla(' + ((hue + i * 60) % 360) + ',100%,72%,0.5)';
-        ctx.beginPath(); ctx.moveTo(Math.cos(a) * 8, Math.sin(a) * 8);
-        ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len); ctx.stroke();
-      }
-      // 中心棱光
-      ctx.fillStyle = 'hsla(' + hue + ',100%,85%,0.6)';
-      ctx.beginPath(); ctx.arc(0, 0, 4 + Math.sin(t * 6) * 1.5, 0, TAU); ctx.fill();
-    } else if (fx.anim === 'halo') {
-      // 倾斜光晕(椭圆,缓慢摆动)
-      ctx.save();
-      ctx.rotate(Math.sin(t * 0.8) * 0.3);
-      ctx.strokeStyle = acc; ctx.globalAlpha = 0.7; ctx.lineWidth = 2.2;
-      ctx.beginPath(); ctx.ellipse(0, -14, 13, 5, 0, 0, TAU); ctx.stroke();
-      ctx.globalAlpha = 0.35; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.ellipse(0, -14, 16, 6.5, 0, 0, TAU); ctx.stroke();
-      ctx.restore();
-      // 三振翅羽光(左右对称,上下扇动)
-      const beat = Math.sin(t * 3) * 0.4;
-      ctx.globalAlpha = 0.6; ctx.strokeStyle = dual; ctx.lineWidth = 2;
-      for (const side of [-1, 1]) for (let i = 0; i < 3; i++) {
-        const a = side * (0.5 + i * 0.35 + beat);
-        const len = 20 + i * 3;
-        ctx.beginPath(); ctx.moveTo(side * 4, 0);
-        ctx.quadraticCurveTo(side * len * 0.6, -4, side * len, -2 - i * 3); ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-    } else if (fx.anim === 'orbit') {
-      // 事件视界暗环
-      ctx.globalAlpha = 0.5; ctx.strokeStyle = dual; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(0, 0, 9 + Math.sin(t * 4) * 1.2, 0, TAU); ctx.stroke();
-      // 吸积盘:两条相反倾角的尘埃带,粒子向内螺旋
-      ctx.globalAlpha = 1;
-      for (let band = 0; band < 2; band++) {
-        const tilt = band ? -0.5 : 0.5;
-        for (let i = 0; i < 10; i++) {
-          const phase = (t * 1.1 + i / 10 + band * 0.5) % 1;
-          const r = 8 + (1 - phase) * 24;
-          const a = i / 10 * TAU + t * (2 + band);
-          const px = Math.cos(a) * r, py = Math.sin(a) * r * (1 - Math.abs(tilt) * 0.5);
-          ctx.fillStyle = band ? dual : acc;
-          ctx.globalAlpha = 0.2 + phase * 0.7;
-          ctx.beginPath(); ctx.arc(px, py + tilt * px * 0.3, 1.2 + phase * 1.3, 0, TAU); ctx.fill();
-        }
-      }
-      // 极向喷流(上下)
-      ctx.globalAlpha = 0.4; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
-      const jet = 18 + Math.sin(t * 5) * 5;
-      ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(0, -jet); ctx.moveTo(0, 6); ctx.lineTo(0, jet); ctx.stroke();
-      ctx.globalAlpha = 1;
-    } else if (fx.anim === 'wings') {
-      // 不死鸟:上下扇动的火焰羽翼(多层羽片)
-      const flap = 0.5 + Math.sin(t * 3) * 0.35;
-      for (const side of [-1, 1]) {
-        for (let f = 0; f < 3; f++) {
-          // 渐变端点为固定局部坐标 → 缓存复用(原每帧 create 6 次)
-          const grad = this._dazzleGrad(ctx, fx, 'w' + side + '_' + f, (g) => {
-            const gr = g.createLinearGradient(side * 4, 0, side * (18 + f * 8), 0);
-            gr.addColorStop(0, acc);
-            gr.addColorStop(1, 'rgba(255,60,0,0)');
-            return gr;
-          });
-          ctx.fillStyle = grad; ctx.globalAlpha = 0.65 - f * 0.12;
-          const spread = (f - 1) * 0.5 + flap * 0.6;
-          ctx.beginPath();
-          ctx.moveTo(side * 4, 2);
-          ctx.quadraticCurveTo(side * (16 + f * 6), -6 + spread * 10, side * (22 + f * 8), 2 + spread * 8);
-          ctx.quadraticCurveTo(side * (14 + f * 5), 4 + spread * 6, side * 5, 7);
-          ctx.closePath(); ctx.fill();
-        }
-      }
-      ctx.globalAlpha = 1;
-      // 升腾火羽粒子
-      for (let i = 0; i < 4; i++) {
-        const ph = (t * 1.5 + i / 4) % 1;
-        ctx.fillStyle = dual; ctx.globalAlpha = (1 - ph) * 0.8;
-        ctx.beginPath(); ctx.arc(Math.sin(i * 2 + t) * 6, 6 - ph * 22, 1.6 * (1 - ph) + 0.6, 0, TAU); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    } else if (fx.anim === 'nova') {
-      // 超新星:周期性冲击波爆环(节律脉冲)
-      const period = 1.6;
-      const ph = (t % period) / period;          // 0→1
-      const r = 6 + ph * 30;
-      ctx.globalAlpha = (1 - ph) * 0.8; ctx.strokeStyle = acc; ctx.lineWidth = 3 * (1 - ph) + 0.5;
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
-      // 次级波(相位错开)
-      const ph2 = ((t + period * 0.5) % period) / period;
-      ctx.globalAlpha = (1 - ph2) * 0.5; ctx.strokeStyle = dual;
-      ctx.beginPath(); ctx.arc(0, 0, 6 + ph2 * 30, 0, TAU); ctx.stroke();
-      // 放射光芒(旋转)
-      ctx.globalAlpha = 0.6; ctx.lineWidth = 1.5; ctx.strokeStyle = '#ffffff';
-      for (let i = 0; i < 8; i++) {
-        const a = t * 0.6 + i / 8 * TAU;
-        const len = 12 + Math.sin(t * 8 + i) * 4;
-        ctx.beginPath(); ctx.moveTo(Math.cos(a) * 7, Math.sin(a) * 7);
-        ctx.lineTo(Math.cos(a) * (7 + len), Math.sin(a) * (7 + len)); ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-    } else if (fx.anim === 'storm') {
-      // 电磁风暴:环绕跳动的锯齿电弧
-      ctx.strokeStyle = acc; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.85;
-      const arcs = 3;
-      for (let k = 0; k < arcs; k++) {
-        const base = t * 2 + k / arcs * TAU;
-        ctx.beginPath();
-        const seg = 7;
-        for (let s = 0; s <= seg; s++) {
-          const a = base + s / seg * (TAU / arcs);
-          // 锯齿半径:用正弦+伪随机抖动模拟闪电
-          const jag = 15 + ((Math.sin(a * 9 + t * 20) + Math.sin(a * 4 - t * 13)) * 2.2);
-          const px = Math.cos(a) * jag, py = Math.sin(a) * jag;
-          s ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-        }
-        ctx.stroke();
-      }
-      // 随机火花
-      ctx.globalAlpha = 0.9; ctx.fillStyle = dual;
-      for (let i = 0; i < 4; i++) {
-        const a = t * 5 + i * 1.7;
-        const r = 15 + Math.sin(t * 30 + i * 3) * 3;
-        ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.4, 0, TAU); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    } else if (fx.anim === 'horizon') {
-      // 黑洞视界:吸积环 + 内陷粒子
-      const ring = ctx.createRadialGradient(0, 0, 6, 0, 0, 22);
-      ring.addColorStop(0, 'rgba(10,10,20,0.95)');
-      ring.addColorStop(0.55, 'rgba(122,74,255,0.5)');
-      ring.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = ring;
-      ctx.beginPath(); ctx.arc(0, 0, 22, 0, TAU); ctx.fill();
-      ctx.strokeStyle = 'rgba(184,168,255,0.9)'; ctx.lineWidth = 1.6;
-      for (let i = 0; i < 3; i++) {
-        const rr = 12 + i * 4 + Math.sin(t * 3 + i) * 1.2;
-        ctx.beginPath(); ctx.ellipse(0, 0, rr, rr * 0.42, t * (1.1 + i * 0.35), 0, TAU); ctx.stroke();
-      }
-      for (let i = 0; i < 5; i++) {
-        const a = t * 2.4 + i / 5 * TAU;
-        ctx.fillStyle = 'rgba(200,180,255,0.8)';
-        ctx.beginPath(); ctx.arc(Math.cos(a) * (20 - (t * 6 + i * 4) % 9), Math.sin(a) * (20 - (t * 6 + i * 4) % 9), 1.3, 0, TAU); ctx.fill();
-      }
-    } else if (fx.anim === 'thorchain') {
-      // 天罚雷链:机体周围折线雷弧
-      ctx.strokeStyle = 'rgba(143,220,255,0.9)'; ctx.lineWidth = 1.6;
-      for (let i = 0; i < 3; i++) {
-        if (((t * 6 + i * 7) % 9) < 3.2) {   // 间歇放电
-          let a0 = t * 1.5 + i / 3 * TAU;
-          ctx.beginPath(); ctx.moveTo(Math.cos(a0) * 10, Math.sin(a0) * 10);
-          for (let k = 1; k <= 3; k++) {
-            const a1 = a0 + (k % 2 ? 0.5 : -0.4) + Math.sin(t * 11 + k + i) * 0.3;
-            ctx.lineTo(Math.cos(a1) * (10 + k * 6), Math.sin(a1) * (10 + k * 6));
-          }
-          ctx.stroke();
-        }
-      }
-      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 14);
-      glow.addColorStop(0, 'rgba(200,240,255,0.5)');
-      glow.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = glow;
-      ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
-    } else if (fx.anim === 'rift') {
-      // 空间裂隙:机体两侧撕开的紫绿裂口
-      for (const sx of [-15, 15]) {
-        const h = 12 + Math.sin(t * 5 + sx) * 4;
-        ctx.fillStyle = 'rgba(122,255,212,0.55)';
-        ctx.beginPath();
-        ctx.moveTo(sx, -h); ctx.lineTo(sx + 4, 0); ctx.lineTo(sx, h); ctx.lineTo(sx - 4, 0);
-        ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = 'rgba(122,255,212,0.9)'; ctx.lineWidth = 1.2; ctx.stroke();
-      }
-      // 裂隙电光
-      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 0.8;
-      ctx.beginPath(); ctx.moveTo(-15, -8 + Math.sin(t * 9) * 6); ctx.lineTo(15, 8 - Math.sin(t * 9) * 6); ctx.stroke();
-    } else if (fx.anim === 'frostnova') {
-      // 寒霜新星:六向冰晶 + 呼吸霜环
-      ctx.strokeStyle = 'rgba(174,240,255,0.85)'; ctx.lineWidth = 1.4;
-      for (let i = 0; i < 6; i++) {
-        const a = i / 6 * TAU + t * 0.6;
-        const r1 = 8, r2 = 15 + Math.sin(t * 4 + i) * 3;
-        ctx.beginPath(); ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
-        ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2); ctx.stroke();
-        ctx.beginPath(); ctx.arc(Math.cos(a) * r2, Math.sin(a) * r2, 1.4, 0, TAU); ctx.stroke();
-      }
-      const fr = 17 + Math.sin(t * 2.4) * 3;
-      ctx.globalAlpha = 0.35;
-      ctx.beginPath(); ctx.arc(0, 0, fr, 0, TAU);
-      ctx.strokeStyle = 'rgba(174,240,255,0.7)'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.globalAlpha = 1;
-    } else if (fx.anim === 'void') {
-      // 虚空:中心吞噬暗核(反差用深色描边 + 亮环)
-      ctx.globalAlpha = 0.6; ctx.strokeStyle = dual; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(0, 0, 7 + Math.sin(t * 3) * 1.5, 0, TAU); ctx.stroke();
-      // 三颗暗色卫星绕行,各带拖影
-      for (let i = 0; i < 3; i++) {
-        const a = t * 1.8 + i / 3 * TAU;
-        const rx = 22, ry = 12;                    // 椭圆轨道
-        for (let tr = 0; tr < 4; tr++) {
-          const aa = a - tr * 0.18;
-          const px = Math.cos(aa) * rx, py = Math.sin(aa) * ry;
-          ctx.globalAlpha = (1 - tr / 4) * 0.7;
-          ctx.fillStyle = tr === 0 ? acc : dual;
-          ctx.beginPath(); ctx.arc(px, py, (tr === 0 ? 2.6 : 1.6) * (1 - tr / 5), 0, TAU); ctx.fill();
-        }
-      }
-      // 吞噬脉动核心
-      ctx.globalAlpha = 0.5 + Math.sin(t * 4) * 0.3; ctx.fillStyle = acc;
-      ctx.beginPath(); ctx.arc(0, 0, 3, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 1;
-    } else if (fx.anim === 'bloom') {
-      // 花神:绽放/收拢的光之花冠(6 瓣,呼吸式开合)
-      const open = 0.5 + Math.sin(t * 1.6) * 0.5;   // 0→1 开合
-      const petals = 6;
-      for (let i = 0; i < petals; i++) {
-        const a = t * 0.5 + i / petals * TAU;
-        const reach = 12 + open * 14;
-        const mx = Math.cos(a) * reach, my = Math.sin(a) * reach;
-        // 花瓣中心逐帧移动:平移到局部原点,径向渐变按原点缓存(原每帧 create 6 次)
-        ctx.save();
-        ctx.translate(mx, my);
-        const grad = this._dazzleGrad(ctx, fx, 'bloom', (g) => {
-          const gr = g.createRadialGradient(0, 0, 0, 0, 0, 6);
-          gr.addColorStop(0, acc);
-          gr.addColorStop(1, 'rgba(0,0,0,0)');
-          return gr;
-        });
-        ctx.fillStyle = grad; ctx.globalAlpha = 0.5 + open * 0.4;
-        ctx.beginPath(); ctx.ellipse(0, 0, 4 + open * 2, 6 + open * 3, a, 0, TAU); ctx.fill();
-        ctx.restore();
-      }
-      // 花蕊流转
-      ctx.globalAlpha = 0.9; ctx.fillStyle = dual;
-      for (let i = 0; i < 5; i++) {
-        const a = -t * 1.5 + i / 5 * TAU;
-        ctx.beginPath(); ctx.arc(Math.cos(a) * 5, Math.sin(a) * 5, 1.4, 0, TAU); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
+    const painter = DAZZLE_PAINTERS[fx.anim];
+    if (painter) painter.call(this, ctx, fx, t, acc, dual);
     ctx.restore();
   }
 }
