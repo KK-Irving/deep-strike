@@ -131,8 +131,12 @@ Object.assign(Game.prototype, {
       }
       // 关卡目标:必须击坠足够数量的敌机才能过关,躲避无法通关
       const hordeMul = this.waveMod && this.waveMod.id === 'horde' ? 1.4 : 1;
-      this.waveQuota = Math.ceil(this.spawnQueue.length * 0.65 * hordeMul * (this.mode === 'mayhem' ? 1.3 : 1)); // 大乱斗:出怪 +30%
-      this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机';
+      // 新手曲线:前 3 波配额系数下调(对标竞品开局节奏);大乱斗出怪 +30%
+      const quotaCoef = n <= 3 ? 0.5 : 0.65;
+      this.waveQuota = Math.max(1, Math.ceil(this.spawnQueue.length * quotaCoef * hordeMul * (this.mode === 'mayhem' ? 1.3 : 1)));
+      this.waveDeadline = 45 + n * 2; // 超时慈悲:开波 45s 后每 8s 配额 -1(最低 1),全波次启用防死锁
+      this._mercyT = this.waveDeadline || 0;
+      this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机' + (this.waveDeadline ? '(超时将请求支援)' : '');
       // 精英机:第 3 波起概率随队,第 7 波起可能双精英,第 10 波起概率出现双词缀精英;猎杀周大增
       const huntWeek = this._mut && this._mut.id === 'hunt';
       if (n >= 3 && RNG() < (huntWeek ? 0.9 : 0.65)) {

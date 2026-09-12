@@ -288,6 +288,15 @@ Object.assign(Game.prototype, {
       skip.innerHTML = '▸ 跳过本次升级(暂存,稍后自动弹出)';
       skip.addEventListener('click', () => this.skipUpgrade());
       row.appendChild(skip);
+      // XP 洪流出口:待选等级堆积时提供批量跳过(折算星晶与得分)
+      if (this.pendingLevels > 3) {
+        const skipAll = document.createElement('button');
+        skipAll.className = 'menu-btn';
+        skipAll.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center;margin-top:6px;color:#ffd166';
+        skipAll.innerHTML = '▸ 全部跳过并折算(剩 ' + this.pendingLevels + ' 次 → 每次折算 300 分 + 20★)';
+        skipAll.addEventListener('click', () => this.skipAllLevels());
+        row.appendChild(skipAll);
+      }
     },
     _renderRelics() {
       this._dom.lvTitle.textContent = '⬆ 远古遗物';

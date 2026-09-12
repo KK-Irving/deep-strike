@@ -279,7 +279,8 @@ class Game {
     this.evo = {}; this.bulletFreezeT = 0;
     this.relics = {}; this.pendingRelic = false; this._relicMode = false; this._relicChoices = [];
     this.augments = {}; this._cometT = 0; this._coilT = 0; this._ammoT = 0; // 海克斯大乱斗:符文与计时器
-    this._forceRelicDrop = false; this._phoenixUsed = false;
+    this._forceRelicDrop = false; this._phoenixUsed = false; this._firstDropDone = false;
+    this._mercyAcc = 0;
     this._campKills = 0; this._campQuota = 0; this._campClean = true; this._campPrev = null; // 深空远征统计
     this._devilMode = false; this._devilChoices = []; this._devilPending = false;
     this.levelupCooldown = 0;
@@ -711,6 +712,23 @@ class Game {
     this._renderCards();
   }
 
+  /* 批量跳过:XP 洪流时一次折算全部待选等级(得分 + 星晶),消灭弹窗地狱 */
+  skipAllLevels() {
+    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode) return;
+    const n = Math.max(0, this.pendingLevels);
+    if (n <= 0) return;
+    this.pendingLevels = 0;
+    this._cardChoices = [];
+    this._pendingSwap = null; this._swapList = null;
+    this.levelupCooldown = 3;
+    const star = n * 20;
+    this.score += n * 300;
+    Shop.addCrystal(star);
+    this._addFloat(new FloatText(this.player.x, this.player.y - 30, '批量跳过 ×' + n + ' · +' + (n * 300) + ' 分 +' + star + '★', '#ffd166', 13));
+    this.state = 'playing';
+    this._showState();
+  }
+
   /* 跳过本次升级:暂存待选等级,获得经验后自动重新弹出(遗物奖励不可跳过) */
   skipUpgrade() {
     if (this.state !== 'levelup' || this._relicMode) return;
@@ -854,6 +872,34 @@ class Game {
   /* ---------------- 波次导演 ---------------- */
 
   /* ---------------- 主更新 ---------------- */
+  /* 超时慈悲:开波超时后每 8s 配额 -1(最低 1),消灭无限增援死锁 */
+  _updateMercy(dt) {
+    if (this.mode === 'boss' || !this.waveDeadline) return;
+    // 支援舰队清扫:超时 16s 后强制清场达成,彻底消灭死锁
+    if (this.waveTime > this.waveDeadline + 16 && this.enemies.length && this.state === 'playing' && this.player.alive) {
+      for (const en of this.enemies) {
+        if (en.dead) continue;
+        en.dead = true;
+        this._explode(en.x, en.y, en.r, '#ffd166', 0.8);
+      }
+      this.waveKills = Math.max(this.waveKills, this.waveQuota);
+      this._addFloat(new FloatText(W / 2, 224, '支援舰队抵达 · 战场已清扫', '#ffd166', 13));
+      AudioSys.bomb();
+      return;
+    }
+    if (this.waveQuota <= 1) return;
+    if (this.waveTime > this.waveDeadline) {
+      this._mercyAcc = (this._mercyAcc || 0) + dt;
+      if (this._mercyAcc >= 8) {
+        this._mercyAcc = 0;
+        if (this.waveQuota > 1) {
+          this.waveQuota--;
+          this._addFloat(new FloatText(W / 2, 200, '支援抵达 · 目标 -1(' + this.waveQuota + ')', '#ffd166', 13));
+        }
+      }
+    }
+  }
+
   /* 波次流:增援补给 / 波清奖励 / 切波(自 update 拆出,v4.0.2) */
   _updateWaveFlow(dt) {
     // 波次推进:配额达成 + 出怪完毕且场上无敌人
@@ -1078,6 +1124,7 @@ class Game {
 
     this._collide();
 
+    this._updateMercy(dt); // 超时慈悲:配额递减,消灭无限增援死锁
     this._updateWaveFlow(dt);
 
     // 玩家阵亡 → 延迟结算
@@ -1406,6 +1453,10 @@ class Game {
       DailyTasks.bump('combo', this.combo, this);
     }
     // 成就
+    if (this.runKills === 1 && this.mode === 'normal' && !this._firstDropDone) {
+      this._firstDropDone = true; // 首杀必掉火力:开局爽点(对标竞品开局掉落)
+      this._dropPower(e.x, e.y, 'power');
+    }
     Ach.unlock('first_kill', this);
     if (this.runKills >= 60) Ach.unlock('run_kill60', this);
     if (this.combo >= 30) Ach.unlock('combo_30', this);
