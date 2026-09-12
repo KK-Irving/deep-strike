@@ -401,13 +401,16 @@ class Player {
     const skin = typeof Shop !== 'undefined' ? Shop.skinSprite() : null;
     const flame = skin ? skin.flame : ['rgba(120,230,255,0.9)', 'rgba(0,120,255,0)'];
     const fl = 9 + Math.sin(this.engine) * 3;
+    // 火焰渐变缓存(固定最大长度,零每帧分配)
+    if (!this._flameGrad) {
+      this._flameGrad = ctx.createLinearGradient(0, 10, 0, 32);
+      this._flameGrad.addColorStop(0, flame[0]);
+      this._flameGrad.addColorStop(1, flame[1]);
+    }
+    ctx.fillStyle = this._flameGrad;
     const flL = fl * (1 + Math.sin(this.engine * 2.7) * 0.18); // 左右独立抖动
     const flR = fl * (1 + Math.sin(this.engine * 2.7 + 1.9) * 0.18);
     for (const [sx, fl2] of [[-5.2, flL], [5.2, flR]]) {
-      const fg = ctx.createLinearGradient(0, 10, 0, 12 + fl2 + 6);
-      fg.addColorStop(0, flame[0]);
-      fg.addColorStop(1, flame[1]);
-      ctx.fillStyle = fg;
       ctx.beginPath();
       ctx.moveTo(sx - 2.4, 11); ctx.lineTo(sx + 2.4, 11); ctx.lineTo(sx, 13 + fl2 + 5);
       ctx.closePath(); ctx.fill();
