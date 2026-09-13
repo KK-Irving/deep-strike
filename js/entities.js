@@ -564,7 +564,7 @@ class Player {
     const multiN = (m.multi || 0) + (game.evo.multi ? 1 : 0); // 万炮齐发:额外 +1 路
     const dmg = (1 + this.dmgBonus) * this.dmgMul;
     const pierce = (m.pierce || 0) + (game.evo.pierce ? 2 : 0);
-    const split = m.split || 0;
+    const split = (m.split || 0) + ((game.shipDef && game.shipDef.perkSplit) || 0); // 裂片:机体天生裂变
     const mk = (ox, oy, vx, vy, extra) =>
       P.push(Object.assign({ x: this.x + ox, y: this.y + oy, vx, vy, r: 3, dmg, color: '#dffaff', dead: false, pierce, split }, extra || {}));
     if (m.railgun) {

@@ -16,8 +16,8 @@ const t = H.suite('商城扩充与去重');
   const r = await page.evaluate(() => {
     const g = window.game;
     const out = {};
-    out.skins24 = SKINS.length === 24;   // 22 + 2 新绚丽
-    out.ships18 = SHIPS.length === 18;   // 16 + 2 新绚丽
+    out.skins24 = SKINS.length === 26;   // 22 + 2 绚丽(v4.1.0)+ 2 高级(v4.3.1)
+    out.ships18 = SHIPS.length === 20;   // 16 + 2 绚丽(v4.1.0)+ 2 机制内建(v4.3.1)
     out.rarePool = SKINS.filter(x => x.rare).length === 6 && SHIPS.filter(x => x.rare).length === 6;
     // 新动效分支存在性:渲染四种新绚丽机体不抛错
     Shop.crystal = 999999;

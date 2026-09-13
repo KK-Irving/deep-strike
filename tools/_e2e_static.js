@@ -192,6 +192,16 @@ function checkVersionSync() {
 
 /* ------------------------------------------------------------------ 主流程 */
 
+/* --------------------------------------------- 2.5) 商城完整性:每款机体必须有 hull 造型 */
+  function checkShopIntegrity() {
+    const shop = fs.readFileSync(path.join(ROOT, 'js', 'shop.js'), 'utf8');
+    const shipIds = [...shop.matchAll(/{ id: '(w+)',s*name: '[^']+'/g)].map(mm => mm[1]);
+    const shapes = [...shop.matchAll(/^  (w+):s*(g) =>/gm)].map(mm => mm[1]);
+    const missing = shipIds.filter(id => !shapes.includes(id));
+    t.check(missing.length === 0, '每款出击机体都有 SHIP_SHAPES 造型(缺失: ' + (missing.join(',') || '无') + ')');
+  }
+  checkShopIntegrity();
+
 (async () => {
   checkEncoding(listTextFiles(ROOT, []));
   checkStreamHygiene();

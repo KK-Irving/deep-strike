@@ -336,6 +336,7 @@ class Game {
     if (load.bomb2) this.player.bombs = Math.min(5, this.player.bombs + 1);
     if (load.lv3) this.pendingLevels += 2;
     if (load.relic5) { this._relicFive = true; this._forceRelicDrop = true; } // 情报网络:首艘旗舰必掉 + 连战五选一
+    if (load.aegis0) for (let i = 0; i < 2; i++) this._dropPower(this.player.x + (i ? 40 : -40), this.player.y - 60); // 空投呼叫:双补给
     if (load.heal0) { this.player.hp = this.player.maxHp; this._heal2x = true; } // 战地维修:过波回复 ×2
     if (load.aegis0) this.player.shield = true;
     if (Shop.eraLv('tec3')) this.pendingLevels += 2; // 纪元·机变 III:出击即获 2 次强化选择
@@ -515,7 +516,8 @@ class Game {
     // 时滞力场:敌弹整体减速(「时间领主」羁绊强化每层效果)
     const timePerStack = this.bonds.includes('chrono') ? 0.16 : 0.10;
     const timeCap = this.bonds.includes('chrono') ? 0.62 : 0.50;
-    this.bulletSlow = (m.time || 0) ? 1 - Math.min(timeCap, timePerStack * m.time) : 1;
+    const timeStacks = (m.time || 0) + ((this.shipDef && this.shipDef.perkTime) || 0); // 潮汐:机体天生时滞
+    this.bulletSlow = timeStacks ? 1 - Math.min(timeCap, timePerStack * timeStacks) : 1;
     if (this.relics.r_voidwatch) this.bulletSlow = Math.max(0.3, this.bulletSlow * 0.9);
     if (m.pact) this.bulletSlow = Math.min(1.25, this.bulletSlow * (1 + (E.pact ? 0.015 : 0.03) * m.pact)); // 贪婪契约:敌弹加速(黄金契约惩罚减半)
     if (A.a_chrono) this.bulletSlow *= 0.7; // 「时间领主」:敌弹永久减速 30%
@@ -1311,7 +1313,7 @@ class Game {
   /* 单发子弹命中结算:暴击 / 贯穿 / 裂变 */
   _hitTarget(b, e) {
     let dmg = b.dmg;
-    let cc = 0.1 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0)
+    let cc = 0.1 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0) + ((this.shipDef && this.shipDef.perkCrit) ? 0.1 : 0)
       + (this.mods.brittle ? 0.3 : 0);
     // 虚空之刃:回旋刃暴击率 ×1.5
     if (b.boom && this.bonds.includes('voidedge')) cc *= 1.5;
