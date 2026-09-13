@@ -492,6 +492,24 @@ Object.assign(Game.prototype, {
         ctx.stroke();
         ctx.restore();
       }
+      // 过载能量条(底边上沿,Phase 7.3)
+      if (this.state === 'playing' && (this.overload || 0) > 0) {
+        const ov = Math.min(100, this.overload);
+        ctx.save();
+        ctx.fillStyle = 'rgba(10,20,40,0.6)';
+        ctx.fillRect(W / 2 - 60, H - 16, 120, 7);
+        ctx.fillStyle = ov >= 100 ? ((Math.sin(performance.now() / 120) > 0) ? '#ffd166' : '#ff9a3c') : '#ff9a3c';
+        ctx.fillRect(W / 2 - 60, H - 16, 120 * ov / 100, 7);
+        ctx.strokeStyle = 'rgba(255,209,102,0.7)'; ctx.lineWidth = 1;
+        ctx.strokeRect(W / 2 - 60, H - 16, 120, 7);
+        if (ov >= 100) {
+          ctx.fillStyle = '#ffd166';
+          ctx.font = 'bold 10px "Segoe UI", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('⚡ 过载就绪 G', W / 2, H - 20);
+        }
+        ctx.restore();
+      }
       // 擦弹计数(右下小字,Phase 7.2)
       if (this.state === 'playing' && (this.grazeCount || 0) > 0) {
         ctx.save();

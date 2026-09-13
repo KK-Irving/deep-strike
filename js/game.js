@@ -305,6 +305,7 @@ class Game {
     this._forceRelicDrop = false; this._phoenixUsed = false; this._firstDropDone = false;
     this._mercyAcc = 0;
     this.grazeCount = 0;
+    this.overload = 0; // 过载能量 0~100
     this._campKills = 0; this._campQuota = 0; this._campClean = true; this._campPrev = null; // 深空远征统计
     this._devilMode = false; this._devilChoices = []; this._devilPending = false;
     this.levelupCooldown = 0;
@@ -376,22 +377,29 @@ class Game {
     if (this.mode === 'campaign') return 'campaign-' + (this.campaignChapter || 1);
     return this.mode === 'weekly' ? this._weekKey() : this._dailyKey();
   }
-  /* 闪避冲刺:沿当前移动方向短距位移 + 0.3s 无敌(冷却 2.5s) */
-  playerDash(dir) {
+  /* 过载大招:全屏 30 伤害 + 清弹 + 5s 狂热 */
+  overloadBurst() {
     const p = this.player;
-    if (this.state !== 'playing' || !p.alive || (p.dashCd || 0) > 0 || p.dashT > 0) return false;
-    const k = this.keys;
-    let dx = (dir === 'left' || k.left) ? -1 : (dir === 'right' || k.right) ? 1 : 0;
-    let dy = (dir === 'up' || k.up) ? -1 : (dir === 'down' || k.down) ? 1 : 0;
-    if (!dx && !dy) dy = -1; // 无方向默认向上闪
-    const len = Math.hypot(dx, dy);
-    p.dashVx = dx / len * 1400;
-    p.dashVy = dy / len * 1400;
-    p.dashT = 0.18;
-    p.dashCd = 2.5;
-    p.invuln = Math.max(p.invuln, 0.3);
-    AudioSys.dash && AudioSys.dash();
-    this._sparks(p.x, p.y, '#aef0ff', 6);
+    if (this.state !== 'playing' || !p.alive || (this.overload || 0) < 100) return false;
+    this.overload = 0;
+    this.buffs.frenzy = Math.max(this.buffs.frenzy, 5);
+    this.enemyBullets.length = 0;
+    for (const en of this.enemies) {
+      if (!en.dead) {
+        en.damage(30, this, true);
+        this._sparks(en.x, en.y, '#ffd166', 3);
+      }
+    }
+    if (this.boss && this.boss.state === 'fight') {
+      this.boss.damage(30, this, true);
+      if (this.boss.pods) for (const pod of this.boss.pods) if (!pod.dead) this.boss.hitPod(pod, 15, this);
+    }
+    this.rings.push(new Ring(p.x, p.y, '#ffd166', 460, 0.8));
+    this.rings.push(new Ring(p.x, p.y, '#ff9a3c', 300, 0.55));
+    this.flashT = 0.3; this.flashColor = 'rgba(255,209,102,';
+    this.shake(10, 0.5);
+    this._addFloat(new FloatText(p.x, p.y - 34, '⚡ 过载爆发!', '#ffd166', 16));
+    AudioSys.bomb();
     return true;
   }
 
@@ -413,6 +421,7 @@ class Game {
     this._sparks(p.x, p.y, '#aef0ff', 6);
     return true;
   }
+
 
   /* 当前模式配置(模式统一基础层) */
   cfg() { return MODES[this.mode] || MODES.normal; }
@@ -1522,6 +1531,7 @@ class Game {
     if (this.relics.r_dice && RNG() < 0.10) this._dropPower(e.x, e.y);
     if (this.mode === 'campaign') { this._campPrevKills = this.waveKills; this._campPrevQuota = this.waveQuota; }
     this.stats.kills = this._stat('kills', 0) + 1;
+    this.overload = Math.min(100, (this.overload || 0) + 2); // 过载:击坠充能
     if (this.combo > this._stat('bestCombo', 0)) this.stats.bestCombo = this.combo;
     this._achEvaluate();
     this.waveKills++;
@@ -1670,6 +1680,7 @@ class Game {
       this.orbs.push(new XPOrb(b.x + Math.cos(a) * 40, b.y + Math.sin(a) * 24, 4));
     }
     Shop.addScrap(this.cfg().scrap); // 旗舰残骸(改装件材料,配置驱动)
+    this.overload = Math.min(100, (this.overload || 0) + 20); // 过载:旗舰大量充能
     // 深空远征:第 5 波旗舰击毁即章节结算
     if (this.mode === 'campaign' && this.wave === 5) {
       this._campKills += this.waveKills;
