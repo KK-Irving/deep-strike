@@ -492,6 +492,15 @@ Object.assign(Game.prototype, {
         ctx.stroke();
         ctx.restore();
       }
+      // 擦弹计数(右下小字,Phase 7.2)
+      if (this.state === 'playing' && (this.grazeCount || 0) > 0) {
+        ctx.save();
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(255,233,138,0.75)';
+        ctx.font = '10px Consolas, monospace';
+        ctx.fillText('GRAZE ' + this.grazeCount, W - 12, H - 8);
+        ctx.restore();
+      }
       if (this.bombActive) {
         const f = 1 - this.bombT / 0.9;
         ctx.strokeStyle = 'rgba(170,240,255,' + Math.max(0, 1 - f) + ')';

@@ -304,6 +304,7 @@ class Game {
     this.augments = {}; this._cometT = 0; this._coilT = 0; this._ammoT = 0; // 海克斯大乱斗:符文与计时器
     this._forceRelicDrop = false; this._phoenixUsed = false; this._firstDropDone = false;
     this._mercyAcc = 0;
+    this.grazeCount = 0;
     this._campKills = 0; this._campQuota = 0; this._campClean = true; this._campPrev = null; // 深空远征统计
     this._devilMode = false; this._devilChoices = []; this._devilPending = false;
     this.levelupCooldown = 0;
@@ -1101,6 +1102,21 @@ class Game {
       // 时滞力场 + 寒霜
       const sdt = dt * this.bulletSlow * (this.buffs.frost > 0 ? 0.4 : 1);
       b.x += b.vx * sdt; b.y += b.vy * sdt;
+      // 擦弹:敌弹贴近判定点掠过(未命中)计一次,满 15 次奖励炸弹(Phase 7.2)
+      const p0 = this.player;
+      if (p0.alive && !b.grazed && !b.dead) {
+        const dd = Math.hypot(b.x - p0.x, b.y - p0.y);
+        if (dd < p0.r + 24 && dd > p0.r + 6) {
+          b.grazed = true;
+          this.grazeCount = (this.grazeCount || 0) + 1;
+          this._sparks(b.x, b.y, '#ffe98a', 1);
+          if (this.grazeCount % 15 === 0 && this.player.bombs < this.bombCap()) {
+            this.player.bombs++;
+            this._addFloat(new FloatText(p0.x, p0.y - 34, '擦弹奖励 炸弹+1', '#ffe98a', 13));
+            AudioSys.powerup();
+          }
+        }
+      }
       if (b.dead || b.y > H + 20 || b.y < -30 || b.x < -20 || b.x > W + 20) this.enemyBullets.splice(i, 1);
     }
     this._updateArr(this.enemies, dt);
