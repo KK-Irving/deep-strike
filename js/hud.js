@@ -481,6 +481,17 @@ Object.assign(Game.prototype, {
         }
       }
 
+      // 闪避冲刺冷却指示(判定点下方小弧)
+      if (this.state === 'playing' && this.player.alive && (this.player.dashCd || 0) > 0) {
+        const frac = 1 - this.player.dashCd / 2.5;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(174,240,255,0.8)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.player.x, this.player.y + 16, 10, -Math.PI / 2, -Math.PI / 2 + frac * TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
       if (this.bombActive) {
         const f = 1 - this.bombT / 0.9;
         ctx.strokeStyle = 'rgba(170,240,255,' + Math.max(0, 1 - f) + ')';

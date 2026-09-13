@@ -41,6 +41,7 @@
     if ((e.code === 'Enter' || e.code === 'Escape') && closeBox()) return;
     if (KEYMAP[e.code]) game.keys[KEYMAP[e.code]] = true;
     if (e.code === 'KeyK') game.tryBomb();
+    if (e.code === 'KeyX') game.playerDash();
     if (e.code === 'KeyM') AudioSys.toggleMute();
     if (e.code === 'KeyF') game.autoFire = !game.autoFire;
     if (e.code === 'KeyP' || e.code === 'Escape') game.togglePause();

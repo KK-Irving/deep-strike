@@ -465,6 +465,7 @@ class Player {
     this.shield = false; this.invuln = 2.2;
     this.chillT = 0; this._phaseT = 0; // 相位疾行:受击后短暂加速
     this.fireCd = 0; this.alive = true;
+    this.dashCd = 0; this.dashT = 0; this.dashVx = 0; this.dashVy = 0; // 闪避冲刺
     this.beamOn = false;
     this.engine = 0; this.showHitbox = false;
     // 肉鸽模组衍生数值(由 game._recalc 刷新)
@@ -479,11 +480,17 @@ class Player {
     if (k.right) dx += 1;
     if (k.up) dy -= 1;
     if (k.down) dy += 1;
+    // 闪避冲刺位移(优先于常规移动,冲刺期间由无敌帧保护)
+    if (this.dashT > 0) {
+      this.dashT -= dt;
+      this.x += this.dashVx * dt;
+      this.y += this.dashVy * dt;
+    }
     if (game.touch.active) {
       const f = Math.min(1, dt * 14);
       this.x += (game.touch.x - this.x) * f;
       this.y += (game.touch.y - this.y) * f;
-    } else if (dx || dy) {
+    } else if (dx || dy && this.dashT <= 0) {
       const len = Math.hypot(dx, dy);
       // 凝滞词缀:受击后移动迟缓
       const chill = this.chillT > 0 ? 0.6 : 1;
@@ -493,6 +500,7 @@ class Player {
     }
     this.chillT = Math.max(0, this.chillT - dt);
     this._phaseT = Math.max(0, this._phaseT - dt);
+    this.dashCd = Math.max(0, (this.dashCd || 0) - dt);
     this.x = clamp(this.x, 16, W - 16);
     this.y = clamp(this.y, 60, H - 22);
     this.showHitbox = !!k.slow;

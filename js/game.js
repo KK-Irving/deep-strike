@@ -375,6 +375,44 @@ class Game {
     if (this.mode === 'campaign') return 'campaign-' + (this.campaignChapter || 1);
     return this.mode === 'weekly' ? this._weekKey() : this._dailyKey();
   }
+  /* 闪避冲刺:沿当前移动方向短距位移 + 0.3s 无敌(冷却 2.5s) */
+  playerDash(dir) {
+    const p = this.player;
+    if (this.state !== 'playing' || !p.alive || (p.dashCd || 0) > 0 || p.dashT > 0) return false;
+    const k = this.keys;
+    let dx = (dir === 'left' || k.left) ? -1 : (dir === 'right' || k.right) ? 1 : 0;
+    let dy = (dir === 'up' || k.up) ? -1 : (dir === 'down' || k.down) ? 1 : 0;
+    if (!dx && !dy) dy = -1; // 无方向默认向上闪
+    const len = Math.hypot(dx, dy);
+    p.dashVx = dx / len * 1400;
+    p.dashVy = dy / len * 1400;
+    p.dashT = 0.18;
+    p.dashCd = 2.5;
+    p.invuln = Math.max(p.invuln, 0.3);
+    AudioSys.dash && AudioSys.dash();
+    this._sparks(p.x, p.y, '#aef0ff', 6);
+    return true;
+  }
+
+  /* 闪避冲刺:沿当前移动方向短距位移 + 0.3s 无敌(冷却 2.5s) */
+  playerDash(dir) {
+    const p = this.player;
+    if (this.state !== 'playing' || !p.alive || (p.dashCd || 0) > 0 || p.dashT > 0) return false;
+    const k = this.keys;
+    let dx = (dir === 'left' || k.left) ? -1 : (dir === 'right' || k.right) ? 1 : 0;
+    let dy = (dir === 'up' || k.up) ? -1 : (dir === 'down' || k.down) ? 1 : 0;
+    if (!dx && !dy) dy = -1; // 无方向默认向上闪
+    const len = Math.hypot(dx, dy);
+    p.dashVx = dx / len * 1400;
+    p.dashVy = dy / len * 1400;
+    p.dashT = 0.18;
+    p.dashCd = 2.5;
+    p.invuln = Math.max(p.invuln, 0.3);
+    AudioSys.dash && AudioSys.dash();
+    this._sparks(p.x, p.y, '#aef0ff', 6);
+    return true;
+  }
+
   /* 当前模式配置(模式统一基础层) */
   cfg() { return MODES[this.mode] || MODES.normal; }
   /* 是否种子挑战模式(由配置声明)——旗舰连战与普通模式使用真随机 */
