@@ -27,7 +27,7 @@ Object.assign(Game.prototype, {
       const threat = this.threatLevel();
       // 波次词缀:第 6 波起 40% 概率(BOSS 波与连战模式除外)
       this.waveMod = null;
-      if (this.mode !== 'boss' && n >= 6 && n % 5 !== 0 && RNG() < (this.mode === 'weekly' ? 0.7 : this.mode === 'mayhem' ? 0.6 : 0.4)) {
+      if (this.cfg().modChance > 0 && n >= 6 && n % 5 !== 0 && RNG() < this.cfg().modChance) {
         this.waveMod = WAVE_MODS[irand(0, WAVE_MODS.length - 1)];
       }
       // 环境参数:威胁与词缀共同作用于本波敌机
@@ -133,7 +133,7 @@ Object.assign(Game.prototype, {
       const hordeMul = this.waveMod && this.waveMod.id === 'horde' ? 1.4 : 1;
       // 新手曲线:前 3 波配额系数下调(对标竞品开局节奏);大乱斗出怪 +30%
       const quotaCoef = n <= 3 ? 0.5 : 0.65;
-      this.waveQuota = Math.max(1, Math.ceil(this.spawnQueue.length * quotaCoef * hordeMul * (this.mode === 'mayhem' ? 1.3 : 1)));
+      this.waveQuota = Math.max(1, Math.ceil(this.spawnQueue.length * quotaCoef * hordeMul * this.cfg().quotaMul));
       this.waveDeadline = 45 + n * 2; // 超时慈悲:开波 45s 后每 8s 配额 -1(最低 1),全波次启用防死锁
       this._mercyT = this.waveDeadline || 0;
       this.banner.sub = '目标:击坠 ' + this.waveQuota + ' 架敌机' + (this.waveDeadline ? '(超时将请求支援)' : '');

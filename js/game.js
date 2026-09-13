@@ -77,6 +77,29 @@ const CAMPAIGN_VARIANTS = ['flag', 'storm', 'tyrant', 'dread'];
 const CAMPAIGN_CHAPTERS = 10;
 const CAMPAIGN_STORE = 'deepstrike.campaign';
 
+/* ============================================================
+ * 模式统一基础层(v4.3.0):全部玩法共享同一套基础管线,
+ * 模式差异由本表声明式驱动,新增模式 = 加一行配置。
+ * seeded     按种子播种(出怪/抽卡跨设备一致)
+ * threat     威胁加成('chapter' = 随远征章节递增)
+ * modChance  波次词缀概率
+ * quotaMul   出怪配额倍率
+ * chips      战术芯片政策(null / 'daily' / 'weekly' / 'boss')
+ * starMul    结算星晶倍率
+ * scrap      旗舰残骸掉落
+ * demon      恶魔契约可触发
+ * firstDrop  首杀必掉火力道具
+ * noWaveRecord 不计入波次纪录(bestWave)
+ * ============================================================ */
+const MODES = {
+  normal:   { name: '无尽模式',   seeded: false, chips: null,    record: 'hi',          modChance: 0.4, quotaMul: 1,   threat: 0,        starMul: 1,   scrap: 1, demon: true,  firstDrop: true,  noWaveRecord: false },
+  daily:    { name: '每日挑战',   seeded: true,  chips: 'daily', record: 'dailyHi.',    modChance: 0.4, quotaMul: 1,   threat: 0,        starMul: 1,   scrap: 1, demon: true,  firstDrop: true,  noWaveRecord: false },
+  weekly:   { name: '周挑战',     seeded: true,  chips: 'weekly', record: 'weeklyHi.',  modChance: 0.7, quotaMul: 1,   threat: 1,        starMul: 1,   scrap: 1, demon: true,  firstDrop: true,  noWaveRecord: false },
+  boss:     { name: '旗舰连战',   seeded: false, chips: 'boss',  record: 'bossHi',      modChance: 0,   quotaMul: 1,   threat: 0,        starMul: 1,   scrap: 2, demon: false, firstDrop: false, noWaveRecord: true },
+  mayhem:   { name: '海克斯大乱斗', seeded: false, chips: null,  record: 'mayhemHi',    modChance: 0.6, quotaMul: 1.3, threat: 0,        starMul: 1.5, scrap: 1, demon: true,  firstDrop: true,  noWaveRecord: false },
+  campaign: { name: '深空远征',   seeded: true,  chips: null,    record: 'campaignHi.', modChance: 0.4, quotaMul: 1,   threat: 'chapter', starMul: 1,  scrap: 1, demon: true,  firstDrop: true,  noWaveRecord: false }
+};
+
 /* 无尽模式波次词缀:第 6 波起概率出现(BOSS 波除外) */
 const WAVE_MODS = [
   { id: 'horde',   icon: '✸', name: '狂潮', desc: '出怪配额 +40%' },
@@ -351,8 +374,10 @@ class Game {
     if (this.mode === 'campaign') return 'campaign-' + (this.campaignChapter || 1);
     return this.mode === 'weekly' ? this._weekKey() : this._dailyKey();
   }
-  /* 是否种子挑战模式(每日/周/章节战役)——旗舰连战与普通模式使用真随机 */
-  isChallenge() { return this.mode === 'daily' || this.mode === 'weekly' || this.mode === 'campaign'; }
+  /* 当前模式配置(模式统一基础层) */
+  cfg() { return MODES[this.mode] || MODES.normal; }
+  /* 是否种子挑战模式(由配置声明)——旗舰连战与普通模式使用真随机 */
+  isChallenge() { return !!this.cfg().seeded; }
   /* 周挑战全局变异:按周种子派生(加盐避免与出怪序列同流),本周固定且人人一致 */
   _weekMutator() {
     if (this.mode !== 'weekly') return null;
@@ -363,10 +388,10 @@ class Game {
   }
   /* 挑战芯片领取闸门:按当前真实日期/周判断本期是否已领取 */
   _claimStoreKey() {
-    return this.mode === 'weekly' ? 'deepstrike.weeklyClaim' : 'deepstrike.dailyClaim';
+    return this.cfg().chips === 'weekly' ? 'deepstrike.weeklyClaim' : 'deepstrike.dailyClaim';
   }
   _canClaimChips() {
-    if (this.mode === 'normal' || this.mode === 'campaign' || this.mode === 'mayhem') return false;
+    if (!this.cfg().chips) return false;
     try {
       const claimed = localStorage.getItem(this._claimStoreKey());
       return claimed !== this._challengeKey();
@@ -1453,7 +1478,7 @@ class Game {
       DailyTasks.bump('combo', this.combo, this);
     }
     // 成就
-    if (this.runKills === 1 && this.mode === 'normal' && !this._firstDropDone) {
+    if (this.cfg().firstDrop && !this._firstDropDone) {
       this._firstDropDone = true; // 首杀必掉火力:开局爽点(对标竞品开局掉落)
       this._dropPower(e.x, e.y, 'power');
     }
@@ -1588,7 +1613,7 @@ class Game {
       const a = i / 15 * TAU;
       this.orbs.push(new XPOrb(b.x + Math.cos(a) * 40, b.y + Math.sin(a) * 24, 4));
     }
-    Shop.addScrap(this.mode === 'boss' ? 2 : 1); // 旗舰残骸(改装件材料)
+    Shop.addScrap(this.cfg().scrap); // 旗舰残骸(改装件材料,配置驱动)
     // 深空远征:第 5 波旗舰击毁即章节结算
     if (this.mode === 'campaign' && this.wave === 5) {
       this._campKills += this.waveKills;
@@ -1597,7 +1622,7 @@ class Game {
       return;
     }
     // 恶魔契约:无伤击毁旗舰后 35% 概率现身(连战不叠加;待升级/遗物链结束后弹出)
-    if (this.mode !== 'boss' && this.waveDamageTaken === 0 && this.player.alive && this._devilRollHit())
+    if (this.cfg().demon && this.waveDamageTaken === 0 && this.player.alive && this._devilRollHit())
       this._devilPending = true;
   }
 
@@ -1949,7 +1974,7 @@ class Game {
     s.eliteKills = this._stat('eliteKills', 0) + this.runEliteKills;
     s.totalScore = this._stat('totalScore', 0) + this.score;
     if (s.totalScore >= 1000000) Ach.unlock('total_score_1m', this);
-    if (this.mode !== 'boss') s.bestWave = Math.max(this._stat('bestWave', 0), this.wave); // 连战阶段号不计波次线
+    if (!this.cfg().noWaveRecord) s.bestWave = Math.max(this._stat('bestWave', 0), this.wave); // 连战阶段号不计波次线(配置驱动)
     s.bestScore = Math.max(this._stat('bestScore', 0), this.score);
     s.bestRunKills = Math.max(this._stat('bestRunKills', 0), this.runKills);
     s.bestCombo = Math.max(this._stat('bestCombo', 0), this.maxCombo);
@@ -1974,7 +1999,7 @@ class Game {
     if (this.mods.pact) Shop.lastEarn = Math.round(Shop.lastEarn * (1 + 0.1 * this.mods.pact));
     if (this.hard) Shop.lastEarn = Math.round(Shop.lastEarn * 1.5);
     if (Shop.eraLv('eco1')) Shop.lastEarn = Math.round(Shop.lastEarn * 1.1); // 纪元·丰饶 I
-    if (this.mode === 'mayhem') Shop.lastEarn = Math.round(Shop.lastEarn * 1.5); // 大乱斗节奏福利
+    if (this.cfg().starMul !== 1) Shop.lastEarn = Math.round(Shop.lastEarn * this.cfg().starMul); // 模式星晶倍率(配置驱动)
     if (this.augments && this.augments.a_stone) Shop.lastEarn = Math.round(Shop.lastEarn * 2); // 「贤者之石」
     if (this.relics.r_grail) Shop.lastEarn *= 2;
     Shop.addCrystal(Shop.lastEarn);
