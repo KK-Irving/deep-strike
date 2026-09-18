@@ -76,7 +76,16 @@ const AudioSys = {
   },
 
   /* ---- 音效 ---- */
-  shoot()      { this.tone({ freq: 920, end: 240, dur: 0.07, type: 'square', vol: 0.05 }); },
+  /* 射击音色表:每条质变武器路线独立音色(参数化,零素材) */
+  SHOOT_TONES: {
+    gun:     { freq: 920,  end: 240,  dur: 0.07, type: 'square',    vol: 0.05 },
+    laser:   { freq: 1500, end: 860,  dur: 0.06, type: 'sawtooth',  vol: 0.045 },
+    spread:  { freq: 700,  end: 170,  dur: 0.06, type: 'square',    vol: 0.05 },
+    rail:    { freq: 180,  end: 1100, dur: 0.11, type: 'sawtooth',  vol: 0.07 },
+    tesla:   { freq: 1250, end: 380,  dur: 0.05, type: 'square',    vol: 0.055 },
+    boomer:  { freq: 480,  end: 720,  dur: 0.08, type: 'triangle',  vol: 0.06 }
+  },
+  shoot(name)  { this.tone(this.SHOOT_TONES[name || 'gun'] || this.SHOOT_TONES.gun); },
   enemyShoot() { this.tone({ freq: 300, end: 130, dur: 0.1, type: 'sawtooth', vol: 0.05 }); },
   hit()        { this.tone({ freq: 520, end: 300, dur: 0.05, type: 'triangle', vol: 0.08 }); },
   explode(big) {

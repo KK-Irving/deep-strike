@@ -571,6 +571,7 @@ class Player {
     const m = game.mods;
     const multiN = (m.multi || 0) + (game.evo.multi ? 1 : 0); // 万炮齐发:额外 +1 路
     const dmg = (1 + this.dmgBonus) * this.dmgMul;
+    let sfx = null; // 射击音色(按质变路线)
     const pierce = (m.pierce || 0) + (game.evo.pierce ? 2 : 0);
     const split = (m.split || 0) + ((game.shipDef && game.shipDef.perkSplit) || 0); // 裂片:机体天生裂变
     const mk = (ox, oy, vx, vy, extra) =>
@@ -663,7 +664,7 @@ class Player {
       mk(-5, 10, -70, 380, rearExtra);
       mk(5, 10, 70, 380, rearExtra);
     }
-    AudioSys.shoot();
+    AudioSys.shoot(m.railgun ? 'rail' : m.tesla ? 'tesla' : m.spread ? 'spread' : m.boomer ? 'boomer' : m.laser ? 'laser' : null);
   }
   _fireHoming(game) {
     const lvl = game.mods.homing;
