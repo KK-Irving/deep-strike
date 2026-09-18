@@ -267,5 +267,11 @@
 <script src="js/waves.js"></script>
 <script src="js/hud.js"></script>
 <script src="js/main.js"></script>
+  <script>
+    // PWA 离线:仅在 http(s) 环境注册(file:// 双击直玩不受影响)
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
 </body>
 </html>

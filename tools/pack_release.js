@@ -8,7 +8,7 @@ const ROOT = path.join(__dirname, '..');
 
 const ver = (fs.readFileSync(path.join(ROOT, 'js', 'version.js'), 'utf8').match(/v[\d.]+/) || ['v?'])[0];
 const dist = path.join(ROOT, 'dist', 'deep-strike-' + ver);
-const RUN_FILES = ['index.html', 'README.md', 'css', 'js'];
+const RUN_FILES = ['index.html', 'README.md', 'sw.js', 'css', 'js'];
 
 // 清理旧产物
 fs.rmSync(path.join(ROOT, 'dist'), { recursive: true, force: true });
