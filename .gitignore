@@ -9,3 +9,4 @@ tools/_shots/
 
 # E2E 运行日志(全量运行器输出)
 tools/_logs/
+dist/
