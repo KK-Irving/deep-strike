@@ -88,6 +88,25 @@ class Particle {
     ctx.fill();
   }
 }
+/* 粒子对象池(v4.5.1):预分配复用,消除压力场景 GC 尖峰 */
+const PARTICLE_POOL = [];
+function obtainParticle(x, y, vx, vy, life, size, color) {
+  for (let i = 0; i < PARTICLE_POOL.length; i++) {
+    const p = PARTICLE_POOL[i];
+    if (p.dead) {
+      p.dead = false; p.x = x; p.y = y; p.vx = vx; p.vy = vy;
+      p.life = life; p.max = life; p.size = size; p.color = color;
+      p.t = 0;
+      return p;
+    }
+  }
+  if (PARTICLE_POOL.length < 640) {
+    const p = new Particle(x, y, vx, vy, life, size, color);
+    PARTICLE_POOL.push(p);
+    return p;
+  }
+  return null;
+}
 
 class Ring {
   constructor(x, y, color, maxR = 90, life = 0.5) {

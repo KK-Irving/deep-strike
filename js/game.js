@@ -1954,7 +1954,8 @@ class Game {
   _sparks(x, y, color, n = 6) {
     for (let i = 0; i < n; i++) {
       const a = crand(0, TAU), sp = crand(60, 220);
-      this._addParticle(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, crand(0.15, 0.35), crand(1.5, 3), color));
+      const p = obtainParticle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, crand(0.15, 0.35), crand(1.5, 3), color);
+      if (p) this._addParticle(p);
     }
   }
 
@@ -1963,7 +1964,8 @@ class Game {
     for (let i = 0; i < n; i++) {
       const a = crand(0, TAU), sp = crand(30, 260) * scale;
       const c = Math.random() < 0.5 ? color : (Math.random() < 0.5 ? '#ffd166' : '#ff8c42');
-      this._addParticle(new Particle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, crand(0.3, 0.8) * scale, crand(1.5, 4) * scale, c));
+      const p = obtainParticle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, crand(0.3, 0.8) * scale, crand(1.5, 4) * scale, c);
+      if (p) this._addParticle(p);
     }
     this.rings.push(new Ring(x, y, color, (r + 20) * scale, 0.4));
   }
