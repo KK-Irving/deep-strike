@@ -27,7 +27,11 @@ Object.assign(Game.prototype, {
       const threat = this.threatLevel();
       // 波次词缀:第 6 波起 40% 概率(BOSS 波与连战模式除外)
       this.waveMod = null;
-      if (this.cfg().modChance > 0 && n >= 6 && n % 5 !== 0 && RNG() < this.cfg().modChance) {
+      // 无尽回廊:层号驱动固定词缀轮换(难度主题化,Phase 8.4)
+      if (this.mode === 'campaign' && (this.campaignChapter || 0) > CAMPAIGN_CHAPTERS) {
+        this.waveMod = WAVE_MODS[(this.campaignChapter - 11) % WAVE_MODS.length];
+      }
+      if (!this.waveMod && this.cfg().modChance > 0 && n >= 6 && n % 5 !== 0 && RNG() < this.cfg().modChance) {
         this.waveMod = WAVE_MODS[irand(0, WAVE_MODS.length - 1)];
       }
       // 环境参数:威胁与词缀共同作用于本波敌机
