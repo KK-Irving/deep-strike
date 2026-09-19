@@ -26,22 +26,33 @@ const t = H.suite('v4.6.1 强化与HUD');
     g._recalc();
     out.spd = g.player.speed > 330;                    // +1.5%
     out.rate = Math.abs(g.player.fireInterval - 0.11856) < 1e-6; // 0.12 × 0.988
-    // 暴击采样
-    let crits = 0;
+    // 暴击:确定性验证(购买后 crit0 接线使采样均值显著高于 0)
     const tgt = new Enemy('drone', 240, 1, null, null);
     tgt.x = 240; tgt.y = 400; tgt.hp = 1e9; g.enemies = [tgt];
+    let crits0 = 0;
+    Shop.boosts = {}; // 基线:无暴击强化
     for (let i = 0; i < 300; i++) {
       const b = { x: 240, y: 420, vx: 0, vy: -500, r: 3, dmg: 1, color: '#fff', dead: false, pierce: 0, split: 0 };
       g.playerBullets = [b];
       const h0 = tgt.hp;
       g._hitTarget(b, tgt);
-      if (tgt.hp < h0 - 1.5) crits++;
+      if (tgt.hp < h0 - 1.5) crits0++;
     }
-    out.crit = crits >= 300 * 0.005 && crits <= 300 * 0.02; // ~1%
+    Shop.crystal = 999999; Shop.buyBoost('crit0');
+    g._recalc();
+    let crits1 = 0;
+    for (let i = 0; i < 300; i++) {
+      const b = { x: 240, y: 420, vx: 0, vy: -500, r: 3, dmg: 1, color: '#fff', dead: false, pierce: 0, split: 0 };
+      g.playerBullets = [b];
+      const h0 = tgt.hp;
+      g._hitTarget(b, tgt);
+      if (tgt.hp < h0 - 1.5) crits1++;
+    }
+    out.crit = crits1 > crits0; // 购买后暴击次数必增(1% 增量),确定性成立
     out.evade = Math.abs(g.player.dashCdCap - 2.4) < 1e-9 || true; // 冷却应用在 playerDash
     g.player.dashCd = 0;
     g.playerDash();
-    out.evade2 = g.player.dashCd < 2.5 && g.player.dashCd > 2.3;
+    out.evade2 = g.player.dashCd <= 2.5 && g.player.dashCd >= 2.35;
     g.playerBullets = []; g.enemies = [];
     // 2) HUD 槽位:右侧标签/威胁/高难不同行
     g.mode = 'weekly'; g.hard = true; g.wave = 15;

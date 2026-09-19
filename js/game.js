@@ -406,7 +406,7 @@ class Game {
     AudioSys.bomb();
     // 天罚光柱流:金色光尘自天而降(剪影:自上而下,与 K 的放射护罩相反)
     for (let i = 0; i < 18; i++) {
-      const pt = obtainParticle(p.x + rand(-130, 130), p.y - rand(160, 330), rand(-15, 15), rand(420, 640), crand(0.35, 0.55), crand(1.8, 3), i % 2 ? '#ffd166' : '#fff2b0');
+      const pt = obtainParticle(p.x + crand(-130, 130), p.y - crand(160, 330), crand(-15, 15), crand(420, 640), crand(0.35, 0.55), crand(1.8, 3), i % 2 ? '#ffd166' : '#fff2b0');
       if (pt) this._addParticle(pt);
     }
     return true;
@@ -1323,7 +1323,7 @@ class Game {
         this.rings.push(new Ring(this.player.x, this.player.y, '#ff9a3c', 360, 0.5));
         this.flashT = Math.max(this.flashT, 0.08); this.flashColor = 'rgba(255,235,170,';
         for (let i = 0; i < 8; i++) {
-          const pt = obtainParticle(this.player.x + rand(-120, 120), this.player.y - rand(140, 300), rand(-10, 10), rand(380, 560), crand(0.3, 0.5), crand(1.6, 2.6), '#ffe98a');
+          const pt = obtainParticle(this.player.x + crand(-120, 120), this.player.y - crand(140, 300), crand(-10, 10), crand(380, 560), crand(0.3, 0.5), crand(1.6, 2.6), '#ffe98a');
           if (pt) this._addParticle(pt);
         }
         this.shake(6, 0.3);
@@ -1728,7 +1728,7 @@ class Game {
     while (xp > 0) {
       const v = Math.min(4, xp);
       xp -= v;
-      this.orbs.push(new XPOrb(e.x + rand(-10, 10), e.y + rand(-10, 10), v));
+      this.orbs.push(new XPOrb(e.x + crand(-10, 10), e.y + crand(-10, 10), v));
     }
     if (this.orbs.length > 140) {
       const overflow = this.orbs.splice(0, this.orbs.length - 140);
