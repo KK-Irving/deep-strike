@@ -2,7 +2,8 @@
 /* 深空突袭 Service Worker(v4.5.3,零依赖手写)
  * cache-first app shell:预缓存全部运行文件,安装后可完全离线游玩。
  * 版本化缓存名:发版后 activate 自动清理旧缓存。 */
-const CACHE = 'deep-strike-v4.5.3';
+// 缓存名由运行文件 js/version.js 动态派生:发版只改版本文件,SW 自动切换新缓存
+let CACHE = 'deep-strike-runtime';
 const SHELL = [
   './',
   './index.html',
@@ -24,7 +25,12 @@ const SHELL = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    fetch('./js/version.js')
+      .then((r) => r.text())
+      .then((t) => { const m = t.match(/v[\d.]+/); if (m) CACHE = 'deep-strike-' + m[0]; })
+      .then(() => caches.open(CACHE))
+      .then((c) => c.addAll(SHELL))
+      .then(() => self.skipWaiting())
   );
 });
 

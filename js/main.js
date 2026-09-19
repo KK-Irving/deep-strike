@@ -226,6 +226,16 @@
     game.tryBomb();
   }, { passive: false });
   document.body.addEventListener('touchstart', () => document.body.classList.add('touch-ui'), { once: true, passive: true });
+  $('btnDashT').addEventListener('touchstart', (e2) => {
+    e2.preventDefault();
+    AudioSys.init();
+    game.playerDash();
+  }, { passive: false });
+  $('btnOverT').addEventListener('touchstart', (e2) => {
+    e2.preventDefault();
+    AudioSys.init();
+    game.overloadBurst();
+  }, { passive: false });
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     AudioSys.init();

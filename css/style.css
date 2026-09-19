@@ -461,3 +461,17 @@ h2 {
 
 /* ---- 纪元天赋 ---- */
 .menu-btn.era-node.lit { border-color: rgba(81, 224, 138, 0.55); }
+
+/* ---- 触屏虚拟按钮(冲刺/过载) ---- */
+#touchExtra { display: none; }
+body.touch-ui #touchExtra {
+  display: flex; gap: 10px;
+  position: fixed; right: 12px; bottom: 92px; z-index: 30;
+}
+.touch-act {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(10, 20, 45, 0.55); color: #aef0ff;
+  border: 1.5px solid rgba(126, 243, 255, 0.5);
+  font-size: 20px; line-height: 1; cursor: pointer;
+}
+.touch-act:last-child { border-color: rgba(255, 209, 102, 0.6); color: #ffd166; }
