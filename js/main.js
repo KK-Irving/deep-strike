@@ -225,7 +225,12 @@
     AudioSys.init();
     game.tryBomb();
   }, { passive: false });
-  document.body.addEventListener('touchstart', () => document.body.classList.add('touch-ui'), { once: true, passive: true });
+  // 触屏 UI 状态持久化:曾用过触屏的设备直接启用,无需每次首触检测
+  if (localStorage.getItem('deepstrike.touch') === '1') document.body.classList.add('touch-ui');
+  document.body.addEventListener('touchstart', () => {
+    document.body.classList.add('touch-ui');
+    try { localStorage.setItem('deepstrike.touch', '1'); } catch (e2) { /* 忽略 */ }
+  }, { once: true, passive: true });
   $('btnDashT').addEventListener('touchstart', (e2) => {
     e2.preventDefault();
     AudioSys.init();

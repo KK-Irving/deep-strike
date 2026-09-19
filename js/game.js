@@ -417,7 +417,7 @@ class Game {
     p.dashT = 0.18;
     p.dashCd = 2.5;
     p.invuln = Math.max(p.invuln, 0.3);
-    AudioSys.dash && AudioSys.dash();
+    AudioSys.dash();
     this._sparks(p.x, p.y, '#aef0ff', 6);
     return true;
   }
@@ -1119,6 +1119,7 @@ class Game {
           b.grazed = true;
           this.grazeCount = (this.grazeCount || 0) + 1;
           this._sparks(b.x, b.y, '#ffe98a', 1);
+          AudioSys.graze && AudioSys.graze();
           if (this.grazeCount % 15 === 0 && this.player.bombs < this.bombCap()) {
             this.player.bombs++;
             this._addFloat(new FloatText(p0.x, p0.y - 34, '擦弹奖励 炸弹+1', '#ffe98a', 13));
@@ -1215,6 +1216,8 @@ class Game {
     this._collide();
 
     this._updateMercy(dt); // 超时慈悲:配额递减,消灭无限增援死锁
+    if (this.boss) this.boss.modFire = this.waveMod && this.waveMod.id === 'barrage' ? 0.7
+      : this.waveMod && this.waveMod.id === 'rage' ? 0.8 : 1; // 回廊词缀联动:火力节奏(Phase 8.4)
     this._updateWaveFlow(dt);
 
     // 玩家阵亡 → 延迟结算
@@ -1531,7 +1534,10 @@ class Game {
     if (this.relics.r_dice && RNG() < 0.10) this._dropPower(e.x, e.y);
     if (this.mode === 'campaign') { this._campPrevKills = this.waveKills; this._campPrevQuota = this.waveQuota; }
     this.stats.kills = this._stat('kills', 0) + 1;
-    this.overload = Math.min(100, (this.overload || 0) + 2); // 过载:击坠充能
+    const ovPrev = this.overload || 0;
+    this.overload = Math.min(100, ovPrev + 2); // 过载:击坠充能
+    if (Math.floor(ovPrev / 30) !== Math.floor(this.overload / 30) && this.overload < 100 && this.state === 'playing')
+      AudioSys.overloadHum && AudioSys.overloadHum(); // 蓄能里程碑低鸣(30/60/90)
     if (this.combo > this._stat('bestCombo', 0)) this.stats.bestCombo = this.combo;
     this._achEvaluate();
     this.waveKills++;
@@ -1922,7 +1928,10 @@ class Game {
    * 连战模式按虚拟波号(阶段 ×5)成长,与旗舰强度同步。 */
   enemyDmg(kind) {
     const w = this.mode === 'boss' ? this.wave * 5 : this.wave;
-    const base = 22 + Math.min(18, (w - 1) * 0.7) + this.threatLevel() * 2 + (this.hard ? 5 : 0);
+    let base = 22 + Math.min(18, (w - 1) * 0.7) + this.threatLevel() * 2 + (this.hard ? 5 : 0);
+    // 回廊词缀联动:钢铁 +25% / 狂暴 +20%(词缀从环境层延伸至弹幕伤害)
+    if (this.waveMod && this.waveMod.id === 'iron') base *= 1.25;
+    if (this.waveMod && this.waveMod.id === 'rage') base *= 1.2;
     return Math.round(base * (kind === 'orange' ? 1.15 : 1));
   }
 

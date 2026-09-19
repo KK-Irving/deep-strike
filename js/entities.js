@@ -707,22 +707,7 @@ class Player {
     if (blink) ctx.globalAlpha = 0.35;
     // 引擎火焰(随皮肤配色)
     const skin = typeof Shop !== 'undefined' ? Shop.skinSprite() : null;
-    const flame = skin ? skin.flame : ['rgba(120,230,255,0.9)', 'rgba(0,120,255,0)'];
-    const fl = 9 + Math.sin(this.engine) * 3;
-    // 火焰渐变缓存(固定最大长度,零每帧分配)
-    if (!this._flameGrad) {
-      this._flameGrad = ctx.createLinearGradient(0, 10, 0, 32);
-      this._flameGrad.addColorStop(0, flame[0]);
-      this._flameGrad.addColorStop(1, flame[1]);
-    }
-    ctx.fillStyle = this._flameGrad;
-    const flL = fl * (1 + Math.sin(this.engine * 2.7) * 0.18); // 左右独立抖动
-    const flR = fl * (1 + Math.sin(this.engine * 2.7 + 1.9) * 0.18);
-    for (const [sx, fl2] of [[-5.2, flL], [5.2, flR]]) {
-      ctx.beginPath();
-      ctx.moveTo(sx - 2.4, 11); ctx.lineTo(sx + 2.4, 11); ctx.lineTo(sx, 13 + fl2 + 5);
-      ctx.closePath(); ctx.fill();
-    }
+    this._drawFlame(ctx, skin ? skin.flame : ['rgba(120,230,255,0.9)', 'rgba(0,120,255,0)']);
     // 机体(预渲染精灵,应用当前机体造型与皮肤)
     const spr = (typeof Shop !== 'undefined') ? Shop.shipSprite() : (skin || SPRITES.player);
     ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
@@ -731,14 +716,7 @@ class Player {
     const fx = (typeof Shop !== 'undefined' && Shop.activeFx) ? Shop.activeFx() : null;
     if (fx && !blink) this._drawDazzle(ctx, fx);
     // 护盾
-    if (this.shield) {
-      const sc = skin ? skin.accent : '#5ac8ff';
-      ctx.strokeStyle = sc;
-      ctx.globalAlpha = 0.55 + Math.sin(this.engine * 0.6) * 0.25;
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(0, 0, 17, 0, TAU); ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
+    if (this.shield) this._drawShieldRing(ctx, skin);
     // 低速判定点
     if (this.showHitbox) {
       ctx.fillStyle = '#ffffff';
@@ -768,6 +746,34 @@ class Player {
     let g = this._dazzleGrads[k];
     if (!g) { g = make(ctx); this._dazzleGrads[k] = g; }
     return g;
+  }
+
+  /* 引擎火焰(v4.5.5 自 draw 拆出):双喷口分离火焰,渐变缓存 */
+  _drawFlame(ctx, flame) {
+    const fl = 9 + Math.sin(this.engine) * 3;
+    if (!this._flameGrad) {
+      this._flameGrad = ctx.createLinearGradient(0, 10, 0, 32);
+      this._flameGrad.addColorStop(0, flame[0]);
+      this._flameGrad.addColorStop(1, flame[1]);
+    }
+    ctx.fillStyle = this._flameGrad;
+    const flL = fl * (1 + Math.sin(this.engine * 2.7) * 0.18); // 左右独立抖动
+    const flR = fl * (1 + Math.sin(this.engine * 2.7 + 1.9) * 0.18);
+    for (const [sx, fl2] of [[-5.2, flL], [5.2, flR]]) {
+      ctx.beginPath();
+      ctx.moveTo(sx - 2.4, 11); ctx.lineTo(sx + 2.4, 11); ctx.lineTo(sx, 13 + fl2 + 5);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  /* 护盾环(v4.5.5 自 draw 拆出) */
+  _drawShieldRing(ctx, skin) {
+    const sc = skin ? skin.accent : '#5ac8ff';
+    ctx.strokeStyle = sc;
+    ctx.globalAlpha = 0.55 + Math.sin(this.engine * 0.6) * 0.25;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 17, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   _drawDazzle(ctx, fx) {
@@ -1159,7 +1165,7 @@ class Boss {
     this.t = 0; this.flash = 0; this.dead = false;
     this.state = 'enter';
     this.dir = 1;
-    this.fireCd = 1.2;
+    this.fireCd = 1.2 * (this.modFire || 1);
     this.score = (2500 + wave * 250) * (tyrant ? 1.5 : storm ? 1.25 : 1);
     this.escortCd = tyrant ? 4 : storm ? 4.5 : 6;
     this.phase = 0;
@@ -1218,7 +1224,7 @@ class Boss {
         game.enemyShot(x + pod.ox, y + pod.oy + 10, pa, 230 + Math.min(this.wave, 18) * 3, 'orange');
       }
       this.fireCd = (this.phase === 0 ? 1.0 : this.phase === 1 ? 0.9 : 0.75)
-        * (this.podsAlive() === 0 ? 1.3 : 1);
+        * (this.podsAlive() === 0 ? 1.3 : 1) * (this.modFire || 1);
       AudioSys.enemyShoot();
       return;
     }
@@ -1228,13 +1234,13 @@ class Boss {
         const a = game.aimedAngle(x, y);
         for (let i = -2; i <= 2; i++)
           game.enemyShot(x, y, a + i * 0.14, 230 + this.wave * 4, 'orange');
-        this.fireCd = 0.85;
+        this.fireCd = 0.85 * (this.modFire || 1);
       } else if (this.phase === 1) {
         // 三臂螺旋
         const a0 = this.t * 3.2;
         for (let i = 0; i < 3; i++)
           game.enemyShot(x, y, a0 + i * Math.PI * 2 / 3, 175);
-        this.fireCd = 0.12;
+        this.fireCd = 0.12 * (this.modFire || 1);
       } else {
         // 双向四臂螺旋 + 瞄准齐射
         const a = this.t * 4.6;
@@ -1246,7 +1252,7 @@ class Boss {
           for (let i = -1; i <= 1; i++)
             game.enemyShot(x, y, aim + i * 0.2, 240 + this.wave * 3);
         }
-        this.fireCd = 0.16;
+        this.fireCd = 0.16 * (this.modFire || 1);
       }
       AudioSys.enemyShoot();
       return;
@@ -1257,13 +1263,13 @@ class Boss {
         const a = game.aimedAngle(x, y);
         for (let i = -1; i <= 1; i++)
           game.enemyShot(x, y, a + i * 0.1, 240 + Math.min(this.wave, 18) * 4, 'orange');
-        this.fireCd = 0.8;
+        this.fireCd = 0.8 * (this.modFire || 1);
       } else if (this.phase === 1) {
         // 双臂旋转螺旋
         const n = 2, a0 = this.t * 3.6;
         for (let i = 0; i < n; i++)
           game.enemyShot(x, y, a0 + i * Math.PI, 165);
-        this.fireCd = 0.13;
+        this.fireCd = 0.13 * (this.modFire || 1);
       } else {
         // 四臂螺旋 + 周期性瞄准齐射
         const a = this.t * 4.2;
@@ -1275,7 +1281,7 @@ class Boss {
           for (let i = -1; i <= 1; i++)
             game.enemyShot(x, y, aim + i * 0.16, 220 + Math.min(this.wave, 18) * 3);
         }
-        this.fireCd = 0.18;
+        this.fireCd = 0.18 * (this.modFire || 1);
       }
       AudioSys.enemyShoot();
       return;
@@ -1284,19 +1290,19 @@ class Boss {
       const a = game.aimedAngle(x, y);
       for (let i = -1; i <= 1; i++)
         game.enemyShot(x, y, a + i * 0.18, 210 + Math.min(this.wave, 18) * 4, 'orange');
-      this.fireCd = 1.05;
+      this.fireCd = 1.05 * (this.modFire || 1);
     } else if (this.phase === 1) {
       const n = 16;
       for (let i = 0; i < n; i++)
         game.enemyShot(x, y, this.t + i / n * TAU, 135);
-      this.fireCd = 1.5;
+      this.fireCd = 1.5 * (this.modFire || 1);
     } else {
       const a = this.t * 4.2;
       game.enemyShot(x, y, a, 150);
       game.enemyShot(x, y, a + Math.PI / 2, 150);
       game.enemyShot(x, y, a + Math.PI, 150);
       game.enemyShot(x, y, a + Math.PI * 1.5, 150);
-      this.fireCd = 0.16;
+      this.fireCd = 0.16 * (this.modFire || 1);
     }
     AudioSys.enemyShoot();
   }
