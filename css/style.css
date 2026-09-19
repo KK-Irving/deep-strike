@@ -462,6 +462,17 @@ h2 {
 /* ---- 纪元天赋 ---- */
 .menu-btn.era-node.lit { border-color: rgba(81, 224, 138, 0.55); }
 
+/* ---- 进化卡:流光边框(质变视觉) ---- */
+.card.evo-card { position: relative; overflow: hidden; }
+.card.evo-card::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,240,190,0.35) 48%, rgba(255,255,255,0.6) 50%, rgba(255,240,190,0.35) 52%, transparent 70%);
+  background-size: 240% 100%;
+  animation: evoSheen 2.2s linear infinite;
+  pointer-events: none;
+}
+@keyframes evoSheen { from { background-position: 130% 0; } to { background-position: -130% 0; } }
+
 /* ---- 触屏虚拟按钮(冲刺/过载) ---- */
 #touchExtra { display: none; }
 body.touch-ui #touchExtra {

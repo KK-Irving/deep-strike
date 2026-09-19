@@ -86,6 +86,11 @@ const AudioSys = {
     boomer:  { freq: 480,  end: 720,  dur: 0.08, type: 'triangle',  vol: 0.06 }
   },
   shoot(name)  { this.tone(this.SHOOT_TONES[name || 'gun'] || this.SHOOT_TONES.gun); },
+  evolution()  {
+    this.tone({ freq: 70, end: 55, dur: 0.6, type: 'sine', vol: 0.25 });
+    [392, 523, 659, 784, 1047, 1319].forEach((f, i) =>
+      this.tone({ freq: f, dur: 0.12, type: 'triangle', vol: 0.14, delay: i * 0.08 }));
+  },
   graze()      { this.tone({ freq: 2100, end: 2600, dur: 0.05, type: 'sine',     vol: 0.05 }); },   // 擦弹"叮"
   dash()       { this.tone({ freq: 300,  end: 900,  dur: 0.09, type: 'sawtooth', vol: 0.06 }); },   // 冲刺"嗖"(上扫)
   overloadHum(){ this.tone({ freq: 70,   end: 55,   dur: 0.5,  type: 'sine',     vol: 0.22 }); },   // 过载"嗡"

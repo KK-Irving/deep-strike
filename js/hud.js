@@ -578,7 +578,8 @@ Object.assign(Game.prototype, {
       ctx.fillStyle = '#ffd166';
       ctx.font = 'bold 16px Consolas, monospace';
       ctx.fillText((this.mode === 'boss' ? 'STAGE ' : 'WAVE ') + this.wave, W - 14, 14);
-      // 关卡目标进度
+      // 关卡目标进度(右侧槽位化:y38 起每行 14px,避免模式标签/威胁/高难互叠)
+      let rs = 38; // 右列槽位游标
       const quotaMet = this.waveKills >= this.waveQuota;
       ctx.font = 'bold 12px Consolas, monospace';
       if (this.wave % 5 === 0) {
@@ -593,10 +594,10 @@ Object.assign(Game.prototype, {
         ctx.fillText('击坠 ' + this.waveKills + ' / ' + this.waveQuota, W - 14, 38);
       }
       if (AudioSys.muted) {
-        // 放在右列最下方(挑战标签 y54 / 威胁等级 y68 之下),避免与目标进度文字叠印
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.font = '12px sans-serif';
-        ctx.fillText('♪ OFF', W - 14, 82);
+        ctx.fillText('♪ OFF', W - 14, 38 + 16); // 目标行下
+        rs += 16;
       }
       // 挑战模式标识
       if (this.mode !== 'normal') {
@@ -604,20 +605,24 @@ Object.assign(Game.prototype, {
         const best = this.mode === 'boss' ? this._bossBest() : this.mode === 'campaign' ? this._challengeBest() : this.mode === 'mayhem' ? this._mayhemBest() : this._challengeBest();
         ctx.fillStyle = '#ffd166';
         ctx.font = 'bold 11px Consolas, monospace';
-        ctx.fillText(tagName + ' · 纪录 ' + best, W - 14, 54);
+        ctx.fillText(tagName + ' · 纪录 ' + best, W - 14, rs);
+        rs += 14;
       }
       // 无尽模式:威胁等级与波次词缀
       const threat = this.threatLevel();
       if (threat > 0) {
         ctx.fillStyle = 'rgba(255,120,140,0.9)';
         ctx.font = 'bold 11px Consolas, monospace';
-        ctx.fillText('⚡ 威胁等级 ' + threat, W - 14, this.mode !== 'normal' ? 68 : 54);
+        ctx.fillText('⚡ 威胁等级 ' + threat, W - 14, rs);
+        rs += 14;
       }
+      let ls = 54; // 左列槽位游标(38 是 HI 行)
       if (this.waveMod) {
         ctx.fillStyle = '#ffd166';
         ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(this.waveMod.icon + ' ' + this.waveMod.name + ' · ' + this.waveMod.desc, 14, 54);
+        ctx.fillText(this.waveMod.icon + ' ' + this.waveMod.name + ' · ' + this.waveMod.desc, 14, ls);
+        ls += 14;
       }
       // 限时增益倒计时
       const bt = [];
@@ -630,21 +635,22 @@ Object.assign(Game.prototype, {
         ctx.fillStyle = jamOnly ? '#b0ff5a' : '#c86bff';
         ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('✦ ' + bt.join(' · '), 14, 68);
+        ctx.fillText('✦ ' + bt.join(' · '), 14, ls);
+        ls += 14;
       }
       // 周挑战全局变异
       if (this._mut) {
         ctx.fillStyle = '#c86bff';
         ctx.font = 'bold 11px "Segoe UI", "Microsoft YaHei", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(this._mut.icon + ' 周变异·' + this._mut.name + ' · ' + this._mut.desc, 14, 82);
+        ctx.fillText(this._mut.icon + ' 周变异·' + this._mut.name + ' · ' + this._mut.desc, 14, ls);
       }
       // 高难模式标识
       if (this.hard) {
         ctx.fillStyle = '#ff5577';
         ctx.font = 'bold 11px Consolas, monospace';
         ctx.textAlign = 'right';
-        ctx.fillText('☠ 高难 ×1.5★', W - 14, 96);
+        ctx.fillText('☠ 高难 ×1.5★', W - 14, rs + 2);
       }
       // 生命条(数值化生命)
       {

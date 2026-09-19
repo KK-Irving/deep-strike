@@ -419,7 +419,7 @@ class Game {
     p.dashVx = dx / len * 1400;
     p.dashVy = dy / len * 1400;
     p.dashT = 0.18;
-    p.dashCd = 2.5;
+    p.dashCd = 2.5 - 0.1 * boostLevel('evade0'); // 相位引擎:冲刺冷却缩短
     p.invuln = Math.max(p.invuln, 0.3);
     AudioSys.dash();
     this._sparks(p.x, p.y, '#aef0ff', 6);
@@ -555,8 +555,9 @@ class Game {
     if (A.a_overclock) interval *= 0.85;
     if (A.a_urf) interval *= 0.65;
     if (Shop.eraLv('atk2')) interval *= 0.94; // 纪元·贯穿 II
+    interval *= 1 - 0.012 * boostLevel('rate0'); // 射频调谐
     p.fireInterval = Math.max(0.045, interval);
-    p.speed = (sh.speed || 330) * Math.pow(1.10, m.speed || 0) * (A.a_engine ? 1.2 : 1) * (E.speed ? 1.25 : 1);
+    p.speed = (sh.speed || 330) * Math.pow(1.10, m.speed || 0) * (A.a_engine ? 1.2 : 1) * (E.speed ? 1.25 : 1) * (1 + 0.015 * boostLevel('spd0')); // 推进矩阵
     p.magnetR = 140 + (sh.perkMagnet || 0) + (m.magnet || 0) * 45 + 18 * boostLevel('magnet0') + (Shop.eraLv('tec1') ? 30 : 0); // 纪元·机变 I
     if (E.magnet) p.magnetR *= 1.8;
     if (this.relics.r_magnet) p.magnetR *= 1.6;
@@ -910,7 +911,19 @@ class Game {
       if (this.runEvoCount >= 3) Ach.unlock('evo_3', this);
       if (this.runEvoCount >= 5) Ach.unlock('evo_5', this);
       if (this.runEvoCount >= 8) Ach.unlock('evo_8', this);
-      AudioSys.bond();
+      // 进化仪式:全屏金闪 + 双冲击环 + 粒子喷泉(质变时刻的演出)
+      AudioSys.evolution();
+      this.flashT = 0.45; this.flashColor = 'rgba(255,209,102,';
+      this.shake(8, 0.5);
+      const p0 = this.player;
+      this.rings.push(new Ring(p0.x, p0.y, '#ffd166', 260, 0.7));
+      this.rings.push(new Ring(p0.x, p0.y, '#fff6cf', 170, 0.5));
+      for (let i = 0; i < 30; i++) {
+        const ang = (i / 30) * TAU;
+        const sp = 150 + (i % 3) * 60;
+        const pt = obtainParticle(p0.x, p0.y, Math.cos(ang) * sp, Math.sin(ang) * sp - 120, crand(0.5, 0.9), crand(2, 3.5), i % 2 ? '#ffd166' : '#fff6cf');
+        if (pt) this._addParticle(pt);
+      }
       this.banner = { text: '✦ 进化 · ' + u.name, sub: u.desc, life: 3.0, max: 3.0, gold: true };
       this._recalc();
       this.pendingLevels--;
@@ -1471,7 +1484,7 @@ class Game {
   /* 单发子弹命中结算:暴击 / 贯穿 / 裂变 */
   _hitTarget(b, e) {
     let dmg = b.dmg;
-    let cc = 0.1 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0) + ((this.shipDef && this.shipDef.perkCrit) ? 0.1 : 0)
+    let cc = 0.1 * (this.mods.crit || 0) + (this.evo.crit ? 0.3 : 0) + (this.relics.r_hunter ? 0.1 : 0) + ((this.shipDef && this.shipDef.perkCrit) ? 0.1 : 0) + 0.01 * boostLevel('crit0')
       + (this.mods.brittle ? 0.3 : 0);
     // 虚空之刃:回旋刃暴击率 ×1.5
     if (b.boom && this.bonds.includes('voidedge')) cc *= 1.5;

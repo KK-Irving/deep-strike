@@ -712,6 +712,16 @@ class Player {
     const spr = (typeof Shop !== 'undefined') ? Shop.shipSprite() : (skin || SPRITES.player);
     ctx.drawImage(spr.body, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
     ctx.globalAlpha = 1;
+    // 进化标识:金色呼吸环(只要本局有任一进化)
+    if (game.runEvoCount > 0 && !blink) {
+      const er = 19 + Math.sin(this.engine * 2.2) * 1.6;
+      ctx.strokeStyle = 'rgba(255,209,102,0.55)';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([7, 5]);
+      ctx.lineDashOffset = -this.engine * 14;
+      ctx.beginPath(); ctx.arc(0, 0, er, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+    }
     // 绚丽机体/皮肤:逐帧动效(仅 tier3,明显区别于普通皮肤的静态描边)
     const fx = (typeof Shop !== 'undefined' && Shop.activeFx) ? Shop.activeFx() : null;
     if (fx && !blink) this._drawDazzle(ctx, fx);
