@@ -404,6 +404,11 @@ class Game {
     this.shake(10, 0.5);
     this._addFloat(new FloatText(p.x, p.y - 34, '⚡ 过载爆发!', '#ffd166', 16));
     AudioSys.bomb();
+    // 天罚光柱流:金色光尘自天而降(剪影:自上而下,与 K 的放射护罩相反)
+    for (let i = 0; i < 18; i++) {
+      const pt = obtainParticle(p.x + rand(-130, 130), p.y - rand(160, 330), rand(-15, 15), rand(420, 640), crand(0.35, 0.55), crand(1.8, 3), i % 2 ? '#ffd166' : '#fff2b0');
+      if (pt) this._addParticle(pt);
+    }
     return true;
   }
 
@@ -1316,6 +1321,11 @@ class Game {
         for (const en of this.enemies) if (!en.dead) en.damage(40, this, true);
         if (this.boss && this.boss.state === 'fight') this.boss.damage(20, this, true);
         this.rings.push(new Ring(this.player.x, this.player.y, '#ff9a3c', 360, 0.5));
+        this.flashT = Math.max(this.flashT, 0.08); this.flashColor = 'rgba(255,235,170,';
+        for (let i = 0; i < 8; i++) {
+          const pt = obtainParticle(this.player.x + rand(-120, 120), this.player.y - rand(140, 300), rand(-10, 10), rand(380, 560), crand(0.3, 0.5), crand(1.6, 2.6), '#ffe98a');
+          if (pt) this._addParticle(pt);
+        }
         this.shake(6, 0.3);
         AudioSys.explode(false);
       }
@@ -2024,7 +2034,14 @@ class Game {
         for (const pod of this.boss.pods)
           if (!pod.dead) this.boss.hitPod(pod, this.relics.r_dragon ? 12 : 5, this);
     }
-    this.rings.push(new Ring(p.x, p.y, '#aef3ff', nuke ? 480 : 300, 0.7));
+    this.rings.push(new Ring(p.x, p.y, '#ffffff', 90, 0.22));   // 白色核心闪环
+    this.rings.push(new Ring(p.x, p.y, '#dff6ff', 200, 0.42));  // 内层护罩
+    this.rings.push(new Ring(p.x, p.y, '#aef3ff', nuke ? 480 : 300, 0.7)); // 外层穹顶
+    for (let i = 0; i < 12; i++) {                              // 放射尘:水平扩散的冷色光尘
+      const ang = (i / 12) * Math.PI - Math.PI;                 // 上半圆
+      const pt = obtainParticle(p.x, p.y, Math.cos(ang) * 520, Math.sin(ang) * 220, crand(0.14, 0.2), 2, '#dff6ff');
+      if (pt) this._addParticle(pt);
+    }
   }
 
   /* ---------------- 子弹发射 ---------------- */
