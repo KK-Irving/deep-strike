@@ -288,6 +288,21 @@ Object.assign(Game.prototype, {
       skip.innerHTML = '▸ 跳过本次升级(暂存,稍后自动弹出)';
       skip.addEventListener('click', () => this.skipUpgrade());
       row.appendChild(skip);
+      // 刷新 / 放弃(每局有限次数,真实代价)
+      const util = document.createElement('div');
+      util.style.cssText = 'flex-basis:100%;display:flex;gap:8px;justify-content:center;margin-top:10px';
+      const rr = document.createElement('button');
+      rr.className = 'menu-btn';
+      rr.style.cssText = 'width:auto;padding:8px 16px;font-size:12.5px' + ((this.rerollLeft || 0) <= 0 ? ';opacity:0.4' : ';color:#7ef3ff');
+      rr.innerHTML = '↻ 刷新候选(剩 ' + (this.rerollLeft || 0) + ' 次)';
+      rr.addEventListener('click', () => this.rerollChoices());
+      const ab = document.createElement('button');
+      ab.className = 'menu-btn';
+      ab.style.cssText = 'width:auto;padding:8px 16px;font-size:12.5px' + ((this.abandonLeft || 0) <= 0 ? ';opacity:0.4' : ';color:#ff8fa5');
+      ab.innerHTML = '✕ 放弃升级(剩 ' + (this.abandonLeft || 0) + ' 次 · +150分+10★)';
+      ab.addEventListener('click', () => this.abandonUpgrade());
+      util.appendChild(rr); util.appendChild(ab);
+      row.appendChild(util);
       // XP 洪流出口:待选等级堆积时提供批量跳过(折算星晶与得分)
       if (this.pendingLevels > 3) {
         const skipAll = document.createElement('button');

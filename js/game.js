@@ -306,6 +306,8 @@ class Game {
     this._mercyAcc = 0;
     this.grazeCount = 0;
     this.overload = 0; // 过载能量 0~100
+    this.abandonLeft = 2; this.overloadPulse = 0; this.overloadPulseT = 0;  // 放弃次数(每局):丢失该次升级,换保底补偿
+    this.rerollLeft = 1;   // 刷新次数(每局):重抽当前三选一
     this._campKills = 0; this._campQuota = 0; this._campClean = true; this._campPrev = null; // 深空远征统计
     this._devilMode = false; this._devilChoices = []; this._devilPending = false;
     this.levelupCooldown = 0;
@@ -382,17 +384,19 @@ class Game {
     const p = this.player;
     if (this.state !== 'playing' || !p.alive || (this.overload || 0) < 100) return false;
     this.overload = 0;
-    this.buffs.frenzy = Math.max(this.buffs.frenzy, 5);
+    this.buffs.frenzy = Math.max(this.buffs.frenzy, 8);        // 狂热 8s(炸弹无增益)
+    this.overloadPulse = 3;                                     // 持续 3 段冲击波(能量释放的延续感)
+    this.overloadPulseT = 0;
     this.enemyBullets.length = 0;
     for (const en of this.enemies) {
       if (!en.dead) {
-        en.damage(30, this, true);
+        en.damage(60, this, true);                              // 炸弹 8~23 → 过载 60,质变级伤害
         this._sparks(en.x, en.y, '#ffd166', 3);
       }
     }
     if (this.boss && this.boss.state === 'fight') {
-      this.boss.damage(30, this, true);
-      if (this.boss.pods) for (const pod of this.boss.pods) if (!pod.dead) this.boss.hitPod(pod, 15, this);
+      this.boss.damage(60, this, true);
+      if (this.boss.pods) for (const pod of this.boss.pods) if (!pod.dead) this.boss.hitPod(pod, 25, this);
     }
     this.rings.push(new Ring(p.x, p.y, '#ffd166', 460, 0.8));
     this.rings.push(new Ring(p.x, p.y, '#ff9a3c', 300, 0.55));
@@ -800,6 +804,81 @@ class Game {
     this.score += n * 300;
     Shop.addCrystal(star);
     this._addFloat(new FloatText(this.player.x, this.player.y - 30, '批量跳过 ×' + n + ' · +' + (n * 300) + ' 分 +' + star + '★', '#ffd166', 13));
+    this.state = 'playing';
+    this._showState();
+  }
+
+  /* 刷新三选一:消耗每局 1 次的刷新机会,重抽当前候选(等级不丢) */
+  rerollChoices() {
+    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode || this._pendingSwap) return;
+    if ((this.rerollLeft || 0) <= 0) return;
+    this.rerollLeft--;
+    this._cardChoices = this._drawChoices();
+    AudioSys.levelup();
+    this._renderCards();
+  }
+  /* 放弃升级:丢失该次选择(与跳过不同:pendingLevels 真实 -1,不会回来),换保底补偿;每局限 2 次 */
+  abandonUpgrade() {
+    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode) return;
+    if ((this.abandonLeft || 0) <= 0 || this.pendingLevels <= 0) return;
+    this.abandonLeft--;
+    this.pendingLevels--;
+    this._cardChoices = [];
+    this._pendingSwap = null; this._swapList = null;
+    this.levelupCooldown = 3;
+    this.score += 150;
+    Shop.addCrystal(10);
+    this._addFloat(new FloatText(this.player.x, this.player.y - 30, '放弃升级 · +150 分 +10★(剩 ' + this.abandonLeft + ' 次)', '#9fe8ff', 12));
+    this.state = 'playing';
+    this._showState();
+  }
+
+  /* 刷新三选一:消耗每局 1 次的刷新机会,重抽当前候选(等级不丢) */
+  rerollChoices() {
+    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode || this._pendingSwap) return;
+    if ((this.rerollLeft || 0) <= 0) return;
+    this.rerollLeft--;
+    this._cardChoices = this._drawChoices();
+    AudioSys.levelup();
+    this._renderCards();
+  }
+  /* 放弃升级:丢失该次选择(与跳过不同:pendingLevels 真实 -1,不会回来),换保底补偿;每局限 2 次 */
+  abandonUpgrade() {
+    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode) return;
+    if ((this.abandonLeft || 0) <= 0 || this.pendingLevels <= 0) return;
+    this.abandonLeft--;
+    this.pendingLevels--;
+    this._cardChoices = [];
+    this._pendingSwap = null; this._swapList = null;
+    this.levelupCooldown = 3;
+    this.score += 150;
+    Shop.addCrystal(10);
+    this._addFloat(new FloatText(this.player.x, this.player.y - 30, '放弃升级 · +150 分 +10★(剩 ' + this.abandonLeft + ' 次)', '#9fe8ff', 12));
+    this.state = 'playing';
+    this._showState();
+  }
+
+  /* 刷新三选一:消耗每局 1 次的刷新机会,重抽当前候选(等级不丢) */
+  rerollChoices() {
+    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode || this._pendingSwap) return;
+    if ((this.rerollLeft || 0) <= 0) return;
+    this.rerollLeft--;
+    this._cardChoices = this._drawChoices();
+    AudioSys.levelup();
+    this._renderCards();
+  }
+  /* 放弃升级:丢失该次选择(pendingLevels 真实 -1 不会回来),换保底补偿;每局限 2 次 */
+  abandonUpgrade() {
+    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode) return;
+    if ((this.abandonLeft || 0) <= 0 || this.pendingLevels <= 0) return;
+    this.abandonLeft--;
+    this.pendingLevels--;
+    this._cardChoices = [];
+    this._pendingSwap = null; this._swapList = null;
+    this.levelupCooldown = 3;
+    this.score += 150;
+    Shop.addCrystal(10);
+    this._addFloat(new FloatText(this.player.x, this.player.y - 30, '放弃升级 · +150 分 +10★(剩 ' + this.abandonLeft + ' 次)', '#9fe8ff', 12));
     this.state = 'playing';
     this._showState();
   }
@@ -1215,7 +1294,20 @@ class Game {
 
     this._collide();
 
-    this._updateMercy(dt); // 超时慈悲:配额递减,消灭无限增援死锁
+    // 过载余波:3 段延迟冲击波(对普通敌机 40/段),能量持续释放
+    if ((this.overloadPulse || 0) > 0) {
+      this.overloadPulseT = (this.overloadPulseT || 0) + dt;
+      if (this.overloadPulseT >= 0.6) {
+        this.overloadPulseT = 0;
+        this.overloadPulse--;
+        for (const en of this.enemies) if (!en.dead) en.damage(40, this, true);
+        if (this.boss && this.boss.state === 'fight') this.boss.damage(20, this, true);
+        this.rings.push(new Ring(this.player.x, this.player.y, '#ff9a3c', 360, 0.5));
+        this.shake(6, 0.3);
+        AudioSys.explode(false);
+      }
+    }
+
     if (this.boss) this.boss.modFire = this.waveMod && this.waveMod.id === 'barrage' ? 0.7
       : this.waveMod && this.waveMod.id === 'rage' ? 0.8 : 1; // 回廊词缀联动:火力节奏(Phase 8.4)
     this._updateWaveFlow(dt);
