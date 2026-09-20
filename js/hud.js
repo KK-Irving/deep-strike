@@ -281,36 +281,28 @@ Object.assign(Game.prototype, {
         if (this.bonds.includes(b.id)) html += '<span class="chip bond" title="' + b.desc + '">羁绊·' + b.name + '</span>';
       }
       this._dom.ownRow.innerHTML = html || '<span class="chip">首次升级 · 选择你的成长路线</span>';
-      // 跳过按钮:暂存本次升级,稍后自动弹出
-      const skip = document.createElement('button');
-      skip.className = 'menu-btn';
-      skip.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center;margin-top:10px';
-      skip.innerHTML = '▸ 跳过本次升级(暂存,稍后自动弹出)';
-      skip.addEventListener('click', () => this.skipUpgrade());
-      row.appendChild(skip);
-      // 刷新 / 放弃(每局有限次数,真实代价)
+      // 刷新 / 放弃双按钮(有限次数,真实代价)
       const util = document.createElement('div');
       util.style.cssText = 'flex-basis:100%;display:flex;gap:8px;justify-content:center;margin-top:10px';
       const rr = document.createElement('button');
       rr.className = 'menu-btn';
       rr.style.cssText = 'width:auto;padding:8px 16px;font-size:12.5px' + ((this.rerollLeft || 0) <= 0 ? ';opacity:0.4' : ';color:#7ef3ff');
-      rr.innerHTML = '↻ 刷新候选(剩 ' + (this.rerollLeft || 0) + ' 次)';
+      rr.innerHTML = '↻ 刷新候选(剩 ' + (this.rerollLeft || 0) + ')';
       rr.addEventListener('click', () => this.rerollChoices());
       const ab = document.createElement('button');
       ab.className = 'menu-btn';
-      ab.style.cssText = 'width:auto;padding:8px 16px;font-size:12.5px' + ((this.abandonLeft || 0) <= 0 ? ';opacity:0.4' : ';color:#ff8fa5');
-      ab.innerHTML = '✕ 放弃升级(剩 ' + (this.abandonLeft || 0) + ' 次 · +150分+10★)';
-      ab.addEventListener('click', () => this.abandonUpgrade());
+      ab.style.cssText = 'width:auto;padding:8px 16px;font-size:12.5px;color:#ff8fa5' + ((this.abandonLeft || 0) <= 0 ? ';opacity:0.4' : '');
+      ab.innerHTML = '✕ 放弃升级(剩 ' + (this.abandonLeft || 0) + ' · +150分+10★)';
+      ab.addEventListener('click', () => { this.abandonUpgrade(); this._renderCards(); });
       util.appendChild(rr); util.appendChild(ab);
       row.appendChild(util);
-      // XP 洪流出口:待选等级堆积时提供批量跳过(折算星晶与得分)
-      if (this.pendingLevels > 3) {
-        const skipAll = document.createElement('button');
-        skipAll.className = 'menu-btn';
-        skipAll.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center;margin-top:6px;color:#ffd166';
-        skipAll.innerHTML = '▸ 全部跳过并折算(剩 ' + this.pendingLevels + ' 次 → 每次折算 300 分 + 20★)';
-        skipAll.addEventListener('click', () => this.skipAllLevels());
-        row.appendChild(skipAll);
+      if ((this.abandonLeft || 0) > 0 && this.pendingLevels > 3) {
+        const abAll = document.createElement('button');
+        abAll.className = 'menu-btn';
+        abAll.style.cssText = 'width:auto;padding:8px 22px;font-size:13px;flex-basis:100%;text-align:center;margin-top:6px;color:#ff8fa5';
+        abAll.innerHTML = '▸ 全部放弃并折算(剩 ' + this.abandonLeft + ' 次 → 每次 150 分 + 10★)';
+        abAll.addEventListener('click', () => this.abandonUpgrade());
+        row.appendChild(abAll);
       }
     },
     _renderRelics() {

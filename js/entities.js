@@ -1171,7 +1171,7 @@ class Boss {
     const storm = this.variant === 'storm', tyrant = this.variant === 'tyrant';
     this.x = W / 2; this.y = -90;
     this.r = 44;
-    this.maxHp = this.hp = (150 + wave * 45) * (tyrant ? 1.6 : storm ? 1.3 : 1);
+    this.maxHp = this.hp = (420 + wave * 110) * (tyrant ? 1.6 : storm ? 1.3 : 1);
     this.t = 0; this.flash = 0; this.dead = false;
     this.state = 'enter';
     this.dir = 1;
@@ -1206,12 +1206,47 @@ class Boss {
     this.phase = frac > 0.66 ? 0 : (frac > 0.33 ? 1 : 2);
     this.fireCd -= dt;
     if (this.fireCd <= 0) this._attack(game);
+    this.specialCd = (this.specialCd || 0) - dt;
+    if (this.specialCd <= 0 && this.state === 'fight') this._special(game);
     this.escortCd -= dt;
     if (this.phase >= 1 && this.escortCd <= 0) {
       this.escortCd = tyrant ? 4 : storm ? 5 : 6;
       game.enemies.push(new Enemy('drone', clamp(this.x - 60, 40, W - 40), game.wave, null, game._env));
       game.enemies.push(new Enemy('drone', clamp(this.x + 60, 40, W - 40), game.wave, null, game._env));
     }
+  }
+
+  /* 专属技能(v4.7.0):各变体独立大招 */
+  _special(game) {
+    const x = this.x, y = this.y + 26;
+    if (this.variant === 'flag') {
+      for (let ring = 0; ring < 2; ring++)
+        for (let i = 0; i < 18; i++)
+          game.enemyShot(x, y, i / 18 * TAU + ring * 0.17 + this.t * 0.5, 150 + ring * 40, ring ? 'orange' : 'pink');
+      this.specialCd = 5.5;
+    } else if (this.variant === 'storm') {
+      for (let i = 0; i < 3; i++) {
+        const cx = game.player.x + Math.cos(this.t * 2 + i * 2.1) * 130;
+        const cy = game.player.y - 180 + Math.sin(this.t * 1.7 + i * 1.4) * 40;
+        for (let k = 0; k < 4; k++)
+          game.enemyShot(cx + rand(-14, 14), cy, Math.PI / 2 + rand(-0.25, 0.25), 260, 'orange');
+      }
+      this.specialCd = 4.2;
+    } else if (this.variant === 'tyrant') {
+      const a = game.aimedAngle(x, y);
+      for (let i = 0; i < 6; i++)
+        game.enemyShot(x, y, a + (i - 2.5) * 0.07, 320 + this.wave * 3, 'orange');
+      this.specialCd = 3.4;
+    } else if (this.variant === 'dread') {
+      for (const pod of (this.pods || [])) {
+        if (pod.dead) continue;
+        const px = x + pod.ox, py = y + pod.oy;
+        for (let i = 0; i < 4; i++)
+          game.enemyShot(px, py, i / 4 * TAU + this.t, 190, 'orange');
+      }
+      this.specialCd = 3.8;
+    }
+    game.shake(4, 0.25);
   }
 
   _attack(game) {

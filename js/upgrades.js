@@ -49,7 +49,7 @@ const UPGRADES = [
   { id: 'glass',    icon: '💥', name: '玻璃大炮',   max: 5, rar: 2, curse: true, desc: '诅咒:所有伤害 +20%/级,生命上限 -8%/级' },
   { id: 'brittle',  icon: '🗡️', name: '脆刃',       max: 5, rar: 2, curse: true, desc: '诅咒:暴击率 +6%/级,受伤 ×(1+10%×等级)' },
   { id: 'pact',     icon: '📜', name: '贪婪契约',   max: 5, rar: 2, curse: true, desc: '诅咒:得分与星晶 +10%/级,敌弹速度 +3%/级' },
-  { id: 'slotplus', icon: '🧬', name: '基因扩展',   max: 5, rar: 2, desc: '隐藏卡:强化槽位 +1', hidden: true }
+  { id: 'slotplus', icon: '🧬', name: '基因扩展',   max: 2, rar: 2, desc: '隐藏卡:强化槽位 +1(最多 2 次)', hidden: true }
 ];
 
 /* 羁绊:同时拥有指定技能后觉醒,提供额外特效 */

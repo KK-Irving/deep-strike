@@ -307,7 +307,7 @@ class Game {
     this.grazeCount = 0;
     this.overload = 0; // 过载能量 0~100
     this.abandonLeft = 2; this.overloadPulse = 0; this.overloadPulseT = 0;  // 放弃次数(每局):丢失该次升级,换保底补偿
-    this.rerollLeft = 1;   // 刷新次数(每局):重抽当前三选一
+    this.rerollLeft = 0;   // 刷新次数:击败旗舰概率掉落(15%)
     this._campKills = 0; this._campQuota = 0; this._campClean = true; this._campPrev = null; // 深空远征统计
     this._devilMode = false; this._devilChoices = []; this._devilPending = false;
     this.levelupCooldown = 0;
@@ -581,6 +581,11 @@ class Game {
     if (A.a_chrono) this.bulletSlow *= 0.7; // 「时间领主」:敌弹永久减速 30%
     // 卡槽系统:基础 5 槽,隐藏卡扩展
     this.maxSlots = 5 + (m.slotplus || 0) + (E.slotplus ? 1 : 0); // 无限基因再 +1
+    // 基因扩展低概率掉落:满槽时 1%~3%(绚丽机体+皮肤各+1%,加算)
+    const rareCount = Object.keys((typeof Shop !== 'undefined' && Shop.ownedShip) || {}).filter(k => (SHIPS.find(x => x.id === k) || {}).rare).length
+      + Object.keys((typeof Shop !== 'undefined' && Shop.owned) || {}).filter(k => (SKINS.find(x => x.id === k) || {}).rare).length;
+    const ownedNow = UPGRADES.filter(u2 => !u2.hidden && (m[u2.id] || 0) > 0).length;
+    this.slotplusChance = (ownedNow >= this.maxSlots) ? Math.min(0.03, 0.01 * Math.max(1, rareCount)) : 0;
     // 生命值系统:上限 = 机体基础 + 卡片成长 + 等级成长(+泰坦血统 50 + 机库装甲扩容)
     const glassHp = m.glass ? (E.glass ? 1 - 0.04 * m.glass : 1 - 0.08 * m.glass) : 1; // 玻璃大炮:逐级 -8%,进化后惩罚减半
     p.maxHp = Math.round(((sh.hp || 100) + 20 * (m.vitality || 0) + 5 * (this.level - 1) + (E.vitality ? 50 : 0)
@@ -823,57 +828,7 @@ class Game {
     AudioSys.levelup();
     this._renderCards();
   }
-  /* 放弃升级:丢失该次选择(与跳过不同:pendingLevels 真实 -1,不会回来),换保底补偿;每局限 2 次 */
-  abandonUpgrade() {
-    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode) return;
-    if ((this.abandonLeft || 0) <= 0 || this.pendingLevels <= 0) return;
-    this.abandonLeft--;
-    this.pendingLevels--;
-    this._cardChoices = [];
-    this._pendingSwap = null; this._swapList = null;
-    this.levelupCooldown = 3;
-    this.score += 150;
-    Shop.addCrystal(10);
-    this._addFloat(new FloatText(this.player.x, this.player.y - 30, '放弃升级 · +150 分 +10★(剩 ' + this.abandonLeft + ' 次)', '#9fe8ff', 12));
-    this.state = 'playing';
-    this._showState();
-  }
-
-  /* 刷新三选一:消耗每局 1 次的刷新机会,重抽当前候选(等级不丢) */
-  rerollChoices() {
-    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode || this._pendingSwap) return;
-    if ((this.rerollLeft || 0) <= 0) return;
-    this.rerollLeft--;
-    this._cardChoices = this._drawChoices();
-    AudioSys.levelup();
-    this._renderCards();
-  }
-  /* 放弃升级:丢失该次选择(与跳过不同:pendingLevels 真实 -1,不会回来),换保底补偿;每局限 2 次 */
-  abandonUpgrade() {
-    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode) return;
-    if ((this.abandonLeft || 0) <= 0 || this.pendingLevels <= 0) return;
-    this.abandonLeft--;
-    this.pendingLevels--;
-    this._cardChoices = [];
-    this._pendingSwap = null; this._swapList = null;
-    this.levelupCooldown = 3;
-    this.score += 150;
-    Shop.addCrystal(10);
-    this._addFloat(new FloatText(this.player.x, this.player.y - 30, '放弃升级 · +150 分 +10★(剩 ' + this.abandonLeft + ' 次)', '#9fe8ff', 12));
-    this.state = 'playing';
-    this._showState();
-  }
-
-  /* 刷新三选一:消耗每局 1 次的刷新机会,重抽当前候选(等级不丢) */
-  rerollChoices() {
-    if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode || this._pendingSwap) return;
-    if ((this.rerollLeft || 0) <= 0) return;
-    this.rerollLeft--;
-    this._cardChoices = this._drawChoices();
-    AudioSys.levelup();
-    this._renderCards();
-  }
-  /* 放弃升级:丢失该次选择(pendingLevels 真实 -1 不会回来),换保底补偿;每局限 2 次 */
+  /* 放弃本次升级:真实丢失该次选择(不暂存,pendingLevels 真实 -1),换保底补偿;每局限 2 次 */
   abandonUpgrade() {
     if (this.state !== 'levelup' || this._relicMode || this._augMode || this._devilMode) return;
     if ((this.abandonLeft || 0) <= 0 || this.pendingLevels <= 0) return;
@@ -899,7 +854,6 @@ class Game {
     this.state = 'playing';
     this._showState();
     this._addFloat(new FloatText(this.player.x, this.player.y - 30, '升级已暂存,稍后自动弹出', '#9fe8ff', 12));
-    this._maybeDevil();
   }
 
   /* 满槽替换界面:展示已持有模块,点击丢弃 */
@@ -1802,6 +1756,10 @@ class Game {
     }
     Shop.addScrap(this.cfg().scrap); // 旗舰残骸(改装件材料,配置驱动)
     this.overload = Math.min(100, (this.overload || 0) + 20); // 过载:旗舰大量充能
+    if (RNG() < 0.15) {                                        // 15% 概率掉「刷新机会」
+      this.rerollLeft = (this.rerollLeft || 0) + 1;
+      this._addFloat(new FloatText(b.x, b.y - 60, '↻ 刷新机会 +1', '#7ef3ff', 13));
+    }
     // 深空远征:第 5 波旗舰击毁即章节结算
     if (this.mode === 'campaign' && this.wave === 5) {
       this._campKills += this.waveKills;
