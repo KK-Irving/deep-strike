@@ -23,7 +23,7 @@ const t = H.suite('5 级制与进化');
     const g = window.game;
     const out = {};
     // 1) 结构:全员 5 级、进化全覆盖
-    out.allMax5 = UPGRADES.every(u => u.max === 5);
+    out.allMax5 = UPGRADES.every(u => u.max === (u.id === 'slotplus' ? 2 : 5)); // 基因扩展 v4.7.0 上限改为 2
     out.evoCover = UPGRADES.every(u => EVOLUTIONS.some(e => e.base === u.id));
     out.evoUnique = new Set(EVOLUTIONS.map(e => e.base)).size === EVOLUTIONS.length;
     // 2) 满级卡不入池;满级且未进化 → 必注入进化
