@@ -1229,7 +1229,7 @@ class Boss {
         const cx = game.player.x + Math.cos(this.t * 2 + i * 2.1) * 130;
         const cy = game.player.y - 180 + Math.sin(this.t * 1.7 + i * 1.4) * 40;
         for (let k = 0; k < 4; k++)
-          game.enemyShot(cx + rand(-14, 14), cy, Math.PI / 2 + rand(-0.25, 0.25), 260, 'orange');
+          game.enemyShot(cx + crand(-14, 14), cy, Math.PI / 2 + crand(-0.25, 0.25), 260, 'orange');
       }
       this.specialCd = 4.2;
     } else if (this.variant === 'tyrant') {
